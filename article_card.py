@@ -11,9 +11,10 @@ from datetime import datetime
 def load_bilingual_txt(txt_file):
     article = {
         'title': '', 'original': '', 'translation': '',
-        'vocabulary': [], 'sentences': []
+        'en_zh': [], 'vocabulary': [], 'sentences': []
     }
     section = None
+    en_zh_buffer = []
 
     with open(txt_file, 'r', encoding='utf-8') as f:
         for line in f:
@@ -21,15 +22,22 @@ def load_bilingual_txt(txt_file):
             if line.startswith('TITLE:'):
                 article['title'] = line.replace('TITLE:', '').strip()
             elif line == '---':
+                if section == 'en_zh' and en_zh_buffer:
+                    article['en_zh'].append('\n'.join(en_zh_buffer))
+                    en_zh_buffer = []
                 section = None
             elif section == 'original':
                 article['original'] += line + '\n'
             elif section == 'translation':
                 article['translation'] += line + '\n'
+            elif section == 'en_zh':
+                en_zh_buffer.append(line)
             elif line == 'ORIGINAL:':
                 section = 'original'
             elif line == 'TRANSLATION:':
                 section = 'translation'
+            elif line == 'EN-ZH:':
+                section = 'en_zh'
             elif line == 'VOCABULARY:':
                 section = 'vocab'
             elif line == 'SENTENCES:':
@@ -125,16 +133,31 @@ def create_png(article, output_path):
     y += 30
     y += 20
     y += 45
-    for line in article['original'].split('\n'):
-        if line.strip():
-            for l in wrap_text(line, LINE_CHARS):
-                y += LINE_HEIGHT
-    y += 30
-    y += 45
-    for line in article['translation'].split('\n'):
-        if line.strip():
-            for l in wrap_text(line, LINE_CHARS_CN):
-                y += LINE_HEIGHT_CN
+
+    en_zh_pairs = article.get('en_zh', [])
+    if en_zh_pairs:
+        for pair in en_zh_pairs:
+            lines = pair.split('\n')
+            for line in lines:
+                if line.strip():
+                    if any('a' <= c <= 'z' or 'A' <= c <= 'Z' for c in line[:10]):
+                        for l in wrap_text(line, LINE_CHARS):
+                            y += LINE_HEIGHT
+                    else:
+                        for l in wrap_text(line, LINE_CHARS_CN):
+                            y += LINE_HEIGHT_CN
+            y += 20
+    else:
+        for line in article['original'].split('\n'):
+            if line.strip():
+                for l in wrap_text(line, LINE_CHARS):
+                    y += LINE_HEIGHT
+        y += 30
+        y += 45
+        for line in article['translation'].split('\n'):
+            if line.strip():
+                for l in wrap_text(line, LINE_CHARS_CN):
+                    y += LINE_HEIGHT_CN
     y += 30
     y += 45
 
@@ -424,6 +447,10 @@ def main():
         sys.exit(1)
 
     txt_file = sys.argv[1].replace('.txt', '') + '_trans.txt'
+    if not os.path.exists(txt_file):
+        print(f"错误: 文件不存在 {txt_file}")
+        print("请先生成翻译文件（包含 EN-ZH 区块）")
+        sys.exit(1)
     article = load_bilingual_txt(txt_file)
 
     base_name = os.path.splitext(txt_file)[0]
