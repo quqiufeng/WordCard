@@ -642,16 +642,21 @@ def main():
     parser.add_argument('input', help='输入文章文件')
     parser.add_argument('-o', '--output', default='./output', help='输出目录')
     parser.add_argument('-d', '--difficulty', default='intermediate', help='难度')
-    parser.add_argument('--step', choices=['translate', 'render', 'all'], default='all', 
-                       help='步骤: translate=翻译生成txt, render=从txt生成卡片, all=全部')
     
     args = parser.parse_args()
     
-    if args.step == 'translate':
-        step_translate(args.input, args.output, args.difficulty)
-    elif args.step == 'render':
+    input_path = Path(args.input)
+    output_path = Path(args.output) / input_path.stem
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    txt_file = output_path / f"{input_path.stem}.txt"
+    
+    if txt_file.exists():
+        print(f"检测到双语txt文件: {txt_file.name}")
+        print(f"跳过翻译，直接生成卡片...\n")
         step_render(args.input, args.output)
     else:
+        print(f"未检测到双语txt文件，开始翻译...\n")
         step_translate(args.input, args.output, args.difficulty)
         print("\n" + "="*50)
         print("翻译完成，现在生成卡片...")
