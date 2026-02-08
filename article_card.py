@@ -70,11 +70,7 @@ def translate_batch(translator, tokenizer, texts, target_lang='zho_Hans'):
         all_results.extend(batch_results)
         del encoded, input_ids
         torch.cuda.empty_cache()
-        
-        progress = min(i + batch_size, len(texts))
-        print(f"  翻译进度: {progress}/{len(texts)}", end='\r')
     
-    print(f"  翻译进度: {len(texts)}/{len(texts)} (100%)")
     all_results = [r.replace("<unk>", "").strip() for r in all_results]
     return all_results
 
@@ -514,10 +510,20 @@ def main():
         sentences = split_sentences(original)
         
         print("翻译词汇...")
-        vocab_list = [{'word': w, 'pos': get_pos(w), 'meaning': translate_batch(translator, tokenizer, [w], target_lang='zho_Hans')[0], 'example': f'This word is {w}.'} for w in words]
+        vocab_list = []
+        for i, w in enumerate(words):
+            trans = translate_batch(translator, tokenizer, [w], target_lang='zho_Hans')[0]
+            vocab_list.append({'word': w, 'pos': get_pos(w), 'meaning': trans, 'example': f'This word is {w}.'})
+            print(f"  词汇: {i+1}/{len(words)}", end='\r')
+        print(f"  词汇: {len(words)}/{len(words)} (完成)")
         
         print("翻译句子...")
-        sent_list = [{'original': s, 'translation': translate_batch(translator, tokenizer, [s], target_lang='zho_Hans')[0]} for s in sentences]
+        sent_list = []
+        for i, s in enumerate(sentences):
+            trans = translate_batch(translator, tokenizer, [s], target_lang='zho_Hans')[0]
+            sent_list.append({'original': s, 'translation': trans})
+            print(f"  句子: {i+1}/{len(sentences)}", end='\r')
+        print(f"  句子: {len(sentences)}/{len(sentences)} (完成)")
         
         cleanup_translator(translator, tokenizer)
         
