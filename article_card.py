@@ -274,8 +274,10 @@ def create_md(article, output_path):
 
 ---
 
-    ## 词汇表
+## 词汇表
 
+| English (120) | Chinese (80) | English (120) | Chinese (80) |
+|---------------|--------------|---------------|--------------|
 """
 
     vocab = article['vocabulary']
@@ -283,28 +285,19 @@ def create_md(article, output_path):
     left_col = vocab[:half]
     right_col = vocab[half:]
 
-    col_width = 260
-    word_slot = 120
-
     for i in range(len(left_col)):
         left_v = left_col[i]
         right_v = right_col[i] if i < len(right_col) else None
 
-        left_1 = left_v['word'].ljust(word_slot)
-        left_line = f"|{left_1} {left_v['meaning']}"
+        left_word = left_v['word'][:118]
+        left_mean = left_v['meaning'][:78]
 
         if right_v:
-            right_1 = right_v['word'].ljust(word_slot)
-            content += f"{left_line} {right_1} {right_v['meaning']} |\n"
+            right_word = right_v['word'][:118]
+            right_mean = right_v['meaning'][:78]
+            content += f"| {left_word:<118} | {left_mean:<78} | {right_word:<118} | {right_mean:<78} |\n"
         else:
-            content += f"{left_line} {' ' * col_width} |\n"
-
-    content += """
----
-
-## 精彩句子
-
-"""
+            content += f"| {left_word:<118} | {left_mean:<78} |                      |                      |\n"
 
     for i, s in enumerate(article['sentences'], 1):
         content += f"> **{s['original']}**\n>\n> {s['translation']}\n\n"
