@@ -156,6 +156,7 @@ def create_png(article, output_path):
             left_y += len(meaning_lines) * LINE_HEIGHT_CN
         else:
             left_y += LINE_HEIGHT_CN
+        left_y += 10
 
     for i in range(len(right_col)):
         v = right_col[i]
@@ -165,6 +166,7 @@ def create_png(article, output_path):
             right_y += len(meaning_lines) * LINE_HEIGHT_CN
         else:
             right_y += LINE_HEIGHT_CN
+        right_y += 10
 
     y = max(left_y, right_y) + 10
     y += 30
