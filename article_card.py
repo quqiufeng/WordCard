@@ -254,8 +254,8 @@ def save_pdf(article, base_path):
         pdf.add_font("LXGW", "", "LXGWWenKaiMono-Light.ttf", uni=True)
         
         pdf.set_font("LXGW", size=16)
-        pdf.cell(0, 10, article['title'], align="C", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(5)
+        pdf.cell(0, 10, article['title'], align="C")
+        pdf.ln(10)
         
         pdf.set_font("LXGW", size=9)
         pdf.cell(0, 5, f"难度: {article['difficulty']} | 词数: {article['word_count']}", align="C")
@@ -266,9 +266,9 @@ def save_pdf(article, base_path):
         pdf.add_page()
         pdf.set_font("LXGW", size=12)
         pdf.cell(0, 8, "原文")
-        pdf.ln(5)
+        pdf.ln(8)
         pdf.line(10, pdf.get_y(), 80, pdf.get_y())
-        pdf.ln(3)
+        pdf.ln(5)
         
         pdf.set_font("LXGW", size=9)
         original_text = article['original'].replace('\n', ' ')[:800]
@@ -277,9 +277,9 @@ def save_pdf(article, base_path):
         pdf.add_page()
         pdf.set_font("LXGW", size=12)
         pdf.cell(0, 8, "译文")
-        pdf.ln(5)
+        pdf.ln(8)
         pdf.line(10, pdf.get_y(), 80, pdf.get_y())
-        pdf.ln(3)
+        pdf.ln(5)
         
         pdf.set_font("LXGW", size=9)
         trans_text = article['translation'].replace('\n', ' ')[:800]
@@ -288,9 +288,9 @@ def save_pdf(article, base_path):
         pdf.add_page()
         pdf.set_font("LXGW", size=12)
         pdf.cell(0, 8, f"词汇表 ({len(article['vocabulary'])}词)")
-        pdf.ln(5)
+        pdf.ln(8)
         pdf.line(10, pdf.get_y(), 80, pdf.get_y())
-        pdf.ln(3)
+        pdf.ln(5)
         
         pdf.set_font("LXGW", size=8)
         for v in article['vocabulary'][:18]:
@@ -298,16 +298,16 @@ def save_pdf(article, base_path):
             pdf.cell(25, 5, v['word'])
             pdf.set_font("LXGW", size=8)
             pdf.cell(15, 5, f"({v['pos']})")
-            pdf.ln(4)
+            pdf.ln(5)
             pdf.multi_cell(0, 4, v['meaning'])
-            pdf.ln(1)
+            pdf.ln(2)
         
         pdf.add_page()
         pdf.set_font("LXGW", size=12)
         pdf.cell(0, 8, "精彩句子")
-        pdf.ln(5)
+        pdf.ln(8)
         pdf.line(10, pdf.get_y(), 80, pdf.get_y())
-        pdf.ln(3)
+        pdf.ln(5)
         
         pdf.set_font("LXGW", size=8)
         for i, s in enumerate(article['sentences'][:6], 1):
@@ -326,79 +326,153 @@ def save_pdf(article, base_path):
         return pdf_file
         
     except Exception as e:
-        print(f"   pdf: 跳过 ({e})")
+        print(f"   pdf: 跳过")
+        import traceback
+        traceback.print_exc()
         return None
 
 def save_png(article, base_path):
-    cards_dir = str(base_path) + '_cards'
-    os.makedirs(cards_dir, exist_ok=True)
+    png_file = str(base_path) + '_card.png'
     
     try:
         from PIL import Image, ImageDraw, ImageFont
         
-        def text_wrap_pil(text, max_width, font):
-            lines = []
+        CARD_WIDTH = 375
+        
+        try:
+            font_title = ImageFont.truetype(FONT_PATH, 28)
+            font_header = ImageFont.truetype(FONT_PATH, 16)
+            font_section = ImageFont.truetype(FONT_PATH, 18)
+            font_text = ImageFont.truetype(FONT_PATH, 14)
+            font_small = ImageFont.truetype(FONT_PATH, 12)
+        except:
+            font_title = ImageFont.load_default()
+            font_header = ImageFont.load_default()
+            font_section = ImageFont.load_default()
+            font_text = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+        
+        def wrap_text(text, max_width, font, draw):
             words = text.split()
-            current_line = ""
+            lines = []
+            current = ""
             for word in words:
-                test_line = current_line + " " + word if current_line else word
-                bbox = font.getbbox(test_line)
-                if bbox[2] - bbox[0] <= max_width - 40:
-                    current_line = test_line
+                test = current + " " + word if current else word
+                bbox = font.getbbox(test)
+                if bbox[2] - bbox[0] <= max_width - 60:
+                    current = test
                 else:
-                    if current_line:
-                        lines.append(current_line)
-                    current_line = word
-            if current_line:
-                lines.append(current_line)
+                    if current:
+                        lines.append(current)
+                    current = word
+            if current:
+                lines.append(current)
             return lines
         
-        def draw_card(texts, filename, title=""):
-            img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), COLORS['bg'])
-            draw = ImageDraw.Draw(img)
-            try:
-                font_title = ImageFont.truetype(FONT_PATH, 28)
-                font_header = ImageFont.truetype(FONT_PATH, 16)
-                font_text = ImageFont.truetype(FONT_PATH, 14)
-                font_small = ImageFont.truetype(FONT_PATH, 12)
-            except:
-                font_title = ImageFont.load_default()
-                font_header = ImageFont.load_default()
-                font_text = ImageFont.load_default()
-                font_small = ImageFont.load_default()
-            
-            draw.text((20, 20), "WordCard", font=font_header, fill=COLORS['accent'])
-            if title:
-                bbox = font_title.getbbox(title)
-                draw.text(((CARD_WIDTH - (bbox[2] - bbox[0])) // 2, 50), title, font=font_title, fill=COLORS['title'])
-            
-            y = 90
-            for text in texts:
-                lines = text_wrap_pil(text, CARD_WIDTH - 60, font_text)
-                for line in lines:
-                    if y > CARD_HEIGHT - 40:
-                        break
-                    bbox = font_text.getbbox(line)
-                    draw.text((40, y), line, font=font_text, fill=COLORS['text'])
-                    y += bbox[3] - bbox[1] + 8
-            
-            draw.text((CARD_WIDTH - 80, CARD_HEIGHT - 25), filename.split('.')[0], font=font_small, fill=COLORS['translation'])
-            img.save(cards_dir + '/' + filename)
-            print(f"   {filename}: {cards_dir}/{filename}")
+        def get_text_height(lines, font):
+            h = 0
+            for line in lines:
+                bbox = font.getbbox(line)
+                h += bbox[3] - bbox[1] + 6
+            return h
         
-        cover_texts = [f"难度: {article['difficulty']}", f"单词数: {article['word_count']}", 
-                      f"词汇: {len(article['vocabulary'])}个", f"句子: {len(article['sentences'])}句"]
-        draw_card(cover_texts, '01_cover.png', article['title'])
+        content_width = CARD_WIDTH - 60
         
-        vocab_texts = [f"{v['word']} ({v['pos']}) - {v['meaning']}" for v in article['vocabulary'][:10]]
-        draw_card(vocab_texts, '02_vocab.png', "词汇表")
+        title_h = 100
+        meta_h = 60
+        vocab_h = len(article['vocabulary'][:12]) * 55
+        sent_h = len(article['sentences'][:4]) * 90
         
-        sentence_texts = [f"{i}. {s['original'][:50]}..." for i, s in enumerate(article['sentences'][:5], 1)]
-        draw_card(sentence_texts, '03_sentences.png', "精彩句子")
+        orig_lines = wrap_text(article['original'][:400], content_width, font_text, None)
+        orig_h = get_text_height(orig_lines, font_text) + 50
         
-        return cards_dir
+        trans_lines = wrap_text(article['translation'][:400], content_width, font_text, None)
+        trans_h = get_text_height(trans_lines, font_text) + 50
+        
+        CARD_HEIGHT = title_h + meta_h + orig_h + trans_h + vocab_h + sent_h + 150
+        CARD_HEIGHT = int(CARD_HEIGHT)
+        
+        vocab_h = len(article['vocabulary'][:12]) * 50
+        sent_h = len(article['sentences'][:4]) * 80
+        
+        CARD_HEIGHT = int(CARD_HEIGHT)
+        
+        img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), COLORS['bg'])
+        draw = ImageDraw.Draw(img)
+        
+        draw.text((20, 20), "WordCard", font=font_header, fill=COLORS['accent'])
+        
+        bbox = font_title.getbbox(article['title'])
+        draw.text(((CARD_WIDTH - (bbox[2] - bbox[0])) // 2, 50), article['title'], font=font_title, fill=COLORS['title'])
+        
+        y = 110
+        draw.text((60, y), f"难度: {article['difficulty']}", font=font_small, fill=COLORS['translation'])
+        y += 18
+        draw.text((60, y), f"词数: {article['word_count']}", font=font_small, fill=COLORS['translation'])
+        y += 18
+        draw.text((60, y), f"词汇: {len(article['vocabulary'])}个  句子: {len(article['sentences'])}句", font=font_small, fill=COLORS['translation'])
+        
+        y += 30
+        draw.text((20, y), "原文", font=font_section, fill=COLORS['accent'])
+        y += 25
+        for line in orig_lines:
+            bbox = font_text.getbbox(line)
+            draw.text((40, y), line, font=font_text, fill=COLORS['text'])
+            y += bbox[3] - bbox[1] + 6
+        
+        y += 30
+        draw.text((20, y), "译文", font=font_section, fill=COLORS['accent'])
+        y += 25
+        for line in trans_lines:
+            bbox = font_text.getbbox(line)
+            draw.text((40, y), line, font=font_text, fill=COLORS['text'])
+            y += bbox[3] - bbox[1] + 6
+        
+        y += 30
+        draw.text((20, y), f"词汇表 ({len(article['vocabulary'])}词)", font=font_section, fill=COLORS['accent'])
+        y += 25
+        for v in article['vocabulary'][:12]:
+            draw.text((40, y), v['word'], font=font_text, fill=COLORS['highlight'])
+            bbox = font_text.getbbox(v['word'])
+            draw.text((40 + bbox[2] + 10, y), f"({v['pos']})", font=font_small, fill=COLORS['accent'])
+            y += 18
+            meaning_lines = wrap_text(v['meaning'], content_width - 20, font_small, None)
+            for ml in meaning_lines:
+                mb = font_small.getbbox(ml)
+                draw.text((50, y), ml, font=font_small, fill=COLORS['translation'])
+                y += mb[3] - mb[1] + 4
+            y += 8
+        
+        y += 30
+        draw.text((20, y), "精彩句子", font=font_section, fill=COLORS['accent'])
+        y += 25
+        for i, s in enumerate(article['sentences'][:4], 1):
+            draw.text((40, y), f"{i}.", font=font_text, fill=COLORS['text'])
+            y += 20
+            sent_lines = wrap_text(s['original'][:60], content_width - 30, font_text, None)
+            for sl in sent_lines:
+                sb = font_text.getbbox(sl)
+                draw.text((55, y), sl, font=font_text, fill=COLORS['text'])
+                y += sb[3] - sb[1] + 4
+            y += 5
+            trans_lines = wrap_text(s['translation'][:60], content_width - 30, font_small, None)
+            for tl in trans_lines:
+                tb = font_small.getbbox(tl)
+                draw.text((55, y), tl, font=font_small, fill=COLORS['translation'])
+                y += tb[3] - tb[1] + 4
+            y += 15
+        
+        img.save(png_file)
+        print(f"   png: {png_file}")
+        return png_file
+        
     except ImportError:
         print(f"   png: 跳过 (pip install pillow)")
+        return None
+    except Exception as e:
+        print(f"   png: 跳过")
+        import traceback
+        traceback.print_exc()
         return None
 
 def main():
