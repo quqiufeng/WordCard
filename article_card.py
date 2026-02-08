@@ -258,12 +258,15 @@ def save_pdf(article, base_path):
         pdf.ln(5)
         
         pdf.set_font("LXGW", size=9)
-        pdf.cell(0, 5, f"难度: {article['difficulty']} | 词数: {article['word_count']}", align="C", new_x="LMARGIN", new_y="NEXT")
-        pdf.cell(0, 5, f"词汇: {len(article['vocabulary'])}个 | 句子: {len(article['sentences'])}句", align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 5, f"难度: {article['difficulty']} | 词数: {article['word_count']}", align="C")
+        pdf.ln(5)
+        pdf.cell(0, 5, f"词汇: {len(article['vocabulary'])}个 | 句子: {len(article['sentences'])}句", align="C")
+        pdf.ln(10)
         
         pdf.add_page()
         pdf.set_font("LXGW", size=12)
-        pdf.cell(0, 8, "原文", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 8, "原文")
+        pdf.ln(5)
         pdf.line(10, pdf.get_y(), 80, pdf.get_y())
         pdf.ln(3)
         
@@ -273,7 +276,8 @@ def save_pdf(article, base_path):
         
         pdf.add_page()
         pdf.set_font("LXGW", size=12)
-        pdf.cell(0, 8, "译文", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 8, "译文")
+        pdf.ln(5)
         pdf.line(10, pdf.get_y(), 80, pdf.get_y())
         pdf.ln(3)
         
@@ -283,30 +287,33 @@ def save_pdf(article, base_path):
         
         pdf.add_page()
         pdf.set_font("LXGW", size=12)
-        pdf.cell(0, 8, f"词汇表 ({len(article['vocabulary'])}词)", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 8, f"词汇表 ({len(article['vocabulary'])}词)")
+        pdf.ln(5)
         pdf.line(10, pdf.get_y(), 80, pdf.get_y())
         pdf.ln(3)
         
         pdf.set_font("LXGW", size=8)
         for v in article['vocabulary'][:18]:
             pdf.set_font("LXGW", size=9)
-            pdf.cell(25, 5, v['word'], 0, 0, "L")
+            pdf.cell(25, 5, v['word'])
             pdf.set_font("LXGW", size=8)
-            pdf.cell(15, 5, f"({v['pos']})", 0, 0, "L")
+            pdf.cell(15, 5, f"({v['pos']})")
             pdf.ln(4)
             pdf.multi_cell(0, 4, v['meaning'])
             pdf.ln(1)
         
         pdf.add_page()
         pdf.set_font("LXGW", size=12)
-        pdf.cell(0, 8, "精彩句子", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 8, "精彩句子")
+        pdf.ln(5)
         pdf.line(10, pdf.get_y(), 80, pdf.get_y())
         pdf.ln(3)
         
         pdf.set_font("LXGW", size=8)
         for i, s in enumerate(article['sentences'][:6], 1):
             pdf.set_font("LXGW", size=9)
-            pdf.cell(0, 5, f"{i}.", new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 5, f"{i}.")
+            pdf.ln(5)
             pdf.multi_cell(0, 4, s['original'][:80])
             pdf.set_font("LXGW", size=8)
             pdf.set_text_color(100, 100, 100)
