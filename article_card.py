@@ -234,65 +234,97 @@ def save_md(article, base_path):
 
 def save_pdf(article, base_path):
     pdf_file = str(base_path) + '.pdf'
+    
     try:
-        from weasyprint import HTML
-        pdf_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>{article['title']}</title>
-    <style>
-        @font-face {{ font-family: 'LXGW'; src: url('LXGWWenKaiMono-Light.ttf') format('truetype'); }}
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'LXGW', 'Microsoft YaHei', sans-serif; font-size: 14px; line-height: 1.8; color: {COLORS['text']}; background: {COLORS['bg']}; }}
-        .page {{ width: 375px; min-height: 667px; padding: 20px; background: {COLORS['bg']}; margin: 0 auto; page-break-after: always; }}
-        .cover {{ display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, {COLORS['bg']} 0%, #FAFAFA 100%); }}
-        .title {{ font-size: 28px; font-weight: bold; color: {COLORS['title']}; margin-bottom: 20px; }}
-        .meta {{ font-size: 12px; color: {COLORS['translation']}; margin-top: 10px; }}
-        .section-title {{ font-size: 18px; font-weight: bold; color: {COLORS['accent']}; margin: 20px 0 10px 0; padding-bottom: 5px; border-bottom: 2px solid {COLORS['accent']}; }}
-        .content {{ font-size: 14px; line-height: 1.8; text-indent: 2em; }}
-        .vocab-item {{ background: {COLORS['card_bg']}; padding: 10px; border-radius: 8px; margin: 8px 0; }}
-        .word {{ font-weight: bold; color: {COLORS['highlight']}; }}
-        .pos {{ color: {COLORS['accent']}; margin-left: 5px; }}
-        .meaning {{ font-size: 12px; color: {COLORS['translation']}; }}
-        .footer {{ text-align: center; margin-top: 20px; font-size: 10px; color: {COLORS['translation']}; }}
-    </style>
-</head>
-<body>
-    <div class="page cover">
-        <div class="title">{article['title']}</div>
-        <div class="meta">
-            <p>难度: {article['difficulty']}</p>
-            <p>单词数: {article['word_count']}</p>
-            <p>词汇: {len(article['vocabulary'])}个</p>
-            <p>句子: {len(article['sentences'])}句</p>
-            <p style="margin-top: 30px;">{datetime.now().strftime('%Y-%m-%d')}</p>
-        </div>
-    </div>
-    <div class="page">
-        <div class="section-title">原文</div>
-        <div class="content">{article['original'].replace(chr(10), '<br>')[:1500]}</div>
-        <div class="footer">Page 2</div>
-    </div>
-    <div class="page">
-        <div class="section-title">译文</div>
-        <div class="content">{article['translation'].replace(chr(10), '<br>')[:1500]}</div>
-        <div class="footer">Page 3</div>
-    </div>
-    <div class="page">
-        <div class="section-title">词汇表 ({len(article['vocabulary'])}词)</div>
-"""
-        for v in article['vocabulary'][:15]:
-            pdf_html += f'<div class="vocab-item"><span class="word">{v["word"]}</span> <span class="pos">{v["pos"]}</span><div class="meaning">{v["meaning"]}</div></div>\n'
-        pdf_html += '<div class="footer">Page 4</div></div><div class="page"><div class="section-title">精彩句子</div>\n'
-        for i, s in enumerate(article['sentences'][:5], 1):
-            pdf_html += f'<div class="vocab-item"><div>{i}. {s["original"]}</div><div class="meaning">{s["translation"]}</div></div>\n'
-        pdf_html += '<div class="footer">Page 5</div></div></body></html>'
-        HTML(string=pdf_html).write_pdf(pdf_file)
+        from fpdf import FPDF
+        
+        class PDF(FPDF):
+            def header(self):
+                self.set_font('Arial', 'B', 12)
+                self.cell(0, 10, 'WordCard', 0, 1, 'R')
+                self.ln(5)
+            
+            def footer(self):
+                self.set_y(-15)
+                self.set_font('Arial', 'I', 8)
+                self.cell(0, 10, 'Page %d' % self.page_no(), 0, 0, 'C')
+        
+        pdf = PDF(unit='mm', format=(100, 178))
+        pdf.add_page()
+        
+        pdf.add_font('LXGW', '', FONT_PATH, uni=True)
+        
+        pdf.set_font('LXGW', '', 10)
+        pdf.cell(0, 10, f"{article['title']}", 0, 1, 'C')
+        pdf.ln(5)
+        
+        pdf.set_font('LXGW', '', 8)
+        pdf.cell(0, 5, f"难度: {article['difficulty']} | 单词: {article['word_count']} | 词汇: {len(article['vocabulary'])} | 句子: {len(article['sentences'])}", 0, 1, 'C')
+        
+        pdf.add_page()
+        pdf.set_font('LXGW', 'B', 12)
+        pdf.cell(0, 10, '原文', 0, 1, 'L')
+        pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+        pdf.ln(3)
+        
+        pdf.set_font('LXGW', '', 9)
+        original_lines = article['original'].replace('\n', ' ').split('. ')
+        for para in original_lines[:30]:
+            pdf.multi_cell(0, 5, para + '.')
+            pdf.ln(2)
+        
+        pdf.add_page()
+        pdf.set_font('LXGW', 'B', 12)
+        pdf.cell(0, 10, '译文', 0, 1, 'L')
+        pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+        pdf.ln(3)
+        
+        pdf.set_font('LXGW', '', 9)
+        trans_lines = article['translation'].replace('\n', ' ').split('. ')
+        for para in trans_lines[:30]:
+            pdf.multi_cell(0, 5, para + '.')
+            pdf.ln(2)
+        
+        pdf.add_page()
+        pdf.set_font('LXGW', 'B', 12)
+        pdf.cell(0, 10, f"词汇表 ({len(article['vocabulary'])}词)", 0, 1, 'L')
+        pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+        pdf.ln(3)
+        
+        pdf.set_font('LXGW', '', 8)
+        for v in article['vocabulary'][:20]:
+            pdf.set_font('LXGW', 'B', 9)
+            pdf.cell(15, 5, v['word'], 0, 0, 'L')
+            pdf.set_font('LXGW', '', 8)
+            pdf.cell(15, 5, f"({v['pos']})", 0, 0, 'L')
+            pdf.ln(4)
+            pdf.multi_cell(0, 4, v['meaning'])
+            pdf.ln(2)
+        
+        pdf.add_page()
+        pdf.set_font('LXGW', 'B', 12)
+        pdf.cell(0, 10, '精彩句子', 0, 1, 'L')
+        pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+        pdf.ln(3)
+        
+        pdf.set_font('LXGW', '', 8)
+        for i, s in enumerate(article['sentences'][:8], 1):
+            pdf.set_font('LXGW', 'I', 8)
+            pdf.cell(0, 5, f"{i}.", 0, 1, 'L')
+            pdf.set_font('LXGW', '', 8)
+            pdf.multi_cell(0, 4, s['original'][:100])
+            pdf.set_font('LXGW', '', 7)
+            pdf.set_text_color(100, 100, 100)
+            pdf.multi_cell(0, 4, s['translation'][:100])
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(3)
+        
+        pdf.output(pdf_file)
         print(f"   pdf: {pdf_file}")
         return pdf_file
+        
     except ImportError:
-        print(f"   pdf: 跳过 (需要安装 weasyprint)")
+        print(f"   pdf: 跳过 (pip install fpdf)")
         return None
 
 def save_png(article, base_path):
