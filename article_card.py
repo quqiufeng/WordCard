@@ -34,7 +34,7 @@ COLORS = {
 CARD_WIDTH = 375
 CARD_HEIGHT = 667
 
-FONT_PATH = "C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Fonts\\LXGWWenKaiMono-Light.ttf"
+FONT_PATH = "LXGWWenKaiMono-Light.ttf"
 
 def load_translator():
     translator = ctranslate2.Translator(MODEL_DIR, device="cuda")
