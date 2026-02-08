@@ -112,8 +112,8 @@ def create_png(article, output_path):
     MARGIN = 40
     LINE_HEIGHT = 42
     LINE_HEIGHT_CN = 52
-    CARD_WIDTH = 680
-    LINE_CHARS = 40
+    CARD_WIDTH = 780
+    LINE_CHARS = 50
     LINE_CHARS_CN = 23
     max_width = CARD_WIDTH - MARGIN * 2
 
@@ -224,13 +224,18 @@ def create_png(article, output_path):
         word_w = text_width(v['word'], font_en)
         if word_w + text_width(v['meaning'], font_text) + 80 > center_x - MARGIN - 20:
             meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
+            draw.text((MARGIN + 10 + 1, left_y + 1), v['word'], font=font_en, fill='#E74C3C')
             draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
             for ml in meaning_lines:
-                draw.text((MARGIN + 220, left_y), ml, font=font_text, fill='#7F8C8D')
+                ml_w = text_width(ml, font_text)
+                draw.text((MARGIN + 220 + 1, left_y + 1), ml, font=font_text, fill='#E74C3C')
+                draw.text((MARGIN + 220, left_y), ml, font=font_text, fill='#E74C3C')
                 left_y += LINE_HEIGHT_CN
         else:
+            draw.text((MARGIN + 10 + 1, left_y + 1), v['word'], font=font_en, fill='#E74C3C')
             draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((MARGIN + 220, left_y), v['meaning'], font=font_text, fill='#7F8C8D')
+            draw.text((MARGIN + 220 + 1, left_y + 1), v['meaning'], font=font_text, fill='#E74C3C')
+            draw.text((MARGIN + 220, left_y), v['meaning'], font=font_text, fill='#E74C3C')
             left_y += LINE_HEIGHT_CN
 
         draw.line((MARGIN, left_y, center_x - 10, left_y), fill='#E0E0E0')
@@ -241,13 +246,18 @@ def create_png(article, output_path):
         word_w = text_width(v['word'], font_en)
         if word_w + text_width(v['meaning'], font_text) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
             meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
+            draw.text((center_x + 20 + 1, right_y + 1), v['word'], font=font_en, fill='#E74C3C')
             draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
             for ml in meaning_lines:
-                draw.text((center_x + 230, right_y), ml, font=font_text, fill='#7F8C8D')
+                ml_w = text_width(ml, font_text)
+                draw.text((center_x + 230 + 1, right_y + 1), ml, font=font_text, fill='#E74C3C')
+                draw.text((center_x + 230, right_y), ml, font=font_text, fill='#E74C3C')
                 right_y += LINE_HEIGHT_CN
         else:
+            draw.text((center_x + 20 + 1, right_y + 1), v['word'], font=font_en, fill='#E74C3C')
             draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((center_x + 230, right_y), v['meaning'], font=font_text, fill='#7F8C8D')
+            draw.text((center_x + 230 + 1, right_y + 1), v['meaning'], font=font_text, fill='#E74C3C')
+            draw.text((center_x + 230, right_y), v['meaning'], font=font_text, fill='#E74C3C')
             right_y += LINE_HEIGHT_CN
 
         draw.line((center_x + 10, right_y, CARD_WIDTH - MARGIN, right_y), fill='#E0E0E0')
