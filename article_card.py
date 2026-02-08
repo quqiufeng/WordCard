@@ -276,8 +276,6 @@ def create_md(article, output_path):
 
 ## 词汇表
 
-| English (120) | Chinese (80) | English (120) | Chinese (80) |
-|---------------|--------------|---------------|--------------|
 """
 
     vocab = article['vocabulary']
@@ -289,15 +287,16 @@ def create_md(article, output_path):
         left_v = left_col[i]
         right_v = right_col[i] if i < len(right_col) else None
 
-        left_word = left_v['word'][:118]
-        left_mean = left_v['meaning'][:78]
+        left_word = left_v['word'][:180]
+        left_mean = left_v['meaning'][:120]
+        left_line = f"| {left_word:<180} |{left_mean:>120} |"
 
         if right_v:
-            right_word = right_v['word'][:118]
-            right_mean = right_v['meaning'][:78]
-            content += f"| {left_word:<118} | {left_mean:<78} | {right_word:<118} | {right_mean:<78} |\n"
+            right_word = right_v['word'][:180]
+            right_mean = right_v['meaning'][:120]
+            content += f"{left_line} {right_word:<180} |{right_mean:>120} |\n"
         else:
-            content += f"| {left_word:<118} | {left_mean:<78} |                      |                      |\n"
+            content += f"{left_line}\n"
 
     for i, s in enumerate(article['sentences'], 1):
         content += f"> **{s['original']}**\n>\n> {s['translation']}\n\n"
