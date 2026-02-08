@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """PNG + MD + PDF 卡片生成"""
 
+import warnings
+warnings.filterwarnings('ignore')
+
 import os
 import sys
 from datetime import datetime
@@ -96,63 +99,63 @@ def create_png(article, output_path):
     CARD_WIDTH = 1000
     max_width = CARD_WIDTH - MARGIN * 2
 
-    img = Image.new('RGB', (CARD_WIDTH, 1), '#F5F5F5')
-    draw = ImageDraw.Draw(img)
     y = MARGIN
 
-    draw.text((MARGIN, y), "WordCard", font=font_section, fill='#27AE60')
     y += 45
-
     for line in wrap_text(article['title'], font_title, max_width):
-        draw.text((MARGIN, y), line, font=font_title, fill='#34495E')
         y += LINE_HEIGHT + 5
     y += 30
-
     y += 20
-    draw.text((MARGIN, y), "原文", font=font_section, fill='#27AE60')
     y += 45
     for line in article['original'].split('\n'):
         if line.strip():
             for l in wrap_text(line, font_en, max_width - 10):
-                draw.text((MARGIN + 10, y), l, font=font_en, fill='#34495E')
                 y += LINE_HEIGHT
-
     y += 30
-    draw.text((MARGIN, y), "译文", font=font_section, fill='#27AE60')
     y += 45
     for line in article['translation'].split('\n'):
         if line.strip():
             for l in wrap_text(line, font_text, max_width - 10):
-                draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
                 y += LINE_HEIGHT
-
     y += 30
-    draw.text((MARGIN, y), "词汇表", font=font_section, fill='#27AE60')
     y += 45
-    for v in article['vocabulary'][:12]:
+
+    vocab = article['vocabulary']
+    half = (len(vocab) + 1) // 2
+    left_col = vocab[:half]
+    right_col = vocab[half:]
+
+    center_x = CARD_WIDTH // 2
+
+    left_y = y
+    right_y = y
+
+    for i in range(len(left_col)):
+        v = left_col[i]
         word_w = font_en.getlength(v['word'])
-        if word_w + font_text.getlength(v['meaning']) + 150 > max_width:
-            meaning_lines = wrap_text(v['meaning'], font_text, max_width - 10 - word_w - 120)
-            draw.text((MARGIN + 10, y), v['word'], font=font_en, fill='#E74C3C')
-            for ml in meaning_lines:
-                draw.text((MARGIN + 120, y), ml, font=font_text, fill='#7F8C8D')
-                y += LINE_HEIGHT
+        if word_w + font_text.getlength(v['meaning']) + 80 > center_x - MARGIN - 20:
+            meaning_lines = wrap_text(v['meaning'], font_text, center_x - MARGIN - 220)
+            left_y += len(meaning_lines) * LINE_HEIGHT
         else:
-            draw.text((MARGIN + 10, y), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((MARGIN + 120, y), v['meaning'], font=font_text, fill='#7F8C8D')
-            y += LINE_HEIGHT
+            left_y += LINE_HEIGHT
 
+    for i in range(len(right_col)):
+        v = right_col[i]
+        word_w = font_en.getlength(v['word'])
+        if word_w + font_text.getlength(v['meaning']) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
+            meaning_lines = wrap_text(v['meaning'], font_text, CARD_WIDTH - center_x - MARGIN - 230)
+            right_y += len(meaning_lines) * LINE_HEIGHT
+        else:
+            right_y += LINE_HEIGHT
+
+    y = max(left_y, right_y) + 10
     y += 30
-    draw.text((MARGIN, y), "精彩句子", font=font_section, fill='#27AE60')
     y += 45
-    for i, s in enumerate(article['sentences'][:5], 1):
+    for i, s in enumerate(article['sentences'], 1):
         orig_w = font_en.getlength(f"{i}. ")
         for j, ol in enumerate(wrap_text(s['original'], font_en, max_width - 10 - orig_w)):
-            prefix = f"{i}. " if j == 0 else "   "
-            draw.text((MARGIN + 10, y), prefix + ol, font=font_en, fill='#34495E')
             y += LINE_HEIGHT
         for tl in wrap_text(s['translation'], font_text, max_width - 30):
-            draw.text((MARGIN + 30, y), tl, font=font_text, fill='#7F8C8D')
             y += LINE_HEIGHT
         y += 10
 
@@ -191,23 +194,53 @@ def create_png(article, output_path):
     y += 30
     draw.text((MARGIN, y), "词汇表", font=font_section, fill='#27AE60')
     y += 45
-    for v in article['vocabulary'][:12]:
+
+    left_start_y = y
+    left_y = y
+    right_y = y
+
+    for i in range(len(left_col)):
+        v = left_col[i]
         word_w = font_en.getlength(v['word'])
-        if word_w + font_text.getlength(v['meaning']) + 150 > max_width:
-            meaning_lines = wrap_text(v['meaning'], font_text, max_width - 10 - word_w - 120)
-            draw.text((MARGIN + 10, y), v['word'], font=font_en, fill='#E74C3C')
+        if word_w + font_text.getlength(v['meaning']) + 80 > center_x - MARGIN - 20:
+            meaning_lines = wrap_text(v['meaning'], font_text, center_x - MARGIN - 220)
+            draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
             for ml in meaning_lines:
-                draw.text((MARGIN + 120, y), ml, font=font_text, fill='#7F8C8D')
-                y += LINE_HEIGHT
+                draw.text((MARGIN + 220, left_y), ml, font=font_text, fill='#7F8C8D')
+                left_y += LINE_HEIGHT
         else:
-            draw.text((MARGIN + 10, y), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((MARGIN + 120, y), v['meaning'], font=font_text, fill='#7F8C8D')
-            y += LINE_HEIGHT
+            draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
+            draw.text((MARGIN + 220, left_y), v['meaning'], font=font_text, fill='#7F8C8D')
+            left_y += LINE_HEIGHT
+
+        draw.line((MARGIN, left_y, center_x - 10, left_y), fill='#E0E0E0')
+        left_y += 10
+
+    for i in range(len(right_col)):
+        v = right_col[i]
+        word_w = font_en.getlength(v['word'])
+        if word_w + font_text.getlength(v['meaning']) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
+            meaning_lines = wrap_text(v['meaning'], font_text, CARD_WIDTH - center_x - MARGIN - 230)
+            draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
+            for ml in meaning_lines:
+                draw.text((center_x + 230, right_y), ml, font=font_text, fill='#7F8C8D')
+                right_y += LINE_HEIGHT
+        else:
+            draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
+            draw.text((center_x + 230, right_y), v['meaning'], font=font_text, fill='#7F8C8D')
+            right_y += LINE_HEIGHT
+
+        draw.line((center_x + 10, right_y, CARD_WIDTH - MARGIN, right_y), fill='#E0E0E0')
+        right_y += 10
+
+    draw.line((center_x, left_start_y, center_x, max(left_y, right_y)), fill='#E0E0E0')
+
+    y = max(left_y, right_y) + 10
 
     y += 30
     draw.text((MARGIN, y), "精彩句子", font=font_section, fill='#27AE60')
     y += 45
-    for i, s in enumerate(article['sentences'][:5], 1):
+    for i, s in enumerate(article['sentences'], 1):
         orig_w = font_en.getlength(f"{i}. ")
         for j, ol in enumerate(wrap_text(s['original'], font_en, max_width - 10 - orig_w)):
             prefix = f"{i}. " if j == 0 else "   "
@@ -241,14 +274,30 @@ def create_md(article, output_path):
 
 ---
 
-## 词汇表
+    ## 词汇表
 
-| 单词 | 释义 |
-|------|------|
+| 单词 | 释义 | 单词 | 释义 |
+|:-----|:-----|:-----|:-----|
 """
 
-    for v in article['vocabulary'][:12]:
-        content += f"| {v['word']} | {v['meaning']} |\n"
+    vocab = article['vocabulary']
+    half = (len(vocab) + 1) // 2
+    left_col = vocab[:half]
+    right_col = vocab[half:]
+
+    left_width = max(len(f"{v['word']} {v['meaning']}") for v in left_col) if left_col else 0
+    right_width = max(len(f"{v['word']} {v['meaning']}") for v in right_col) if right_col else 0
+    max_width = max(left_width, right_width)
+
+    for i in range(len(left_col)):
+        left_v = left_col[i]
+        right_v = right_col[i] if i < len(right_col) else None
+        left_cell = f"{left_v['word']} {left_v['meaning']}"
+        if right_v:
+            right_cell = f"{right_v['word']} {right_v['meaning']}"
+            content += f"| {left_cell:<{max_width}} | {right_cell:<{max_width}} |\n"
+        else:
+            content += f"| {left_cell:<{max_width}} | {' ' * max_width} |\n"
 
     content += """
 ---
@@ -257,7 +306,7 @@ def create_md(article, output_path):
 
 """
 
-    for i, s in enumerate(article['sentences'][:5], 1):
+    for i, s in enumerate(article['sentences'], 1):
         content += f"> **{s['original']}**\n>\n> {s['translation']}\n\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -268,79 +317,107 @@ def create_md(article, output_path):
 
 def create_pdf(article, output_path):
     try:
-        from fpdf2 import FPDF
-    except ImportError as e:
-        print(f"PDF: 跳过 - {e}")
+        from fpdf import FPDF
+    except ImportError:
+        print("PDF: 跳过（需安装: pip install fpdf）")
         return False
+
+    FONT_PATH = "LXGWWenKai-Regular.ttf"
 
     class PDF(FPDF):
         def header(self):
-            self.set_font("helvetica", "B", 16)
-            self.cell(0, 10, "WordCard", 0, 1, "L")
+            self.set_font('Arial', 'B', 12)
+            self.cell(0, 10, 'WordCard', 0, 1, 'R')
             self.ln(5)
 
-        def chapter_title(self, title):
-            self.set_font("helvetica", "B", 14)
-            self.set_text_color(39, 174, 96)
-            self.cell(0, 10, title, 0, 1, "L")
-            self.set_text_color(0, 0, 0)
-            self.ln(3)
+        def footer(self):
+            self.set_y(-15)
+            self.set_font('Arial', 'I', 8)
+            self.cell(0, 10, 'Page %d' % self.page_no(), 0, 0, 'C')
 
-        def chapter_body(self, body, indent=False):
-            self.set_font("helvetica", "", 11)
-            if indent:
-                self.set_x(15)
-            self.multi_cell(0, 7, body)
-            self.ln()
-
-        def simple_table(self, headers, rows):
-            self.set_font("helvetica", "B", 11)
-            col_width = 60
-            for h in headers:
-                self.cell(col_width, 8, h, 1, 0, "C")
-            self.ln()
-            self.set_font("helvetica", "", 10)
-            for row in rows:
-                self.cell(col_width, 7, row[0], 1, 0, "L")
-                text = row[1][:35] + "..." if len(row[1]) > 35 else row[1]
-                self.cell(col_width, 7, text, 1, 1, "L")
-
-    pdf = PDF()
+    pdf = PDF(unit='mm', format=(100, 178))
     pdf.add_page()
-    pdf.set_auto_page_break(True, margin=15)
 
-    pdf.set_font("helvetica", "B", 18)
-    pdf.cell(0, 10, article["title"], 0, 1, "C")
+    pdf.add_font('LXGW', '', FONT_PATH, uni=True)
+
+    pdf.set_font('LXGW', '', 10)
+    pdf.cell(0, 10, article["title"], 0, 1, 'C')
     pdf.ln(5)
 
-    pdf.chapter_title("原文")
-    pdf.chapter_body(article["original"], indent=True)
-
-    pdf.chapter_title("译文")
-    pdf.chapter_body(article["translation"], indent=True)
-
-    pdf.chapter_title("词汇表")
-    vocab_rows = [(v["word"], v["meaning"]) for v in article["vocabulary"][:12]]
-    pdf.simple_table(["Word", "Meaning"], vocab_rows)
+    pdf.set_font('LXGW', '', 8)
+    pdf.cell(0, 5, f"Vocabulary: {len(article['vocabulary'])} | Sentences: {len(article['sentences'])}", 0, 1, 'C')
     pdf.ln(5)
 
-    pdf.chapter_title("精彩句子")
-    for s in article["sentences"][:5]:
-        pdf.set_font("helvetica", "B", 10)
-        pdf.multi_cell(0, 6, s["original"])
-        pdf.set_font("helvetica", "I", 10)
+    pdf.add_page()
+    pdf.set_font('LXGW', '', 12)
+    pdf.cell(0, 10, '原文 / Original', 0, 1, 'L')
+    pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+    pdf.ln(3)
+
+    pdf.set_font('LXGW', '', 9)
+    original_lines = article['original'].replace('\n', ' ').split('. ')
+    for para in original_lines:
+        pdf.multi_cell(0, 5, para + '.')
+        pdf.ln(2)
+
+    pdf.add_page()
+    pdf.set_font('LXGW', '', 12)
+    pdf.cell(0, 10, '译文 / Translation', 0, 1, 'L')
+    pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+    pdf.ln(3)
+
+    pdf.set_font('LXGW', '', 9)
+    trans_lines = article['translation'].replace('\n', ' ').split('. ')
+    for para in trans_lines:
+        pdf.multi_cell(0, 5, para + '.')
+        pdf.ln(2)
+
+    pdf.add_page()
+    pdf.set_font('LXGW', '', 12)
+    pdf.cell(0, 10, '词汇表 / Vocabulary', 0, 1, 'L')
+    pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+    pdf.ln(3)
+
+    pdf.set_font('LXGW', '', 9)
+
+    vocab = article['vocabulary']
+    half = (len(vocab) + 1) // 2
+    left_col = vocab[:half]
+    right_col = vocab[half:]
+
+    for i in range(max(len(left_col), len(right_col))):
+        y = pdf.get_y()
+
+        if i < len(left_col):
+            v = left_col[i]
+            pdf.text(12, y + 3, f"{v['word']} - {v['meaning']}")
+
+        pdf.line(50, y, 50, y + 5)
+
+        if i < len(right_col):
+            v = right_col[i]
+            pdf.text(54, y + 3, f"{v['word']} - {v['meaning']}")
+
+        pdf.ln(10)
+
+    pdf.add_page()
+    pdf.set_font('LXGW', '', 12)
+    pdf.cell(0, 10, '精彩句子 / Sentences', 0, 1, 'L')
+    pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+    pdf.ln(3)
+
+    for i, s in enumerate(article['sentences'], 1):
+        pdf.set_font('LXGW', '', 9)
+        pdf.multi_cell(0, 5, f"{i}. {s['original']}")
+        pdf.set_font('LXGW', '', 9)
         pdf.set_text_color(100, 100, 100)
-        pdf.multi_cell(0, 6, s["translation"])
+        pdf.multi_cell(0, 5, s['translation'])
         pdf.set_text_color(0, 0, 0)
-        pdf.ln(5)
+        pdf.ln(2)
 
-    try:
-        pdf.save(output_path)
-        print(f"PDF: {output_path}")
-        return True
-    except Exception as e:
-        print(f"PDF: 生成失败 ({e})")
-        return False
+    pdf.output(output_path)
+    print(f"PDF: {output_path}")
+    return True
 
 def main():
     if len(sys.argv) < 2:
