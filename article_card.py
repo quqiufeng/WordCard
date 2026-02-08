@@ -276,8 +276,6 @@ def create_md(article, output_path):
 
     ## 词汇表
 
-| 单词 | 释义 | 单词 | 释义 |
-|:-----|:-----|:-----|:-----|
 """
 
     vocab = article['vocabulary']
@@ -285,19 +283,21 @@ def create_md(article, output_path):
     left_col = vocab[:half]
     right_col = vocab[half:]
 
-    left_width = max(len(f"{v['word']} {v['meaning']}") for v in left_col) if left_col else 0
-    right_width = max(len(f"{v['word']} {v['meaning']}") for v in right_col) if right_col else 0
-    max_width = max(left_width, right_width)
+    col_width = 260
+    word_slot = 120
 
     for i in range(len(left_col)):
         left_v = left_col[i]
         right_v = right_col[i] if i < len(right_col) else None
-        left_cell = f"{left_v['word']} {left_v['meaning']}"
+
+        left_1 = left_v['word'].ljust(word_slot)
+        left_line = f"|{left_1} {left_v['meaning']}"
+
         if right_v:
-            right_cell = f"{right_v['word']} {right_v['meaning']}"
-            content += f"| {left_cell:<{max_width}} | {right_cell:<{max_width}} |\n"
+            right_1 = right_v['word'].ljust(word_slot)
+            content += f"{left_line} {right_1} {right_v['meaning']} |\n"
         else:
-            content += f"| {left_cell:<{max_width}} | {' ' * max_width} |\n"
+            content += f"{left_line} {' ' * col_width} |\n"
 
     content += """
 ---
