@@ -50,7 +50,21 @@ def load_bilingual_txt(txt_file):
                     })
     return article
 
-def wrap_text(text, font, max_width):
+def text_width(text, font):
+    import unicodedata
+    width = 0
+    for c in text:
+        if unicodedata.east_asian_width(c) in ('W', 'F'):
+            width += 2
+        else:
+            width += 1
+    return width
+
+def is_chinese(text):
+    import re
+    return bool(re.search('[\u4e00-\u9fff]', text))
+
+def wrap_text(text, max_chars=40):
     if not text:
         return []
 
@@ -60,22 +74,23 @@ def wrap_text(text, font, max_width):
             lines.append('')
             continue
 
-        words = list(paragraph)
-        current_line = ""
-
-        for char in words:
-            test_line = current_line + char
-            width = font.getlength(test_line)
-
-            if width <= max_width:
-                current_line = test_line
-            else:
-                if current_line:
-                    lines.append(current_line)
-                current_line = char
-
-        if current_line:
-            lines.append(current_line)
+        if is_chinese(paragraph):
+            i = 0
+            while i < len(paragraph):
+                lines.append(paragraph[i:i + max_chars])
+                i += max_chars
+        else:
+            words = paragraph.split(' ')
+            current_line = ""
+            for word in words:
+                if len(current_line) + len(word) + 1 <= max_chars:
+                    current_line += (" " if current_line else "") + word
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = word
+            if current_line:
+                lines.append(current_line)
 
     return lines
 
@@ -88,35 +103,38 @@ def create_png(article, output_path):
     try:
         font_title = ImageFont.truetype(font_path, 36)
         font_section = ImageFont.truetype(font_path, 26)
-        font_text = ImageFont.truetype(font_path, 22)
+        font_text = ImageFont.truetype(font_path, 26)
         font_en = ImageFont.truetype(font_path_en, 22)
     except Exception as e:
         print(f"字体加载失败: {e}")
         return False
 
     MARGIN = 40
-    LINE_HEIGHT = 32
-    CARD_WIDTH = 1000
+    LINE_HEIGHT = 42
+    LINE_HEIGHT_CN = 52
+    CARD_WIDTH = 680
+    LINE_CHARS = 40
+    LINE_CHARS_CN = 23
     max_width = CARD_WIDTH - MARGIN * 2
 
     y = MARGIN
 
     y += 45
-    for line in wrap_text(article['title'], font_title, max_width):
+    for line in wrap_text(article['title'], LINE_CHARS):
         y += LINE_HEIGHT + 5
     y += 30
     y += 20
     y += 45
     for line in article['original'].split('\n'):
         if line.strip():
-            for l in wrap_text(line, font_en, max_width - 10):
+            for l in wrap_text(line, LINE_CHARS):
                 y += LINE_HEIGHT
     y += 30
     y += 45
     for line in article['translation'].split('\n'):
         if line.strip():
-            for l in wrap_text(line, font_text, max_width - 10):
-                y += LINE_HEIGHT
+            for l in wrap_text(line, LINE_CHARS_CN):
+                y += LINE_HEIGHT_CN
     y += 30
     y += 45
 
@@ -132,124 +150,39 @@ def create_png(article, output_path):
 
     for i in range(len(left_col)):
         v = left_col[i]
-        word_w = font_en.getlength(v['word'])
-        if word_w + font_text.getlength(v['meaning']) + 80 > center_x - MARGIN - 20:
-            meaning_lines = wrap_text(v['meaning'], font_text, center_x - MARGIN - 220)
-            left_y += len(meaning_lines) * LINE_HEIGHT
+        word_w = text_width(v['word'], font_en)
+        if word_w + text_width(v['meaning'], font_text) + 80 > center_x - MARGIN - 20:
+            meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
+            left_y += len(meaning_lines) * LINE_HEIGHT_CN
         else:
-            left_y += LINE_HEIGHT
+            left_y += LINE_HEIGHT_CN
 
     for i in range(len(right_col)):
         v = right_col[i]
-        word_w = font_en.getlength(v['word'])
-        if word_w + font_text.getlength(v['meaning']) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
-            meaning_lines = wrap_text(v['meaning'], font_text, CARD_WIDTH - center_x - MARGIN - 230)
-            right_y += len(meaning_lines) * LINE_HEIGHT
+        word_w = text_width(v['word'], font_en)
+        if word_w + text_width(v['meaning'], font_text) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
+            meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
+            right_y += len(meaning_lines) * LINE_HEIGHT_CN
         else:
-            right_y += LINE_HEIGHT
+            right_y += LINE_HEIGHT_CN
 
     y = max(left_y, right_y) + 10
+    print(f"[DEBUG-CALC] 词汇表后 y: {y}")
     y += 30
     y += 45
+    print(f"[DEBUG-CALC] 精彩句子标题前 y: {y}")
     for i, s in enumerate(article['sentences'], 1):
         orig_w = font_en.getlength(f"{i}. ")
-        for j, ol in enumerate(wrap_text(s['original'], font_en, max_width - 10 - orig_w)):
-            y += LINE_HEIGHT
-        for tl in wrap_text(s['translation'], font_text, max_width - 30):
-            y += LINE_HEIGHT
-        y += 10
-
-    final_height = y + MARGIN
-
-    img = Image.new('RGB', (CARD_WIDTH, int(final_height)), '#F5F5F5')
-    draw = ImageDraw.Draw(img)
-    y = MARGIN
-
-    draw.text((MARGIN, y), "WordCard", font=font_section, fill='#27AE60')
-    y += 45
-
-    for line in wrap_text(article['title'], font_title, max_width):
-        draw.text((MARGIN, y), line, font=font_title, fill='#34495E')
-        y += LINE_HEIGHT + 5
-    y += 30
-
-    y += 20
-    draw.text((MARGIN, y), "原文", font=font_section, fill='#27AE60')
-    y += 45
-    for line in article['original'].split('\n'):
-        if line.strip():
-            for l in wrap_text(line, font_en, max_width - 10):
-                draw.text((MARGIN + 10, y), l, font=font_en, fill='#34495E')
-                y += LINE_HEIGHT
-
-    y += 30
-    draw.text((MARGIN, y), "译文", font=font_section, fill='#27AE60')
-    y += 45
-    for line in article['translation'].split('\n'):
-        if line.strip():
-            for l in wrap_text(line, font_text, max_width - 10):
-                draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
-                y += LINE_HEIGHT
-
-    y += 30
-    draw.text((MARGIN, y), "词汇表", font=font_section, fill='#27AE60')
-    y += 45
-
-    left_start_y = y
-    left_y = y
-    right_y = y
-
-    for i in range(len(left_col)):
-        v = left_col[i]
-        word_w = font_en.getlength(v['word'])
-        if word_w + font_text.getlength(v['meaning']) + 80 > center_x - MARGIN - 20:
-            meaning_lines = wrap_text(v['meaning'], font_text, center_x - MARGIN - 220)
-            draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
-            for ml in meaning_lines:
-                draw.text((MARGIN + 220, left_y), ml, font=font_text, fill='#7F8C8D')
-                left_y += LINE_HEIGHT
-        else:
-            draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((MARGIN + 220, left_y), v['meaning'], font=font_text, fill='#7F8C8D')
-            left_y += LINE_HEIGHT
-
-        draw.line((MARGIN, left_y, center_x - 10, left_y), fill='#E0E0E0')
-        left_y += 10
-
-    for i in range(len(right_col)):
-        v = right_col[i]
-        word_w = font_en.getlength(v['word'])
-        if word_w + font_text.getlength(v['meaning']) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
-            meaning_lines = wrap_text(v['meaning'], font_text, CARD_WIDTH - center_x - MARGIN - 230)
-            draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
-            for ml in meaning_lines:
-                draw.text((center_x + 230, right_y), ml, font=font_text, fill='#7F8C8D')
-                right_y += LINE_HEIGHT
-        else:
-            draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((center_x + 230, right_y), v['meaning'], font=font_text, fill='#7F8C8D')
-            right_y += LINE_HEIGHT
-
-        draw.line((center_x + 10, right_y, CARD_WIDTH - MARGIN, right_y), fill='#E0E0E0')
-        right_y += 10
-
-    draw.line((center_x, left_start_y, center_x, max(left_y, right_y)), fill='#E0E0E0')
-
-    y = max(left_y, right_y) + 10
-
-    y += 30
-    draw.text((MARGIN, y), "精彩句子", font=font_section, fill='#27AE60')
-    y += 45
-    for i, s in enumerate(article['sentences'], 1):
-        orig_w = font_en.getlength(f"{i}. ")
-        for j, ol in enumerate(wrap_text(s['original'], font_en, max_width - 10 - orig_w)):
+        for j, ol in enumerate(wrap_text(s['original'], LINE_CHARS)):
             prefix = f"{i}. " if j == 0 else "   "
             draw.text((MARGIN + 10, y), prefix + ol, font=font_en, fill='#34495E')
             y += LINE_HEIGHT
-        for tl in wrap_text(s['translation'], font_text, max_width - 30):
+        for tl in wrap_text(s['translation'], LINE_CHARS_CN):
             draw.text((MARGIN + 30, y), tl, font=font_text, fill='#7F8C8D')
-            y += LINE_HEIGHT
+            y += LINE_HEIGHT_CN
         y += 10
+
+    print(f"[DEBUG] 渲染完成，最后y: {y}")
 
     img.save(output_path)
     print(f"PNG: {output_path}")
@@ -274,29 +207,7 @@ def create_md(article, output_path):
 
 ---
 
-## 词汇表
-
 """
-
-    vocab = article['vocabulary']
-    half = (len(vocab) + 1) // 2
-    left_col = vocab[:half]
-    right_col = vocab[half:]
-
-    for i in range(len(left_col)):
-        left_v = left_col[i]
-        right_v = right_col[i] if i < len(right_col) else None
-
-        left_word = left_v['word'][:180]
-        left_mean = left_v['meaning'][:120]
-        left_line = f"| {left_word:<180} |{left_mean:>120} |"
-
-        if right_v:
-            right_word = right_v['word'][:180]
-            right_mean = right_v['meaning'][:120]
-            content += f"{left_line} {right_word:<180} |{right_mean:>120} |\n"
-        else:
-            content += f"{left_line}\n"
 
     for i, s in enumerate(article['sentences'], 1):
         content += f"> **{s['original']}**\n>\n> {s['translation']}\n\n"
