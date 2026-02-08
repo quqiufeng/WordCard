@@ -233,8 +233,94 @@ def save_md(article, base_path):
     return md_file
 
 def save_pdf(article, base_path):
-    print(f"   pdf: 跳过 (Windows字体兼容问题，建议使用PNG)")
-    return None
+    pdf_file = str(base_path) + '.pdf'
+    
+    try:
+        from fpdf import FPDF
+        
+        class MyPDF(FPDF):
+            def header(self):
+                self.set_font("Helvetica", size=8)
+                self.cell(0, 5, "WordCard", align="R")
+                self.ln(5)
+            
+            def footer(self):
+                self.set_y(-15)
+                self.set_font("Helvetica", size=8)
+                self.cell(0, 10, f"Page {self.page_no()}", align="C")
+        
+        pdf = MyPDF(unit="mm", format=(90, 160))
+        pdf.add_page()
+        pdf.add_font("LXGW", "", "LXGWWenKaiMono-Light.ttf", uni=True)
+        
+        pdf.set_font("LXGW", size=16)
+        pdf.cell(0, 10, article['title'], align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(5)
+        
+        pdf.set_font("LXGW", size=9)
+        pdf.cell(0, 5, f"难度: {article['difficulty']} | 词数: {article['word_count']}", align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 5, f"词汇: {len(article['vocabulary'])}个 | 句子: {len(article['sentences'])}句", align="C", new_x="LMARGIN", new_y="NEXT")
+        
+        pdf.add_page()
+        pdf.set_font("LXGW", size=12)
+        pdf.cell(0, 8, "原文", new_x="LMARGIN", new_y="NEXT")
+        pdf.line(10, pdf.get_y(), 80, pdf.get_y())
+        pdf.ln(3)
+        
+        pdf.set_font("LXGW", size=9)
+        original_text = article['original'].replace('\n', ' ')[:800]
+        pdf.multi_cell(0, 5, original_text)
+        
+        pdf.add_page()
+        pdf.set_font("LXGW", size=12)
+        pdf.cell(0, 8, "译文", new_x="LMARGIN", new_y="NEXT")
+        pdf.line(10, pdf.get_y(), 80, pdf.get_y())
+        pdf.ln(3)
+        
+        pdf.set_font("LXGW", size=9)
+        trans_text = article['translation'].replace('\n', ' ')[:800]
+        pdf.multi_cell(0, 5, trans_text)
+        
+        pdf.add_page()
+        pdf.set_font("LXGW", size=12)
+        pdf.cell(0, 8, f"词汇表 ({len(article['vocabulary'])}词)", new_x="LMARGIN", new_y="NEXT")
+        pdf.line(10, pdf.get_y(), 80, pdf.get_y())
+        pdf.ln(3)
+        
+        pdf.set_font("LXGW", size=8)
+        for v in article['vocabulary'][:18]:
+            pdf.set_font("LXGW", size=9)
+            pdf.cell(25, 5, v['word'], 0, 0, "L")
+            pdf.set_font("LXGW", size=8)
+            pdf.cell(15, 5, f"({v['pos']})", 0, 0, "L")
+            pdf.ln(4)
+            pdf.multi_cell(0, 4, v['meaning'])
+            pdf.ln(1)
+        
+        pdf.add_page()
+        pdf.set_font("LXGW", size=12)
+        pdf.cell(0, 8, "精彩句子", new_x="LMARGIN", new_y="NEXT")
+        pdf.line(10, pdf.get_y(), 80, pdf.get_y())
+        pdf.ln(3)
+        
+        pdf.set_font("LXGW", size=8)
+        for i, s in enumerate(article['sentences'][:6], 1):
+            pdf.set_font("LXGW", size=9)
+            pdf.cell(0, 5, f"{i}.", new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(0, 4, s['original'][:80])
+            pdf.set_font("LXGW", size=8)
+            pdf.set_text_color(100, 100, 100)
+            pdf.multi_cell(0, 4, s['translation'][:80])
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(2)
+        
+        pdf.output(pdf_file)
+        print(f"   pdf: {pdf_file}")
+        return pdf_file
+        
+    except Exception as e:
+        print(f"   pdf: 跳过 ({e})")
+        return None
 
 def save_png(article, base_path):
     cards_dir = str(base_path) + '_cards'
