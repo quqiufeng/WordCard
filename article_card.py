@@ -167,10 +167,96 @@ def create_png(article, output_path):
             right_y += LINE_HEIGHT_CN
 
     y = max(left_y, right_y) + 10
-    print(f"[DEBUG-CALC] 词汇表后 y: {y}")
     y += 30
     y += 45
-    print(f"[DEBUG-CALC] 精彩句子标题前 y: {y}")
+    for i, s in enumerate(article['sentences'], 1):
+        orig_w = font_en.getlength(f"{i}. ")
+        for j, ol in enumerate(wrap_text(s['original'], LINE_CHARS)):
+            y += LINE_HEIGHT
+        for tl in wrap_text(s['translation'], LINE_CHARS_CN):
+            y += LINE_HEIGHT_CN
+        y += 10
+
+    final_height = y + MARGIN
+
+    img = Image.new('RGB', (CARD_WIDTH, int(final_height)), '#F5F5F5')
+    draw = ImageDraw.Draw(img)
+    y = MARGIN
+
+    draw.text((MARGIN, y), "WordCard", font=font_section, fill='#27AE60')
+    y += 45
+
+    for line in wrap_text(article['title'], LINE_CHARS):
+        draw.text((MARGIN, y), line, font=font_title, fill='#34495E')
+        y += LINE_HEIGHT + 5
+    y += 30
+
+    y += 20
+    draw.text((MARGIN, y), "原文", font=font_section, fill='#27AE60')
+    y += 45
+    for line in article['original'].split('\n'):
+        if line.strip():
+            for l in wrap_text(line, LINE_CHARS):
+                draw.text((MARGIN + 10, y), l, font=font_en, fill='#34495E')
+                y += LINE_HEIGHT
+
+    y += 30
+    draw.text((MARGIN, y), "译文", font=font_section, fill='#27AE60')
+    y += 45
+    for line in article['translation'].split('\n'):
+        if line.strip():
+            for l in wrap_text(line, LINE_CHARS_CN):
+                draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
+                y += LINE_HEIGHT_CN
+
+    y += 30
+    draw.text((MARGIN, y), "词汇表", font=font_section, fill='#27AE60')
+    y += 45
+
+    left_start_y = y
+    left_y = y
+    right_y = y
+
+    for i in range(len(left_col)):
+        v = left_col[i]
+        word_w = text_width(v['word'], font_en)
+        if word_w + text_width(v['meaning'], font_text) + 80 > center_x - MARGIN - 20:
+            meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
+            draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
+            for ml in meaning_lines:
+                draw.text((MARGIN + 220, left_y), ml, font=font_text, fill='#7F8C8D')
+                left_y += LINE_HEIGHT_CN
+        else:
+            draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
+            draw.text((MARGIN + 220, left_y), v['meaning'], font=font_text, fill='#7F8C8D')
+            left_y += LINE_HEIGHT_CN
+
+        draw.line((MARGIN, left_y, center_x - 10, left_y), fill='#E0E0E0')
+        left_y += 10
+
+    for i in range(len(right_col)):
+        v = right_col[i]
+        word_w = text_width(v['word'], font_en)
+        if word_w + text_width(v['meaning'], font_text) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
+            meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
+            draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
+            for ml in meaning_lines:
+                draw.text((center_x + 230, right_y), ml, font=font_text, fill='#7F8C8D')
+                right_y += LINE_HEIGHT_CN
+        else:
+            draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
+            draw.text((center_x + 230, right_y), v['meaning'], font=font_text, fill='#7F8C8D')
+            right_y += LINE_HEIGHT_CN
+
+        draw.line((center_x + 10, right_y, CARD_WIDTH - MARGIN, right_y), fill='#E0E0E0')
+        right_y += 10
+
+    draw.line((center_x, left_start_y, center_x, max(left_y, right_y)), fill='#E0E0E0')
+
+    y = max(left_y, right_y) + 10
+    y += 30
+    draw.text((MARGIN, y), "精彩句子", font=font_section, fill='#27AE60')
+    y += 45
     for i, s in enumerate(article['sentences'], 1):
         orig_w = font_en.getlength(f"{i}. ")
         for j, ol in enumerate(wrap_text(s['original'], LINE_CHARS)):
@@ -181,8 +267,6 @@ def create_png(article, output_path):
             draw.text((MARGIN + 30, y), tl, font=font_text, fill='#7F8C8D')
             y += LINE_HEIGHT_CN
         y += 10
-
-    print(f"[DEBUG] 渲染完成，最后y: {y}")
 
     img.save(output_path)
     print(f"PNG: {output_path}")
