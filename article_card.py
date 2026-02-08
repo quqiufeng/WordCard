@@ -440,10 +440,11 @@ def article_to_card(input_file, output_dir='./output', difficulty='intermediate'
             draw = ImageDraw.Draw(img)
             
             try:
-                font_title = ImageFont.truetype("simhei.ttf", 24)
-                font_header = ImageFont.truetype("simhei.ttf", 16)
-                font_text = ImageFont.truetype("simhei.ttf", 14)
-                font_small = ImageFont.truetype("simhei.ttf", 12)
+                font_path = "C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\Windows\\Fonts\\LXGWWenKaiMono-Light.ttf"
+                font_title = ImageFont.truetype(font_path, 28)
+                font_header = ImageFont.truetype(font_path, 16)
+                font_text = ImageFont.truetype(font_path, 14)
+                font_small = ImageFont.truetype(font_path, 12)
             except:
                 font_title = ImageFont.load_default()
                 font_header = ImageFont.load_default()
