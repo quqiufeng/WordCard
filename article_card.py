@@ -66,6 +66,9 @@ def load_txt(txt_file):
                     sections['original'] = merge_lines(current_content)
                 elif current_section in ('en_ch', 'sentences'):
                     sections[current_section] = split_bilingual(current_content)
+                elif current_section == 'vocabulary':
+                    # 保留每行一个词汇的格式
+                    sections['vocabulary'] = [l.strip() for l in current_content if l.strip()]
                 else:
                     sections[current_section] = merge_lines(current_content)
                 current_content = []
@@ -90,6 +93,8 @@ def load_txt(txt_file):
             sections['original'] = merge_lines(current_content)
         elif current_section in ('en_ch', 'sentences'):
             sections[current_section] = split_bilingual(current_content)
+        elif current_section == 'vocabulary':
+            sections['vocabulary'] = [l.strip() for l in current_content if l.strip()]
         else:
             sections[current_section] = merge_lines(current_content)
 
@@ -128,7 +133,7 @@ def create_md(sections, output_path):
     content += "\n---\n\n"
     content += "## 词汇表\n\n"
 
-    vocab_lines = sections.get('vocabulary', '').split('\n')
+    vocab_lines = sections.get('vocabulary', [])
     vocab_lines = [line for line in vocab_lines if line.strip()]
 
     def parse_vocab(line):
@@ -251,7 +256,7 @@ def create_png(sections, output_path):
         return get_text_width(text) * 10
 
     # 词汇表解析
-    vocab_lines = sections.get('vocabulary', '').split('\n')
+    vocab_lines = sections.get('vocabulary', [])
     vocab_lines = [l for l in vocab_lines if l.strip()]
 
     def parse_vocab(line):
