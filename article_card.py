@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PNG + MD + PDF 卡片生成"""
+"""卡片生成：把 solar_system_trans.txt 原样渲染成 MD/PNG/PDF"""
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -8,104 +8,62 @@ import os
 import sys
 from datetime import datetime
 
-def load_bilingual_txt(txt_file):
-    article = {
-        'title': '', 'original': '', 'translation': '',
-        'en_zh': [], 'vocabulary': [], 'sentences': []
-    }
-    section = None
-    en_zh_buffer = []
-
+def load_txt(txt_file):
+    """读取 txt 文件，按区块解析"""
     with open(txt_file, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.rstrip('\n')
-            if line.startswith('TITLE:'):
-                article['title'] = line.replace('TITLE:', '').strip()
-            elif line == '---':
-                if section == 'en_zh' and en_zh_buffer:
-                    article['en_zh'].append('\n'.join(en_zh_buffer))
-                    en_zh_buffer = []
-                section = None
-            elif section == 'original':
-                article['original'] += line + '\n'
-            elif section == 'translation':
-                article['translation'] += line + '\n'
-            elif section == 'en_zh':
-                en_zh_buffer.append(line)
-            elif line == 'ORIGINAL:':
-                section = 'original'
-            elif line == 'TRANSLATION:':
-                section = 'translation'
-            elif line == 'EN-ZH:':
-                section = 'en_zh'
-            elif line == 'VOCABULARY:':
-                section = 'vocab'
-            elif line == 'SENTENCES:':
-                section = 'sent'
-            elif section == 'vocab' and '|' in line:
-                parts = line.split('|', 3)
-                if len(parts) >= 2:
-                    import re
-                    word_match = re.match(r'^\d+\.\s*(.+)', parts[0])
-                    word = word_match.group(1) if word_match else parts[0]
-                    article['vocabulary'].append({
-                        'word': word,
-                        'meaning': parts[1]
-                    })
-            elif section == 'sent' and line.strip():
-                import re
-                sent_match = re.match(r'^(\d+\.\s*.+)', line)
-                if sent_match:
-                    article['sentences'].append({'original': sent_match.group(1), 'translation': ''})
-                elif article['sentences'] and not article['sentences'][-1].get('translation'):
-                    article['sentences'][-1]['translation'] = line
-    return article
+        content = f.read()
 
-def text_width(text, font):
-    import unicodedata
-    width = 0
-    for c in text:
-        if unicodedata.east_asian_width(c) in ('W', 'F'):
-            width += 2
-        else:
-            width += 1
-    return width
+    sections = {}
+    current_section = None
+    current_content = []
 
-def is_chinese(text):
-    import re
-    return bool(re.search('[\u4e00-\u9fff]', text))
+    for line in content.split('\n'):
+        if line.startswith('TITLE:'):
+            sections['title'] = line.replace('TITLE:', '').strip()
+        elif line == '---':
+            if current_section:
+                sections[current_section] = '\n'.join(current_content).strip()
+                current_content = []
+            current_section = None
+        elif line == 'ORIGINAL:':
+            current_section = 'original'
+        elif line == 'EN-CH:':
+            current_section = 'en_ch'
+        elif line == 'VOCABULARY:':
+            current_section = 'vocabulary'
+        elif line == 'SENTENCES:':
+            current_section = 'sentences'
+        elif current_section:
+            current_content.append(line)
 
-def wrap_text(text, max_chars=40):
-    if not text:
-        return []
+    if current_section:
+        sections[current_section] = '\n'.join(current_content).strip()
 
-    lines = []
-    for paragraph in text.split('\n'):
-        if not paragraph.strip():
-            lines.append('')
-            continue
+    return sections
 
-        if is_chinese(paragraph):
-            i = 0
-            while i < len(paragraph):
-                lines.append(paragraph[i:i + max_chars])
-                i += max_chars
-        else:
-            words = paragraph.split(' ')
-            current_line = ""
-            for word in words:
-                if len(current_line) + len(word) + 1 <= max_chars:
-                    current_line += (" " if current_line else "") + word
-                else:
-                    if current_line:
-                        lines.append(current_line)
-                    current_line = word
-            if current_line:
-                lines.append(current_line)
+def create_md(sections, output_path):
+    """生成 MD 文件"""
+    content = f"# {sections.get('title', '')}\n\n"
+    content += f"> 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    content += "---\n\n"
+    content += "## 原文\n\n"
+    content += sections.get('original', '') + "\n\n"
+    content += "---\n\n"
+    content += "## 中英双语\n\n"
+    content += sections.get('en_ch', '') + "\n\n"
+    content += "---\n\n"
+    content += "## 词汇表\n\n"
+    content += sections.get('vocabulary', '') + "\n\n"
+    content += "---\n\n"
+    content += "## 精彩句子\n\n"
+    content += sections.get('sentences', '') + "\n"
 
-    return lines
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    print(f"MD: {output_path}")
 
-def create_png(article, output_path):
+def create_png(sections, output_path):
+    """生成 PNG 图片"""
     from PIL import Image, ImageDraw, ImageFont
 
     font_path = "LXGWWenKaiMono-Bold.ttf"
@@ -124,253 +82,111 @@ def create_png(article, output_path):
     LINE_HEIGHT = 42
     LINE_HEIGHT_CN = 52
     CARD_WIDTH = 780
-    LINE_CHARS = 50
-    LINE_CHARS_CN = 23
-    max_width = CARD_WIDTH - MARGIN * 2
 
-    y = MARGIN
-
-    y += 45
-    for line in wrap_text(article['title'], LINE_CHARS):
-        y += LINE_HEIGHT + 5
-    y += 30
-    y += 20
-    y += 45
-
-    en_zh_pairs = article.get('en_zh', [])
-    for pair in en_zh_pairs:
-        lines = pair.split('\n')
+    def get_text_height(text, is_chinese=False):
+        """计算文本高度"""
+        lines = text.split('\n')
+        height = 0
         for line in lines:
             if line.strip():
-                if any('a' <= c <= 'z' or 'A' <= c <= 'Z' for c in line[:10]):
-                    for l in wrap_text(line, LINE_CHARS):
-                        y += LINE_HEIGHT
-                else:
-                    for l in wrap_text(line, LINE_CHARS_CN):
-                        y += LINE_HEIGHT_CN
-        y += 15
+                height += LINE_HEIGHT_CN if is_chinese else LINE_HEIGHT
+        return height
 
+    # 计算总高度
+    y = MARGIN
+    y += 45  # WordCard
+    y += 45 + 30  # 标题
+    y += 20
+    y += 45 + 45  # 原文
+    y += get_text_height(sections.get('original', ''), False)
     y += 30
-    y += 45
-
-    vocab = article['vocabulary']
-    half = (len(vocab) + 1) // 2
-    left_col = vocab[:half]
-    right_col = vocab[half:]
-
-    center_x = CARD_WIDTH // 2
-
-    left_y = y
-    right_y = y
-
-    for i in range(len(left_col)):
-        v = left_col[i]
-        word_w = text_width(v['word'], font_en)
-        if word_w + text_width(v['meaning'], font_text) + 80 > center_x - MARGIN - 20:
-            meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
-            left_y += len(meaning_lines) * LINE_HEIGHT_CN
-        else:
-            left_y += LINE_HEIGHT_CN
-        left_y += 10
-
-    for i in range(len(right_col)):
-        v = right_col[i]
-        word_w = text_width(v['word'], font_en)
-        if word_w + text_width(v['meaning'], font_text) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
-            meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
-            right_y += len(meaning_lines) * LINE_HEIGHT_CN
-        else:
-            right_y += LINE_HEIGHT_CN
-        right_y += 10
-
-    y = max(left_y, right_y) + 10
+    y += 45 + 45  # 中英双语
+    y += get_text_height(sections.get('en_ch', ''), True)
     y += 30
-    y += 45
-    for i, s in enumerate(article['sentences'], 1):
-        orig_w = font_en.getlength(f"{i}. ")
-        for j, ol in enumerate(wrap_text(s['original'], LINE_CHARS)):
-            y += LINE_HEIGHT
-        for tl in wrap_text(s['translation'], LINE_CHARS_CN):
-            y += LINE_HEIGHT_CN
-        y += 10
+    y += 45 + 45  # 词汇表
+    vocab_lines = sections.get('vocabulary', '').split('\n')
+    y += len([l for l in vocab_lines if l.strip()]) * LINE_HEIGHT_CN
+    y += 30
+    y += 45 + 45  # 精彩句子
+    y += get_text_height(sections.get('sentences', ''), True)
+    y += MARGIN
 
-    final_height = y + MARGIN
-
-    img = Image.new('RGB', (CARD_WIDTH, int(final_height)), '#F5F5F5')
+    img = Image.new('RGB', (CARD_WIDTH, int(y)), '#F5F5F5')
     draw = ImageDraw.Draw(img)
     y = MARGIN
 
+    # WordCard
     draw.text((MARGIN, y), "WordCard", font=font_section, fill='#27AE60')
     y += 45
 
-    for line in wrap_text(article['title'], LINE_CHARS):
+    # 标题
+    for line in sections.get('title', '').split('\n'):
         draw.text((MARGIN, y), line, font=font_title, fill='#34495E')
-        y += LINE_HEIGHT + 5
+        y += 45
     y += 30
 
+    # 原文
     y += 20
     draw.text((MARGIN, y), "原文", font=font_section, fill='#27AE60')
     y += 45
-    for line in article['original'].split('\n'):
+    for line in sections.get('original', '').split('\n'):
         if line.strip():
-            for l in wrap_text(line, LINE_CHARS):
-                draw.text((MARGIN + 10, y), l, font=font_en, fill='#34495E')
-                y += LINE_HEIGHT
-
+            draw.text((MARGIN + 10, y), line, font=font_en, fill='#34495E')
+            y += LINE_HEIGHT
     y += 30
+
+    # 中英双语
     draw.text((MARGIN, y), "中英双语", font=font_section, fill='#27AE60')
     y += 45
-    en_zh_pairs = article.get('en_zh', [])
-    for pair in en_zh_pairs:
-        for line in pair.split('\n'):
-            if line.strip():
-                if any('a' <= c <= 'z' or 'A' <= c <= 'Z' for c in line[:10]):
-                    for l in wrap_text(line, LINE_CHARS):
-                        draw.text((MARGIN + 10, y), l, font=font_en, fill='#34495E')
-                        y += LINE_HEIGHT
-                else:
-                    for l in wrap_text(line, LINE_CHARS_CN):
-                        draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
-                        y += LINE_HEIGHT_CN
-        y += 15
-
+    for line in sections.get('en_ch', '').split('\n'):
+        if line.strip():
+            is_cn = any('\u4e00' <= c <= '\u9fff' for c in line)
+            draw.text((MARGIN + 10, y), line, font=font_text if is_cn else font_en, fill='#7F8C8D' if is_cn else '#34495E')
+            y += LINE_HEIGHT_CN if is_cn else LINE_HEIGHT
     y += 30
+
+    # 词汇表
     draw.text((MARGIN, y), "词汇表", font=font_section, fill='#27AE60')
     y += 45
-
-    left_start_y = y
+    center_x = CARD_WIDTH // 2
     left_y = y
     right_y = y
+    left_col = vocab_lines[:len(vocab_lines)//2]
+    right_col = vocab_lines[len(vocab_lines)//2:]
 
-    for i in range(len(left_col)):
-        v = left_col[i]
-        word_w = text_width(v['word'], font_en)
-        if word_w + text_width(v['meaning'], font_text) + 80 > center_x - MARGIN - 20:
-            meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
-            draw.text((MARGIN + 10 + 1, left_y + 1), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
-            for ml in meaning_lines:
-                ml_w = text_width(ml, font_text)
-                draw.text((MARGIN + 220 + 1, left_y + 1), ml, font=font_text, fill='#E74C3C')
-                draw.text((MARGIN + 220, left_y), ml, font=font_text, fill='#E74C3C')
-                left_y += LINE_HEIGHT_CN
-        else:
-            draw.text((MARGIN + 10 + 1, left_y + 1), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((MARGIN + 10, left_y), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((MARGIN + 220 + 1, left_y + 1), v['meaning'], font=font_text, fill='#E74C3C')
-            draw.text((MARGIN + 220, left_y), v['meaning'], font=font_text, fill='#E74C3C')
+    for i, line in enumerate(left_col):
+        if line.strip():
+            draw.text((MARGIN + 10, left_y), line, font=font_en, fill='#E74C3C')
             left_y += LINE_HEIGHT_CN
-
         draw.line((MARGIN, left_y, center_x - 10, left_y), fill='#E0E0E0')
         left_y += 10
 
-    for i in range(len(right_col)):
-        v = right_col[i]
-        word_w = text_width(v['word'], font_en)
-        if word_w + text_width(v['meaning'], font_text) + 80 > CARD_WIDTH - center_x - MARGIN - 20:
-            meaning_lines = wrap_text(v['meaning'], LINE_CHARS_CN)
-            draw.text((center_x + 20 + 1, right_y + 1), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
-            for ml in meaning_lines:
-                ml_w = text_width(ml, font_text)
-                draw.text((center_x + 230 + 1, right_y + 1), ml, font=font_text, fill='#E74C3C')
-                draw.text((center_x + 230, right_y), ml, font=font_text, fill='#E74C3C')
-                right_y += LINE_HEIGHT_CN
-        else:
-            draw.text((center_x + 20 + 1, right_y + 1), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((center_x + 20, right_y), v['word'], font=font_en, fill='#E74C3C')
-            draw.text((center_x + 230 + 1, right_y + 1), v['meaning'], font=font_text, fill='#E74C3C')
-            draw.text((center_x + 230, right_y), v['meaning'], font=font_text, fill='#E74C3C')
+    for i, line in enumerate(right_col):
+        if line.strip():
+            draw.text((center_x + 20, right_y), line, font=font_en, fill='#E74C3C')
             right_y += LINE_HEIGHT_CN
-
         draw.line((center_x + 10, right_y, CARD_WIDTH - MARGIN, right_y), fill='#E0E0E0')
         right_y += 10
 
-    draw.line((center_x, left_start_y, center_x, max(left_y, right_y)), fill='#E0E0E0')
-
-    y = max(left_y, right_y) + 10
+    draw.line((center_x, y, center_x, max(left_y, right_y)), fill='#E0E0E0')
+    y = max(left_y, right_y)
     y += 30
+
+    # 精彩句子
     draw.text((MARGIN, y), "精彩句子", font=font_section, fill='#27AE60')
     y += 45
-    for i, s in enumerate(article['sentences'], 1):
-        orig_w = font_en.getlength(f"{i}. ")
-        for j, ol in enumerate(wrap_text(s['original'], LINE_CHARS)):
-            prefix = f"{i}. " if j == 0 else "   "
-            draw.text((MARGIN + 10, y), prefix + ol, font=font_en, fill='#34495E')
-            y += LINE_HEIGHT
-        for tl in wrap_text(s['translation'], LINE_CHARS_CN):
-            draw.text((MARGIN + 30, y), tl, font=font_text, fill='#7F8C8D')
-            y += LINE_HEIGHT_CN
-        y += 10
+    for line in sections.get('sentences', '').split('\n'):
+        if line.strip():
+            is_cn = any('\u4e00' <= c <= '\u9fff' for c in line)
+            draw.text((MARGIN + 10, y), line, font=font_text if is_cn else font_en, fill='#7F8C8D' if is_cn else '#34495E')
+            y += LINE_HEIGHT_CN if is_cn else LINE_HEIGHT
 
     img.save(output_path)
     print(f"PNG: {output_path}")
     return True
 
-def create_md(article, output_path):
-    content = f"""# {article['title']}
-
-> 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
----
-
-## 原文
-
-{article['original']}
-
----
-
-## 中英双语
-
-"""
-
-    en_zh_pairs = article.get('en_zh', [])
-    for pair in en_zh_pairs:
-        content += pair
-        content += "\n\n"
-
-    content += """---
-
-## 词汇表
-
-"""
-
-    vocab = article['vocabulary']
-    half = (len(vocab) + 1) // 2
-    left_col = vocab[:half]
-    right_col = vocab[half:]
-
-    word_width = 25
-    col_width = 45
-    for i in range(max(len(left_col), len(right_col))):
-        left_item = left_col[i] if i < len(left_col) else None
-        right_item = right_col[i] if i < len(right_col) else None
-
-        left_str = ""
-        right_str = ""
-
-        if left_item:
-            left_str = f"{left_item['word']:<{word_width}}  {left_item['meaning']}"
-            left_str = f"{left_str:<{col_width}}"
-
-        if right_item:
-            right_str = f"{right_item['word']:<{word_width}}  {right_item['meaning']}"
-            right_str = f"{right_str:<{col_width}}"
-
-        content += f"| {left_str} | {right_str} |\n"
-
-    content += "\n---\n\n## 精彩句子\n\n"
-
-    for i, s in enumerate(article['sentences'], 1):
-        content += f"> **{s['original']}**\n>\n> {s['translation']}\n\n"
-
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(content)
-
-    print(f"MD: {output_path}")
-    return True
-
-def create_pdf(article, output_path):
+def create_pdf(sections, output_path):
+    """生成 PDF 文件"""
     try:
         from fpdf import FPDF
     except ImportError:
@@ -392,85 +208,74 @@ def create_pdf(article, output_path):
 
     pdf = PDF(unit='mm', format=(100, 178))
     pdf.add_page()
-
     pdf.add_font('LXGW', '', FONT_PATH, uni=True)
-
     pdf.set_font('LXGW', '', 10)
-    pdf.cell(0, 10, article["title"], 0, 1, 'C')
+    pdf.cell(0, 10, sections.get('title', ''), 0, 1, 'C')
     pdf.ln(5)
 
+    vocab = sections.get('vocabulary', '').split('\n')
+    sentences = sections.get('sentences', '').split('\n')
     pdf.set_font('LXGW', '', 8)
-    pdf.cell(0, 5, f"Vocabulary: {len(article['vocabulary'])} | Sentences: {len(article['sentences'])}", 0, 1, 'C')
+    pdf.cell(0, 5, f"Vocabulary: {len([v for v in vocab if v.strip()])} | Sentences: {len([s for s in sentences if s.strip()])}", 0, 1, 'C')
     pdf.ln(5)
 
+    # 原文
     pdf.add_page()
     pdf.set_font('LXGW', '', 12)
     pdf.cell(0, 10, '原文 / Original', 0, 1, 'L')
     pdf.line(10, pdf.get_y(), 90, pdf.get_y())
     pdf.ln(3)
-
     pdf.set_font('LXGW', '', 9)
-    original_lines = article['original'].replace('\n', ' ').split('. ')
-    for para in original_lines:
-        pdf.multi_cell(0, 5, para + '.')
-        pdf.ln(2)
+    for line in sections.get('original', '').split('\n'):
+        if line.strip():
+            pdf.multi_cell(0, 5, line)
+            pdf.ln(2)
 
+    # 中英双语
     pdf.add_page()
     pdf.set_font('LXGW', '', 12)
     pdf.cell(0, 10, '中英双语 / EN-CH', 0, 1, 'L')
     pdf.line(10, pdf.get_y(), 90, pdf.get_y())
     pdf.ln(3)
-
     pdf.set_font('LXGW', '', 9)
-    en_zh_pairs = article.get('en_zh', [])
-    for pair in en_zh_pairs:
-        for line in pair.split('\n'):
-            if line.strip():
-                pdf.multi_cell(0, 5, line)
-        pdf.ln(3)
+    for line in sections.get('en_ch', '').split('\n'):
+        if line.strip():
+            pdf.multi_cell(0, 5, line)
+            pdf.ln(2)
 
+    # 词汇表
     pdf.add_page()
     pdf.set_font('LXGW', '', 12)
     pdf.cell(0, 10, '词汇表 / Vocabulary', 0, 1, 'L')
     pdf.line(10, pdf.get_y(), 90, pdf.get_y())
     pdf.ln(3)
-
     pdf.set_font('LXGW', '', 9)
-
-    vocab = article['vocabulary']
-    half = (len(vocab) + 1) // 2
-    left_col = vocab[:half]
-    right_col = vocab[half:]
-
+    left_col = vocab[:len(vocab)//2]
+    right_col = vocab[len(vocab)//2:]
     for i in range(max(len(left_col), len(right_col))):
         y = pdf.get_y()
-
-        if i < len(left_col):
-            v = left_col[i]
-            pdf.text(12, y + 3, f"{v['word']} - {v['meaning']}")
-
-        pdf.line(50, y, 50, y + 5)
-
-        if i < len(right_col):
-            v = right_col[i]
-            pdf.text(54, y + 3, f"{v['word']} - {v['meaning']}")
-
+        if i < len(left_col) and left_col[i].strip():
+            pdf.text(12, y + 3, left_col[i])
+        if i < len(right_col) and right_col[i].strip():
+            pdf.line(50, y, 50, y + 5)
+            pdf.text(54, y + 3, right_col[i])
         pdf.ln(10)
 
+    # 精彩句子
     pdf.add_page()
     pdf.set_font('LXGW', '', 12)
     pdf.cell(0, 10, '精彩句子 / Sentences', 0, 1, 'L')
     pdf.line(10, pdf.get_y(), 90, pdf.get_y())
     pdf.ln(3)
-
-    for i, s in enumerate(article['sentences'], 1):
-        pdf.set_font('LXGW', '', 9)
-        pdf.multi_cell(0, 5, f"{i}. {s['original']}")
-        pdf.set_font('LXGW', '', 9)
-        pdf.set_text_color(100, 100, 100)
-        pdf.multi_cell(0, 5, s['translation'])
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(2)
+    pdf.set_font('LXGW', '', 9)
+    for line in sections.get('sentences', '').split('\n'):
+        if line.strip():
+            is_cn = any('\u4e00' <= c <= '\u9fff' for c in line)
+            if is_cn:
+                pdf.set_text_color(100, 100, 100)
+            pdf.multi_cell(0, 5, line)
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(2)
 
     pdf.output(output_path)
     print(f"PDF: {output_path}")
@@ -483,24 +288,22 @@ def main():
         sys.exit(1)
 
     input_file = sys.argv[1]
-    if input_file.endswith('_trans.txt'):
-        txt_file = f"output/{input_file}"
-    else:
-        txt_file = f"output/{input_file}_trans.txt"
+    txt_file = f"output/{input_file}" if not input_file.startswith('output/') else input_file
 
     if not os.path.exists(txt_file):
         print(f"错误: 文件不存在 {txt_file}")
         sys.exit(1)
 
-    article = load_bilingual_txt(txt_file)
-    base_name = os.path.splitext(txt_file)[0]
-    base_name = os.path.basename(base_name)
+    print(f"读取: {txt_file}")
+    sections = load_txt(txt_file)
+    print(f"标题: {sections.get('title', '')}")
 
+    base_name = os.path.splitext(os.path.basename(txt_file))[0]
     os.makedirs('output', exist_ok=True)
 
-    create_png(article, f"output/{base_name}.png")
-    create_md(article, f"output/{base_name}.md")
-    create_pdf(article, f"output/{base_name}.pdf")
+    create_md(sections, f"output/{base_name}.md")
+    create_png(sections, f"output/{base_name}.png")
+    create_pdf(sections, f"output/{base_name}.pdf")
 
 if __name__ == '__main__':
     main()
