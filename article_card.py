@@ -184,7 +184,7 @@ def create_md(sections, output_path):
         if is_chinese(line):
             content += wrap_chinese_md(line, ZH_WRAP * 2) + "\n\n"
         else:
-            content += wrap_english_md(line, EN_WRAP) + "\n"
+            content += wrap_english_md(line, EN_WRAP) + "\n\n"
     content += "\n---\n\n"
     content += "## 词汇表\n\n"
 
@@ -243,7 +243,7 @@ def create_md(sections, output_path):
         if is_chinese(line):
             content += wrap_chinese_md(line, ZH_WRAP * 2) + "\n\n"
         else:
-            content += wrap_english_md(line, EN_WRAP) + "\n"
+            content += wrap_english_md(line, EN_WRAP) + "\n\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
