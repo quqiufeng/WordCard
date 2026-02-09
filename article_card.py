@@ -449,7 +449,7 @@ def create_pdf(sections, output_path):
     pdf.cell(0, 10, sections.get('title', ''), 0, 1, 'C')
     pdf.ln(5)
 
-    vocab = sections.get('vocabulary', '').split('\n')
+    vocab = sections.get('vocabulary', [])
     sentences = sections.get('sentences', '').split('\n')
     pdf.set_font('LXGW', '', 8)
     pdf.cell(0, 5, f"Vocabulary: {len([v for v in vocab if v.strip()])} | Sentences: {len([s for s in sentences if s.strip()])}", 0, 1, 'C')
