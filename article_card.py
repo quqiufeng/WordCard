@@ -53,7 +53,24 @@ def create_md(sections, output_path):
     content += sections.get('en_ch', '') + "\n\n"
     content += "---\n\n"
     content += "## 词汇表\n\n"
-    content += sections.get('vocabulary', '') + "\n\n"
+
+    vocab_lines = sections.get('vocabulary', '').split('\n')
+    vocab_lines = [line for line in vocab_lines if line.strip()]
+
+    left_col = vocab_lines[:len(vocab_lines)//2]
+    right_col = vocab_lines[len(vocab_lines)//2:]
+
+    for i in range(max(len(left_col), len(right_col))):
+        left_item = left_col[i] if i < len(left_col) else ""
+        right_item = right_col[i] if i < len(right_col) else ""
+
+        col_width = 45
+        left_str = f"{left_item:<{col_width}}"
+        right_str = f"{right_item:<{col_width}}"
+
+        content += f"| {left_str} | {right_str} |\n"
+
+    content += "\n"
     content += "---\n\n"
     content += "## 精彩句子\n\n"
     content += sections.get('sentences', '') + "\n"
