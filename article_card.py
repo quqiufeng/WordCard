@@ -58,29 +58,31 @@ def create_md(sections, output_path):
     vocab_lines = [line for line in vocab_lines if line.strip()]
 
     def parse_vocab(line):
-        """解析 '1. word|中文' 格式，返回 (英文, 中文)"""
+        """解析 '1. word|中文' 格式，去掉序号，返回 (英文, 中文)"""
         if '|' in line:
             parts = line.split('|', 1)
-            return parts[0].strip(), parts[1].strip()
+            en = parts[0].strip()
+            cn = parts[1].strip()
+            # 去掉开头的数字序号（如 "1." 或 "10."）
+            import re
+            en = re.sub(r'^\d+\.\s*', '', en)
+            return en, cn
         return line, ""
 
     left_col = vocab_lines[:len(vocab_lines)//2]
     right_col = vocab_lines[len(vocab_lines)//2:]
 
-    left_col_width = 40
-    right_col_width = 40
+    left_col_width = 25
+    right_col_width = 25
 
     for i in range(max(len(left_col), len(right_col))):
         left_en, left_cn = parse_vocab(left_col[i]) if i < len(left_col) else ("", "")
         right_en, right_cn = parse_vocab(right_col[i]) if i < len(right_col) else ("", "")
 
-        left_item = f"{left_en}{' ' * 15}{left_cn}"
-        right_item = f"{right_en}{' ' * 15}{right_cn}"
+        left_item = f"{left_en:<{left_col_width - 10}}{left_cn}"
+        right_item = f"{right_en:<{right_col_width - 10}}{right_cn}"
 
-        left_str = f"{left_item:<{left_col_width}}"
-        right_str = f"{right_item:<{right_col_width}}"
-
-        content += f"| {left_str} | {right_str} |\n"
+        content += f"| {left_item} | {right_item} |\n"
 
     content += "\n"
     content += "---\n\n"
