@@ -5,15 +5,15 @@
 ## 功能特点
 
 - **全文翻译**：使用 NLLB-200 模型将英文翻译成中文
-- **词汇提取**：自动从文章提取长度>=6的有价值词汇（过滤常用词）
-- **句子提取**：提取包含关键词的精彩句子（80-250字符）
+- **词汇提取**：自动从文章提取长度>5的有价值词汇（过滤常用词）
+- **句子提取**：提取包含关键词的精彩句子
 - **双语对照**：生成 EN-CH 双语区块，英文中文逐段对照
-- **格式美观**：中英文宽度对齐，段落清晰
+- **卡片生成**：一键生成 PNG、PDF、MD 三种格式的学习卡片
 
 ## 安装依赖
 
 ```bash
-pip install ctransformers transformers tqdm torch
+pip install ctranslate2 transformers tqdm torch pillow fpdf
 ```
 
 **模型要求**：
@@ -23,19 +23,44 @@ pip install ctransformers transformers tqdm torch
 
 ## 使用方法
 
+### 1. 翻译文章
+
 ```bash
 python translate.py article.txt
 ```
 
+### 2. 生成卡片
+
+```bash
+python article_card.py article_trans.txt
+```
+
+## 输出示例
+
+查看 `output/` 目录：
+
+| 文件 | 说明 |
+|------|------|
+| `solar_system_trans.md` | Markdown 格式 |
+| `solar_system_trans.png` | PNG 图片卡片 |
+| `solar_system_trans.pdf` | PDF 文档卡片 |
+
 ## 配置说明
 
-脚本顶部可配置参数：
+### translate.py 参数
 
 ```python
 MODEL_DIR = "E:/cuda/nllb-200-3.3B-ct2-float16"  # 模型路径
-
-EN_WRAP = 65  # 英文每行字符数（与中文40字符宽度对齐）
+EN_WRAP = 65  # 英文每行字符数
 ZH_WRAP = 40  # 中文每行字符数
+```
+
+### article_card.py 参数
+
+```python
+CARD_WIDTH = 780  # PNG图片宽度(像素)
+EN_WRAP = 52  # 英文换行字符数
+ZH_WRAP = 25  # 中文换行字符数
 ```
 
 ## 技术架构
@@ -46,13 +71,19 @@ ZH_WRAP = 40  # 中文每行字符数
 translate.py
 ├── load_translator()      # 加载 NLLB 翻译模型
 ├── load_article()         # 读取原始文章，解析段落
-├── translate_text()       # 翻译单个文本
-├── translate_batch()      # 批量翻译（带进度条）
-├── wrap_english()          # 英文按字符数换行（单词边界断行）
-├── wrap_chinese()         # 中文按字符数换行
+├── translate_text()        # 翻译单个文本
+├── translate_batch()       # 批量翻译（带进度条）
+├── wrap_english()         # 英文按字符数换行（单词边界断行）
+├── wrap_chinese()          # 中文按字符数换行
 ├── extract_vocabulary()    # 提取文章词汇（过滤常用词）
 ├── extract_sentences()     # 提取精彩句子
 └── create_trans_file()     # 生成输出文件
+
+article_card.py
+├── load_txt()             # 解析 _trans.txt 文件
+├── create_md()            # 生成 Markdown 文件
+├── create_png()           # 生成 PNG 图片卡片
+└── create_pdf()           # 生成 PDF 文档卡片
 ```
 
 ### 处理流程
@@ -70,7 +101,7 @@ translate.py
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│ 3. 提取词汇      │  长度>=6，过滤常用词
+│ 3. 提取词汇      │  长度>5，过滤常用词
 └────────┬────────┘
          ▼
 ┌─────────────────┐
@@ -78,15 +109,21 @@ translate.py
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│ 5. 提取句子      │  80-250字符，关键词筛选
+│ 5. 提取句子      │  关键词筛选
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│ 6. 翻译句子      │  逐句翻译
+│ 6. 翻译句子      │  逗号拆分翻译
 └────────┬────────┘
          ▼
 ┌─────────────────┐
 │ 7. 生成输出      │  格式化为 _trans.txt
+└────────┬────────┘
+         ▼
+    _trans.txt
+         ▼
+┌─────────────────┐
+│ 8. 生成卡片      │  PNG / PDF / MD
 └─────────────────┘
 ```
 
@@ -110,19 +147,21 @@ translate.py
 
 - **句子提取算法**：
   ```
-  1. 词汇表已提取 Top 20 重要词汇
-  2. 按 [.!?] 标点分割句子
-  3. 长度筛选：80 < 字符数 < 250
-  4. 匹配包含词汇表词汇的句子
-  5. 每个词汇最多匹配1个句子，最多返回20个
+  1. 按 [.!?] 标点分割句子
+  2. 长度筛选：80 < 字符数 < 250
+  3. 匹配包含词汇表词汇的句子
+  4. 每个词汇最多匹配1个句子
+  5. 最多返回20个句子
   ```
 
 - **文本换行**：
   - 英文：按字符数，在单词边界断行
   - 中文：按字符数截断
-  - 中英文宽度对齐（65字符 ≈ 40汉字）
+  - 中英文宽度对齐
 
 ## 输出格式
+
+### TXT 文件
 
 ```txt
 TITLE: 文章标题
@@ -133,26 +172,63 @@ ORIGINAL:
 ---
 
 EN-CH:
-中英双语：
-[段落1]
-英文...
-中文...
-[段落2]
-英文...
-中文...
+英文段落1
+中文翻译1
+英文段落2
+中文翻译2
+...
 
 ---
 
 VOCABULARY:
-1. vocabulary|n.|词汇
+1. vocabulary|中文翻译
 2. ...
-3. ...
 
 ---
 
 SENTENCES:
-1. English sentence.|中文翻译。
+1. English sentence.
+中文翻译。
 2. ...
+```
+
+### MD 文件
+
+Markdown 格式，词汇表双列显示：
+
+```markdown
+# 标题
+
+> 生成时间: 2025-02-09
+
+---
+
+## 原文
+
+英文原文...
+
+---
+
+## 中英双语
+
+英文段落...
+中文翻译...
+
+---
+
+## 词汇表
+
+| 英文                中文        | 英文              中文     |
+| planets             星球       | asteroids         小行星   |
+| system              系统       | particles         颗粒     |
+
+---
+
+## 精彩句子
+
+> **English sentence.**
+>
+> 中文翻译。
 ```
 
 ## 文件说明
@@ -164,6 +240,7 @@ SENTENCES:
 | `solar_system.txt` | 示例英文文章 |
 | `solar_system_trans.txt` | 翻译后的双语文件 |
 | `output/` | 生成的卡片文件目录 |
+| `*.ttf` | 中英文字体文件 |
 
 ## 运行环境
 
@@ -171,3 +248,13 @@ SENTENCES:
 - CUDA 11.x + cuDNN 8.x
 - 8GB+ GPU 显存
 - Windows/Linux
+
+## 字体说明
+
+项目包含以下字体文件：
+
+- `LXGWWenKai-Regular.ttf` - 中文常规字体（PDF使用）
+- `LXGWWenKaiMono-Bold.ttf` - 中文粗体（PNG标题使用）
+- `JetBrainsMono-Bold.ttf` - 英文粗体
+
+字体文件需放在项目根目录。
