@@ -257,12 +257,12 @@ def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, 
     content += "---\n\n"
     content += "VOCABULARY:\n"
     for i in range(len(vocab_list)):
-        content += f"{i+1}. {vocab_list[i]}|{vocab_trans[i]}\n"
+        content += f"{i+1}. {vocab_list[i]}|{wrap_chinese(vocab_trans[i])}\n"
     content += '\n'
     content += "---\n\n"
     content += "SENTENCES:\n"
     for i in range(len(sent_list)):
-        content += f"{i+1}. {sent_list[i]}\n{sent_trans[i]}\n"
+        content += f"{i+1}. {wrap_english(sent_list[i])}\n{wrap_chinese(sent_trans[i])}\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
