@@ -55,7 +55,7 @@ def translate_text(translator, tokenizer, text, source_lang="eng_Latn", target_l
     """翻译单个文本"""
     import torch
 
-    encoded = tokenizer.convert_text_to_ids(text)
+    encoded = tokenizer.encode(text)
     tokens = tokenizer.convert_ids_to_tokens(encoded)
 
     results = translator.translate_batch([tokens], target_prefix=[[target_lang]])
