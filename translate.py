@@ -12,6 +12,7 @@ import transformers
 import time
 import sys
 from pathlib import Path
+from tqdm import tqdm
 
 MODEL_DIR = "E:/cuda/nllb-200-3.3B-ct2-float16"
 
@@ -88,18 +89,13 @@ def translate_batch(translator, tokenizer, texts, source_lang="eng_Latn", target
     """翻译文本列表（逐个翻译，确保质量）"""
     all_results = []
 
-    total = len(texts)
-    for i, text in enumerate(texts):
+    for text in tqdm(texts, desc="翻译进度"):
         try:
             result = translate_text(translator, tokenizer, text, source_lang, target_lang)
             all_results.append(result)
         except Exception as e:
-            print(f"  翻译错误: {e}")
+            print(f"\n  翻译错误: {e}")
             all_results.append(text)
-
-        print(f"  翻译进度: {i+1}/{total}", end='\r')
-
-    print(f"  翻译进度: {total}/{total} (100%)")
 
     return all_results
 
@@ -134,31 +130,63 @@ def wrap_chinese(text, max_chars=40):
         lines.append(text[i:i+max_chars])
     return '\n'.join(lines)
 
-def extract_vocabulary(text, max_words=15):
-    """从文章中提取长度>=6的单词，按长度排序"""
+def extract_vocabulary(text, max_words=20):
+    """从文章中提取词汇，按重要性加权排序"""
     import re
+    import math
     from collections import Counter
 
     words = re.findall(r'\b[a-zA-Z]+\b', text.lower())
 
-    stop_words = {'the', 'this', 'that', 'these', 'those', 'with', 'from', 'have', 'has',
-                   'been', 'being', 'were', 'there', 'their', 'which', 'about', 'after',
-                   'before', 'more', 'most', 'some', 'such', 'into', 'over', 'through',
-                   'each', 'other', 'than', 'then', 'when', 'where', 'while', 'would',
-                   'could', 'should', 'what', 'where', 'which', 'who', 'whom', 'your',
-                   'you', 'they', 'them', 'will', 'just', 'like', 'only', 'very',
-                   'solar', 'system', 'planets', 'around', 'objects', 'earth'}
+    stop_words = {
+        # 冠词
+        'a', 'an', 'the',
+        # 介词
+        'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'out', 'as',
+        'into', 'like', 'through', 'after', 'over', 'between', 'under', 'above',
+        # 代词
+        'i', 'me', 'my', 'we', 'us', 'our', 'you', 'your', 'he', 'him', 'his', 'she',
+        'her', 'it', 'its', 'they', 'them', 'their', 'what', 'who', 'which', 'whom',
+        # 连词
+        'and', 'but', 'or', 'nor', 'so', 'yet', 'if', 'then',
+        # 动词
+        'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+        'do', 'does', 'did', 'will', 'would', 'shall', 'should', 'can', 'could', 'may',
+        'might', 'must', 'get', 'got', 'go', 'goes', 'went', 'come', 'came', 'see', 'saw',
+        'know', 'knew', 'think', 'thought', 'say', 'said', 'tell', 'told', 'ask', 'asked',
+        'work', 'works', 'make', 'made', 'take', 'took', 'give', 'gave', 'find', 'found',
+        # 副词
+        'not', 'no', 'yes', 'very', 'just', 'only', 'also', 'too', 'now', 'here', 'there',
+        'when', 'where', 'why', 'how', 'all', 'each', 'both', 'few', 'more', 'most', 'other',
+        'some', 'such', 'ever', 'never', 'always', 'often', 'still', 'even', 'back',
+        # 形容词
+        'new', 'old', 'good', 'bad', 'great', 'high', 'small', 'large', 'long', 'short',
+        'young', 'big', 'red', 'black', 'white', 'same', 'different', 'able', 'sure',
+        # 特殊
+        'about', 'into', 'out', 'off', 'down', 'up', 'one', 'two', 'first', 'last',
+    }
 
-    long_words = [w for w in words if len(w) >= 6 and w not in stop_words]
-    word_freq = Counter(long_words)
+    # 过滤停用词
+    filtered = [w for w in words if w not in stop_words]
 
-    sorted_words = sorted(long_words, key=lambda x: len(x), reverse=True)
+    # 计算词频
+    word_freq = Counter(filtered)
+
+    # 简单加权：词频 × log(长度)
+    # 高频且长的词更重要
+    word_scores = {}
+    for word, freq in word_freq.items():
+        score = freq * math.log(len(word))
+        word_scores[word] = score
+
+    # 按分数降序排序
+    sorted_words = sorted(word_scores.items(), key=lambda x: x[1], reverse=True)
+
+    # 去重取前N个
     unique_words = []
-    seen = set()
-    for w in sorted_words:
-        if w not in seen:
-            seen.add(w)
-            unique_words.append(w)
+    for word, score in sorted_words:
+        if word not in unique_words:
+            unique_words.append(word)
         if len(unique_words) >= max_words:
             break
 
@@ -178,7 +206,7 @@ def extract_sentences(text, max_sents=12):
     good_sents = []
     for sent in sents:
         sent = sent.strip()
-        if len(sent) > 60 and len(sent) < 250:
+        if len(sent) > 80 and len(sent) < 250:
             sent_lower = sent.lower()
             if any(kw in sent_lower for kw in keywords):
                 if sent not in good_sents:
@@ -257,7 +285,7 @@ def main():
 
     print("翻译词汇表...")
     vocab_trans = []
-    for word in vocab_list:
+    for word in tqdm(vocab_list, desc="词汇翻译"):
         trans = translate_text(translator, tokenizer, word)
         vocab_trans.append(trans)
 
@@ -267,13 +295,15 @@ def main():
 
     print("翻译精彩句子...")
     sent_trans = []
-    for sent in sent_list:
+    for sent in tqdm(sent_list, desc="句子翻译"):
         trans = translate_text(translator, tokenizer, sent)
         sent_trans.append(trans)
 
     print("\n" + "=" * 50)
     print("生成输出文件...")
-    output_file = input_path.stem + '_trans.txt'
+    import os
+    os.makedirs('output', exist_ok=True)
+    output_file = f"output/{input_path.stem}_trans.txt"
     create_trans_file(title, paragraphs, full_translation, vocab_list, vocab_trans, sent_list, sent_trans, output_file)
 
     cleanup(translator, tokenizer)
