@@ -154,13 +154,22 @@ def create_md(sections, output_path):
             lines.append(current_line)
         return '\n'.join(lines)
 
-    def wrap_chinese_md(text, max_chars):
-        """MD格式中文换行（按字符数）"""
+    def wrap_chinese_md(text, max_width):
+        """MD格式中文换行（按显示宽度，中文字符=2）"""
         if not text:
             return ""
         lines = []
-        for i in range(0, len(text), max_chars):
-            lines.append(text[i:i + max_chars])
+        current_line = ""
+        for char in text:
+            char_width = 2 if is_chinese(char) else 1
+            if get_text_width(current_line) + char_width <= max_width:
+                current_line += char
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = char
+        if current_line:
+            lines.append(current_line)
         return '\n'.join(lines)
 
     content = f"# {sections.get('title', '')}\n\n"
