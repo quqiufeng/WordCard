@@ -221,13 +221,10 @@ def extract_sentences(text, vocab_list, max_sents=20):
         if len(good_sents) >= max_sents:
             break
 
-    # 对句子应用词汇高亮
-    good_sents = [highlight_vocab_in_text(sent, vocab_list) for sent in good_sents]
-
     return good_sents
 
 def highlight_vocab_in_text(text, vocab_list):
-    """将原文中的词汇表单词替换为 [单词] 格式"""
+    """将原文中的词汇表单词替换为 [单词] 格式（只处理英文）"""
     import re
     result = text
     for word in vocab_list:
@@ -267,7 +264,9 @@ def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, 
     content += "---\n\n"
     content += "SENTENCES:\n"
     for i in range(len(sent_list)):
-        content += f"{i+1}. {wrap_english(sent_list[i])}\n\n{wrap_chinese(sent_trans[i])}\n\n"
+        # 对英文应用词汇高亮
+        highlighted = highlight_vocab_in_text(sent_list[i], vocab_list)
+        content += f"{i+1}. {wrap_english(highlighted)}\n\n{wrap_chinese(sent_trans[i])}\n\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
