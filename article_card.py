@@ -68,13 +68,14 @@ def create_md(sections, output_path):
             return en, cn
         return line, ""
 
-    def format_cell(en, cn, en_width=12, total_width=35):
+    def format_cell(en, cn, total_width=35, min_space=3):
         """英文 + 空白 + 中文 = 固定总宽度"""
+        en_len = len(en)
         cn_len = len(cn)
-        space_len = total_width - en_width - cn_len
-        if space_len < 3:
-            space_len = 3
-        return f"{en:<{en_width}}{' ' * space_len}{cn}"
+        space_len = total_width - en_len - cn_len
+        if space_len < min_space:
+            space_len = min_space
+        return f"{en}{' ' * space_len}{cn}"
 
     left_col = vocab_lines[:len(vocab_lines)//2]
     right_col = vocab_lines[len(vocab_lines)//2:]
