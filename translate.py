@@ -134,18 +134,6 @@ def wrap_chinese(text, max_chars=40):
         lines.append(text[i:i+max_chars])
     return '\n'.join(lines)
 
-def format_translation(original_texts, translation_texts):
-    """格式化译文，英文按字符数，中文按汉字"""
-    formatted_en = []
-    for para in original_texts:
-        formatted_en.append(wrap_english(para))
-
-    formatted_zh = []
-    for trans in translation_texts:
-        formatted_zh.append(wrap_chinese(trans, ZH_WRAP))
-
-    return '\n'.join(formatted_en), '\n'.join(formatted_zh)
-
 def extract_vocabulary(text, max_words=15):
     """从文章中提取长度>=6的单词，按长度排序"""
     import re
@@ -198,15 +186,28 @@ def extract_sentences(text, max_sents=12):
 
     return good_sents[:max_sents]
 
-def create_trans_file(title, formatted_en, formatted_zh, vocab_list, vocab_trans, sent_list, sent_trans, output_path):
+def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, sent_list, sent_trans, output_path):
     """生成 trans 格式文件"""
     content = f"TITLE: {title}\n\n"
+    
+    formatted_en = []
+    for para in paragraphs:
+        formatted_en.append(wrap_english(para))
+    
+    formatted_zh = []
+    for trans in translations:
+        formatted_zh.append(wrap_chinese(trans))
+    
     content += "ORIGINAL:\n"
-    content += formatted_en
+    content += '\n'.join(formatted_en)
     content += '\n\n'
-    content += "TRANSLATION:\n"
-    content += formatted_zh
-    content += '\n\n'
+    content += "---\n\n"
+    content += "EN-CH:\n"
+    content += "中英双语：\n\n"
+    
+    for i, (en_para, zh_para) in enumerate(zip(formatted_en, formatted_zh), 1):
+        content += f"{en_para}\n\n{zh_para}\n\n"
+    
     content += "---\n\n"
     content += "VOCABULARY:\n"
     for i in range(len(vocab_list)):
@@ -250,10 +251,6 @@ def main():
     print(f"翻译耗时: {elapsed:.2f}秒")
 
     print("\n" + "=" * 50)
-    print("生成输出文件...")
-    output_file = input_path.stem + '_trans.txt'
-    formatted_en, formatted_zh = format_translation(paragraphs, full_translation)
-
     print("提取词汇表...")
     vocab_list = extract_vocabulary(' '.join(paragraphs), 20)
     print(f"词汇数量: {len(vocab_list)}")
@@ -274,7 +271,10 @@ def main():
         trans = translate_text(translator, tokenizer, sent)
         sent_trans.append(trans)
 
-    create_trans_file(title, formatted_en, formatted_zh, vocab_list, vocab_trans, sent_list, sent_trans, output_file)
+    print("\n" + "=" * 50)
+    print("生成输出文件...")
+    output_file = input_path.stem + '_trans.txt'
+    create_trans_file(title, paragraphs, full_translation, vocab_list, vocab_trans, sent_list, sent_trans, output_file)
 
     cleanup(translator, tokenizer)
     print("\n完成!")
