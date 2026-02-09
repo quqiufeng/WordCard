@@ -74,7 +74,7 @@ def translate_text(translator, tokenizer, text, source_lang="eng_Latn", target_l
     results = translator.translate_batch(
         [tokens],
         target_prefix=[[target_lang]],
-        max_decoding_length=512  # 增加解码长度
+        max_decoding_length=1024  # 更长的解码长度
     )
 
     result_tokens = results[0].hypotheses[0]
