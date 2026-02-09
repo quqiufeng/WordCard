@@ -52,16 +52,13 @@ def load_bilingual_txt(txt_file):
                         'word': word,
                         'meaning': parts[1]
                     })
-            elif section == 'sent' and '|' in line:
-                parts = line.split('|', 1)
-                if len(parts) >= 2:
-                    import re
-                    sent_match = re.match(r'^\d+\.\s*(.+)', parts[0])
-                    sentence = sent_match.group(1) if sent_match else parts[0]
-                    article['sentences'].append({
-                        'original': sentence,
-                        'translation': parts[1]
-                    })
+            elif section == 'sent' and line.strip():
+                import re
+                sent_match = re.match(r'^(\d+\.\s*.+)', line)
+                if sent_match:
+                    article['sentences'].append({'original': sent_match.group(1), 'translation': ''})
+                elif article['sentences'] and not article['sentences'][-1].get('translation'):
+                    article['sentences'][-1]['translation'] = line
     return article
 
 def text_width(text, font):
