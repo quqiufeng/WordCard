@@ -180,9 +180,9 @@ def create_md(sections, output_path):
     content += "---\n\n"
     content += "## 中英双语\n\n"
     en_ch_lines = sections.get('en_ch', '').split('\n')
-    for line in en_ch_lines:
+    for i, line in enumerate(en_ch_lines):
         if is_chinese(line):
-            content += wrap_chinese_md(line, ZH_WRAP * 2) + "\n"
+            content += wrap_chinese_md(line, ZH_WRAP * 2) + "\n\n"
         else:
             content += wrap_english_md(line, EN_WRAP) + "\n"
     content += "\n---\n\n"
@@ -239,9 +239,9 @@ def create_md(sections, output_path):
     content += "---\n\n"
     content += "## 精彩句子\n\n"
     sent_lines = sections.get('sentences', '').split('\n')
-    for line in sent_lines:
+    for i, line in enumerate(sent_lines):
         if is_chinese(line):
-            content += wrap_chinese_md(line, ZH_WRAP * 2) + "\n"
+            content += wrap_chinese_md(line, ZH_WRAP * 2) + "\n\n"
         else:
             content += wrap_english_md(line, EN_WRAP) + "\n"
 
