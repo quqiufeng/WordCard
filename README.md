@@ -1,5 +1,16 @@
 # WordCard Translator
 
+> **TODO**: 用 Ollama + Qwen:7B 替换 NLLB-200，改善翻译质量
+> 
+> 方案：
+> 1. 新增 `ollama_translate.py` - 调用 Ollama API 翻译
+> 2. 修改 `translate.py` - 支持切换翻译后端（NLLB/Ollama）
+> 3. Ollama 配置：`ollama run qwen:7b`
+> 4. API 地址：`http://localhost:11434/api/generate`
+> 5. 提示词模板：`Translate to Chinese: {text}`
+
+---
+
 英文文章自动翻译工具，生成中英双语学习材料。
 
 ## 功能特点
@@ -13,13 +24,20 @@
 ## 安装依赖
 
 ```bash
-pip install ctranslate2 transformers tqdm torch pillow fpdf
+pip install ctranslate2 transformers tqdm torch pillow fpdf requests
 ```
 
 **模型要求**：
+
+**方案A - NLLB（当前）**：
 - 需要下载 NLLB-200 3.3B 模型（FP16格式）
 - 模型路径：`E:/cuda/nllb-200-3.3B-ct2-float16`
 - 支持 CUDA GPU 加速
+
+**方案B - Ollama Qwen（待实现）**：
+- 安装 Ollama：`winget install Ollama.Ollama`
+- 拉取模型：`ollama run qwen:7b`
+- 无需 CUDA，本地 CPU 推理
 
 ## 使用方法
 
