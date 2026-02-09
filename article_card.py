@@ -60,13 +60,15 @@ def create_md(sections, output_path):
     left_col = vocab_lines[:len(vocab_lines)//2]
     right_col = vocab_lines[len(vocab_lines)//2:]
 
+    left_width = 35
+    right_width = 45
+
     for i in range(max(len(left_col), len(right_col))):
         left_item = left_col[i] if i < len(left_col) else ""
         right_item = right_col[i] if i < len(right_col) else ""
 
-        col_width = 45
-        left_str = f"{left_item:<{col_width}}"
-        right_str = f"{right_item:<{col_width}}"
+        left_str = f"{left_item:<{left_width}}"
+        right_str = f"{right_item:<{right_width}}"
 
         content += f"| {left_str} | {right_str} |\n"
 
