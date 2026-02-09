@@ -22,7 +22,11 @@ def load_txt(txt_file):
             sections['title'] = line.replace('TITLE:', '').strip()
         elif line == '---':
             if current_section:
-                sections[current_section] = '\n'.join(current_content).strip()
+                # 原文和中英双语合并成一段，去掉换行
+                if current_section in ('original', 'en_ch'):
+                    sections[current_section] = ' '.join(current_content).strip()
+                else:
+                    sections[current_section] = '\n'.join(current_content).strip()
                 current_content = []
             current_section = None
         elif line == 'ORIGINAL:':
@@ -37,21 +41,44 @@ def load_txt(txt_file):
             current_content.append(line)
 
     if current_section:
-        sections[current_section] = '\n'.join(current_content).strip()
+        if current_section in ('original', 'en_ch'):
+            sections[current_section] = ' '.join(current_content).strip()
+        else:
+            sections[current_section] = '\n'.join(current_content).strip()
 
     return sections
 
 def create_md(sections, output_path):
     """生成 MD 文件"""
+    ZH_WRAP = 25
+    EN_WRAP = 50
+
+    def is_chinese(text):
+        return any('\u4e00' <= c <= '\u9fff' for c in text)
+
+    def wrap_md(text, max_chars):
+        """MD格式换行"""
+        if not text:
+            return ""
+        lines = []
+        for i in range(0, len(text), max_chars):
+            lines.append(text[i:i + max_chars])
+        return '\n'.join(lines)
+
     content = f"# {sections.get('title', '')}\n\n"
     content += f"> 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     content += "---\n\n"
     content += "## 原文\n\n"
-    content += sections.get('original', '') + "\n\n"
+    content += wrap_md(sections.get('original', ''), EN_WRAP) + "\n\n"
     content += "---\n\n"
     content += "## 中英双语\n\n"
-    content += sections.get('en_ch', '') + "\n\n"
-    content += "---\n\n"
+    en_ch_lines = sections.get('en_ch', '').split('\n')
+    for line in en_ch_lines:
+        if is_chinese(line):
+            content += wrap_md(line, ZH_WRAP * 2) + "\n"
+        else:
+            content += wrap_md(line, EN_WRAP) + "\n"
+    content += "\n---\n\n"
     content += "## 词汇表\n\n"
 
     vocab_lines = sections.get('vocabulary', '').split('\n')
@@ -248,26 +275,24 @@ def create_png(sections, output_path):
     y += 20
     draw.text((MARGIN, y), "原文", font=font_section, fill='#27AE60')
     y += 45
-    for line in sections.get('original', '').split('\n'):
-        if line.strip():
-            for l in wrap_english(line, EN_WRAP):
-                draw.text((MARGIN + 10, y), l, font=font_text, fill='#34495E')
-                y += LINE_HEIGHT
+    for line in wrap_english(sections.get('original', ''), EN_WRAP):
+        draw.text((MARGIN + 10, y), line, font=font_text, fill='#34495E')
+        y += LINE_HEIGHT
     y += 30
 
     # 中英双语
     draw.text((MARGIN, y), "中英双语", font=font_section, fill='#27AE60')
     y += 45
-    for line in sections.get('en_ch', '').split('\n'):
-        if line.strip():
-            if is_chinese(line):
-                for l in wrap_chinese(line, ZH_WRAP):
-                    draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
-                    y += LINE_HEIGHT_CN
-            else:
-                for l in wrap_english(line, EN_WRAP):
-                    draw.text((MARGIN + 10, y), l, font=font_text, fill='#34495E')
-                    y += LINE_HEIGHT
+    en_ch_lines = sections.get('en_ch', '').split('\n')
+    for line in en_ch_lines:
+        if is_chinese(line):
+            for l in wrap_chinese(line, ZH_WRAP):
+                draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
+                y += LINE_HEIGHT_CN
+        else:
+            for l in wrap_english(line, EN_WRAP):
+                draw.text((MARGIN + 10, y), l, font=font_text, fill='#34495E')
+                y += LINE_HEIGHT
     y += 30
 
     # 词汇表
