@@ -137,7 +137,25 @@ def create_md(sections, output_path):
         return '\n'.join(lines)
 
     def wrap_md(text, max_chars):
-        """MD格式换行"""
+        """MD格式中文换行（按字符数，不截断单词）"""
+        if not text:
+            return ""
+        lines = []
+        current_line = ""
+        for char in text:
+            char_width = 2 if is_chinese(char) else 1
+            if get_text_width(current_line) + char_width <= max_chars:
+                current_line += char
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = char
+        if current_line:
+            lines.append(current_line)
+        return '\n'.join(lines)
+
+    def wrap_chinese_md(text, max_chars):
+        """MD格式中文换行（按字符数）"""
         if not text:
             return ""
         lines = []
@@ -155,7 +173,7 @@ def create_md(sections, output_path):
     en_ch_lines = sections.get('en_ch', '').split('\n')
     for line in en_ch_lines:
         if is_chinese(line):
-            content += wrap_md(line, ZH_WRAP * 2) + "\n"
+            content += wrap_chinese_md(line, ZH_WRAP * 2) + "\n"
         else:
             content += wrap_english_md(line, EN_WRAP) + "\n"
     content += "\n---\n\n"
@@ -211,7 +229,12 @@ def create_md(sections, output_path):
     content += "\n"
     content += "---\n\n"
     content += "## 精彩句子\n\n"
-    content += sections.get('sentences', '') + "\n"
+    sent_lines = sections.get('sentences', '').split('\n')
+    for line in sent_lines:
+        if is_chinese(line):
+            content += wrap_chinese_md(line, ZH_WRAP * 2) + "\n"
+        else:
+            content += wrap_english_md(line, EN_WRAP) + "\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
