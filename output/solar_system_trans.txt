@@ -62,8 +62,6 @@ home [planet].
 ---
 
 EN-CH:
-中英双语：
-
 The solar [system] consists of the Sun and everything that
 orbits, or [travels] around, the Sun. This includes the eight
 [planets] and their moons, dwarf [planets], and [countless]
@@ -193,82 +191,83 @@ VOCABULARY:
 ---
 
 SENTENCES:
-1. The solar system consists of the Sun and everything that orbits,
-or travels around, the Sun.
+1. The solar [system] consists of the Sun and everything that
+orbits, or [travels] around, the Sun.
 
-太阳系由太阳和围绕太阳运转的物体组成.
+太阳系由太阳和围绕它运行的一切组成，或在周围旅行，在太阳.
 
-2. This includes the eight planets and their moons, dwarf planets,
-and countless asteroids, comets, and other small icy objects.
+2. This includes the eight [planets] and their moons, dwarf
+[planets], and [countless] [asteroids], comets, and other small
+icy [objects].
 
-这包括八颗行星及其卫星,矮行星,无数小行星,彗星和其他小冰冷物体.
+这包括八个行星及其卫星，矮行星，以及无数的小行星，彗星，其他小冰的物体.
 
-3. The solar system extends about two light-years from the Sun,
-marking the outer boundary where the Sun's gravitational
+3. The solar [system] extends about two light-years from the Sun,
+marking the outer [boundary] where the Sun's [gravitational]
 influence ends.
 
-太阳系距离太阳大约有两光年,标志着太阳的外界,太阳的引力影响结束.
+太阳系距离太阳大约有两光年，标志着太阳引力影响结束的外界.
 
-4. Without the Sun's gravitational pull, the planets would drift
-aimlessly through space.
+4. Without the Sun's [gravitational] pull, the [planets] would
+drift aimlessly through space.
 
-没有太阳的引力, 星球将无目的地漂流在太空中.
+没有太阳的引力，星球会无目的地在太空中漂流.
 
-5. The four inner planets—Mercury, Venus, Earth, and Mars—are
-terrestrial planets with solid, rocky surfaces.
+5. The four inner [planets]—[mercury], Venus, Earth, and Mars—are
+terrestrial [planets] with solid, rocky surfaces.
 
-四个内行星水星,金星,地球和火星是陆地行星, 表面是坚固的岩石.
+四个内行星水星，金星，地球，火星是地球类的行星,，在岩石表面.
 
-6. Beyond Mars lies the asteroid belt, a region containing millions
-of rocky objects.
+6. Beyond Mars lies the [asteroid] belt, a [region] [containing]
+[millions] of rocky [objects].
 
-在火星之外, 存在小行星带,
+在火星之外,有小行星带，这是一个包含数百万岩石物体的区域.
 
-7. The asteroids range in size from tiny particles to Ceres, the
-largest object in the belt and the only dwarf planet in the
-inner solar system.
+7. The [asteroids] range in size from tiny [particles] to Ceres,
+the [largest] object in the belt and the only dwarf [planet] in
+the inner solar [system].
 
-小行星的尺寸从微小的粒子到Ceres,
+小行星的尺寸从微小的粒子到天体，它是太阳系内唯一的矮行星.
 
-8. The four outer planets—Jupiter, Saturn, Uranus, and Neptune—are
-much larger than the inner planets.
+8. The four outer [planets]—[jupiter], Saturn, [uranus], and
+[neptune]—are much larger than the inner [planets].
 
-四颗外行星――木星,土星,天王星和海王星――比内行星大得多.
+四颗外行星木星，土星，太阳，而海王星则比内行星大得多.
 
-9. Jupiter is the largest planet in our solar system, with a mass
-more than twice that of all other planets combined.
+9. [jupiter] is the [largest] [planet] in our solar [system], with
+a mass more than twice that of all other [planets] combined.
 
-木星是太阳系中最大的行星,
+木星是太阳系中最大的行星，它的质量是其他行星总和的两倍.
 
-10. Saturn is famous for its spectacular ring system, composed
-mainly of ice particles.
+10. Saturn is famous for its spectacular ring [system], composed
+mainly of ice [particles].
 
-土星以其令人惊叹的环系而闻名,
+土星以其壮观的环系而闻名，主要由冰颗粒组成.
 
-11. Uranus and Neptune, the most distant planets, are ice giants
-with frigid temperatures.
+11. [uranus] and [neptune], the most [distant] [planets], are ice
+giants with frigid temperatures.
 
-乌拉努斯和海王星是最遥远的行星,
+天王星和海王星，最遥远的行星，它们是极寒的冰巨星.
 
-12. Uranus rotates on its side, while Neptune has the strongest
-winds in the solar system.
+12. [uranus] rotates on its side, while [neptune] has the strongest
+winds in the solar [system].
 
-天王星的旋转是侧面的, 而海王星的风力是太阳系中最强的.
+天王星在侧面旋转，而海王星拥有太阳系中最强的风.
 
-13. Beyond Neptune lies the Kuiper Belt, a donut-shaped region
-containing countless icy bodies.
+13. Beyond [neptune] lies the Kuiper Belt, a donut-shaped [region]
+[containing] [countless] icy bodies.
 
-超越海王星的 Kuiper 带是一个甜甜圈形状的区域,
+海王星的另一边是柯伊伯带，一个甜甜圈形状的区域包含无数的冰体.
 
-14. Each planet travels in an elliptical orbit around the Sun,
+14. Each [planet] [travels] in an elliptical orbit around the Sun,
 following the laws of gravity discovered by Isaac Newton.
 
-每个行星都以圆轨道绕太阳运行,
+每颗行星都以圆轨道绕太阳运行，根据艾萨克·牛顿发现的引力定律.
 
-15. Over millions of years, this material slowly collapsed under its
-own gravity, forming the Sun and the surrounding protoplanetary
-disk from which the planets eventually emerged.
+15. Over [millions] of years, this material slowly collapsed under
+its own gravity, forming the Sun and the surrounding
+protoplanetary disk from which the [planets] eventually emerged.
 
-数百万年来,这种物质在自身的重力下慢慢地崩,形成了太阳和周围的原行星盘,行星最终
-从中出现.
+在数百万年里，这种物质在自身的重力下慢慢崩，形成太阳和周围的原行星盘,从中行星最
+终出现.
 
