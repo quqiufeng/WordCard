@@ -68,23 +68,22 @@ def translate_text(translator, tokenizer, text, source_lang="eng_Latn", target_l
     """翻译单个文本"""
     import torch
 
-    encoded = tokenizer.encode(text)
-    tokens = tokenizer.convert_ids_to_tokens(encoded)
+    tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(text))
 
     results = translator.translate_batch(
         [tokens],
         target_prefix=[[target_lang]],
-        max_decoding_length=1024  # 更长的解码长度
+        max_decoding_length=2048
     )
 
     result_tokens = results[0].hypotheses[0]
+    # 去掉语言前缀
     if result_tokens and result_tokens[0] == target_lang:
         result_tokens = result_tokens[1:]
 
     result = tokenizer.convert_tokens_to_string(result_tokens).strip()
     result = result.replace("<unk>", "").strip()
 
-    del encoded
     torch.cuda.empty_cache()
 
     return result
@@ -265,7 +264,7 @@ def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, 
     content += "---\n\n"
     content += "SENTENCES:\n"
     for i in range(len(sent_list)):
-        content += f"{i+1}. {wrap_english(sent_list[i])}\n\n{sent_trans[i]}\n\n"
+        content += f"{i+1}. {wrap_english(sent_list[i])}\n\n{wrap_chinese(sent_trans[i])}\n\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
@@ -317,8 +316,16 @@ def main():
     print("翻译精彩句子...")
     sent_trans = []
     for sent in tqdm(sent_list, desc="句子翻译"):
-        trans = translate_text(translator, tokenizer, sent)
-        sent_trans.append(trans)
+        # 按逗号拆分翻译，再合并
+        parts = sent.split(',')
+        translations = []
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            trans = translate_text(translator, tokenizer, part)
+            translations.append(trans)
+        sent_trans.append('，'.join(translations))
 
     print("\n" + "=" * 50)
     print("生成输出文件...")
