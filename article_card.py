@@ -68,11 +68,21 @@ def create_md(sections, output_path):
             return en, cn
         return line, ""
 
+    def text_width(text):
+        """计算文本显示宽度：英文字符=1，中文字符=2"""
+        width = 0
+        for c in text:
+            if '\u4e00' <= c <= '\u9fff':
+                width += 2  # 中文字符宽度2
+            else:
+                width += 1  # 英文字符宽度1
+        return width
+
     def format_cell(en, cn, col_width=35, min_space=3):
-        """英文 + 空白 + 中文 = 固定列宽"""
-        en_len = len(en)
-        cn_len = len(cn)
-        space_len = col_width - en_len - cn_len
+        """英文 + 空白 + 中文 = 固定列宽（按显示宽度）"""
+        en_w = text_width(en)
+        cn_w = text_width(cn)
+        space_len = col_width - en_w - cn_w
         if space_len < min_space:
             space_len = min_space
         return f"{en}{' ' * space_len}{cn}"
