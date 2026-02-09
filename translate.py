@@ -15,8 +15,8 @@ from pathlib import Path
 
 MODEL_DIR = "E:/cuda/nllb-200-3.3B-ct2-float16"
 
-EN_WRAP_WORDS = 15
-ZH_WRAP_CHARS = 40
+EN_WRAP_WORDS = 10  # 英文每行单词数
+ZH_WRAP_CHARS = 40  # 中文每行汉字数
 
 LANG_CODE_MAP = {
     'en': 'eng_Latn',
