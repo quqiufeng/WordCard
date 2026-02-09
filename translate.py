@@ -142,120 +142,60 @@ def format_translation(original_texts, translation_texts):
 
     return '\n'.join(formatted_en), '\n'.join(formatted_zh)
 
-VOCABULARY_MAP = {
-    'solar system': '太阳系',
-    'planet': '行星',
-    'moon': '卫星',
-    'asteroid': '小行星',
-    'comet': '彗星',
-    'gravity': '引力',
-    'orbit': '轨道',
-    'atmosphere': '大气层',
-    'temperature': '温度',
-    'surface': '表面',
-    'galaxy': '星系',
-    'universe': '宇宙',
-    'Mercury': '水星',
-    'Venus': '金星',
-    'Earth': '地球',
-    'Mars': '火星',
-    'Jupiter': '木星',
-    'Saturn': '土星',
-    'Uranus': '天王星',
-    'Neptune': '海王星',
-    'Pluto': '冥王星',
-    'terrestrial': '类地行星的',
-    'gas giant': '气态巨行星',
-    'ice giant': '冰巨行星',
-    'dwarf planet': '矮行星',
-    'rotation': '自转',
-    'fusion': '聚变',
-    'elliptical': '椭圆的',
-    'asteroid belt': '小行星带',
-    'Kuiper Belt': '柯伊伯带',
-    'spacecraft': '宇宙飞船',
-    'telescope': '望远镜',
-    'formation': '形成',
-    'collapse': '坍缩',
-    'nebula': '星云',
-    'protoplanetary': '原行星的',
-    'million': '百万',
-    'billion': '十亿',
-    'century': '世纪',
-    'boundary': '边界',
-    'classify': '分类',
-    'discover': '发现',
-    'explore': '探索',
-    'fascinating': '迷人的',
-    'remarkable': '非凡的',
-    'fragility': '脆弱性',
-    'resilience': '韧性',
-}
-
-def extract_vocabulary(text, max_words=25):
-    """从文章中提取词汇"""
-    words = text.split()
-    found = set()
-    result = []
-    
-    for word in VOCABULARY_MAP.keys():
-        word_lower = word.lower()
-        for w in words:
-            w_clean = w.lower().strip('.,;:!?()[]{}""\'')
-            if w_clean == word_lower:
-                found.add(word_lower)
-                break
-    
-    for word in found:
-        if word in VOCABULARY_MAP:
-            result.append((word, VOCABULARY_MAP[word]))
-    
-    additional = []
-    for w in words:
-        w_clean = w.lower().strip('.,;:!?()[]{}""\'')
-        if len(w_clean) > 5 and w_clean not in found and w_clean not in additional:
-            if any(c.isalpha() for c in w_clean):
-                additional.append(w_clean)
-        if len(additional) >= 5:
-            break
-    
-    for word in additional:
-        if word in VOCABULARY_MAP:
-            result.append((word, VOCABULARY_MAP[word]))
-    
-    return result[:max_words]
-
-def extract_sentences(text, max_sents=10):
-    """从文章中提取精彩句子"""
+def extract_vocabulary(text, max_words=15):
+    """从文章中提取长度>=6的单词，按长度排序"""
     import re
-    sentences = []
-    
+    from collections import Counter
+
+    words = re.findall(r'\b[a-zA-Z]+\b', text.lower())
+
+    stop_words = {'the', 'this', 'that', 'these', 'those', 'with', 'from', 'have', 'has',
+                   'been', 'being', 'were', 'there', 'their', 'which', 'about', 'after',
+                   'before', 'more', 'most', 'some', 'such', 'into', 'over', 'through',
+                   'each', 'other', 'than', 'then', 'when', 'where', 'while', 'would',
+                   'could', 'should', 'what', 'where', 'which', 'who', 'whom', 'your',
+                   'you', 'they', 'them', 'will', 'just', 'like', 'only', 'very',
+                   'solar', 'system', 'planets', 'around', 'objects', 'earth'}
+
+    long_words = [w for w in words if len(w) >= 6 and w not in stop_words]
+    word_freq = Counter(long_words)
+
+    sorted_words = sorted(long_words, key=lambda x: len(x), reverse=True)
+    unique_words = []
+    seen = set()
+    for w in sorted_words:
+        if w not in seen:
+            seen.add(w)
+            unique_words.append(w)
+        if len(unique_words) >= max_words:
+            break
+
+    return unique_words[:max_words]
+
+def extract_sentences(text, max_sents=12):
+    """从文章中提取完整句子"""
+    import re
+
     text_clean = text.replace('!', '.').replace('?', '.')
-    
     sents = re.split(r'(?<=[.!?])\s+', text_clean)
-    
-    keywords = ['solar', 'planet', 'sun', 'Mercury', 'Venus', 'Earth', 'Mars',
-                'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'gravity', 'orbit',
-                'million', 'billion', 'year', 'formed', 'discovered']
-    
+
+    keywords = ['solar', 'planet', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter',
+                'Saturn', 'Uranus', 'Neptune', 'gravity', 'million', 'billion',
+                'formed', 'discovered', 'explore', 'spacecraft', 'telescope']
+
+    good_sents = []
     for sent in sents:
         sent = sent.strip()
-        if len(sent) > 50 and len(sent) < 200:
+        if len(sent) > 60 and len(sent) < 250:
             sent_lower = sent.lower()
             if any(kw in sent_lower for kw in keywords):
-                if sent not in sentences:
-                    sentences.append(sent)
-    
-    return sentences[:max_sents]
+                if sent not in good_sents:
+                    good_sents.append(sent)
 
-def create_trans_file(title, formatted_en, formatted_zh, original_texts, translation_texts, output_path):
+    return good_sents[:max_sents]
+
+def create_trans_file(title, formatted_en, formatted_zh, vocab_list, vocab_trans, sent_list, sent_trans, output_path):
     """生成 trans 格式文件"""
-    full_text = ' '.join(original_texts)
-    full_trans = ' '.join(translation_texts)
-    
-    vocab_list = extract_vocabulary(full_text, 25)
-    sent_list = extract_sentences(full_text, 10)
-    
     content = f"TITLE: {title}\n\n"
     content += "ORIGINAL:\n"
     content += formatted_en
@@ -265,13 +205,13 @@ def create_trans_file(title, formatted_en, formatted_zh, original_texts, transla
     content += '\n\n'
     content += "---\n\n"
     content += "VOCABULARY:\n"
-    for word, meaning in vocab_list:
-        content += f"{word}|n.|{meaning}\n"
+    for i in range(len(vocab_list)):
+        content += f"{i+1}. {vocab_list[i]}|n.|{vocab_trans[i]}\n"
     content += '\n'
     content += "---\n\n"
     content += "SENTENCES:\n"
-    for sent in sent_list:
-        content += f"{sent}|翻译\n"
+    for i in range(len(sent_list)):
+        content += f"{i+1}. {sent_list[i]}|{sent_trans[i]}\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
@@ -309,7 +249,28 @@ def main():
     print("生成输出文件...")
     output_file = input_path.stem + '_trans.txt'
     formatted_en, formatted_zh = format_translation(paragraphs, full_translation)
-    create_trans_file(title, formatted_en, formatted_zh, paragraphs, full_translation, output_file)
+
+    print("提取词汇表...")
+    vocab_list = extract_vocabulary(' '.join(paragraphs), 20)
+    print(f"词汇数量: {len(vocab_list)}")
+
+    print("翻译词汇表...")
+    vocab_trans = []
+    for word in vocab_list:
+        trans = translate_text(translator, tokenizer, word)
+        vocab_trans.append(trans)
+
+    print("提取精彩句子...")
+    sent_list = extract_sentences(' '.join(paragraphs), 12)
+    print(f"句子数量: {len(sent_list)}")
+
+    print("翻译精彩句子...")
+    sent_trans = []
+    for sent in sent_list:
+        trans = translate_text(translator, tokenizer, sent)
+        sent_trans.append(trans)
+
+    create_trans_file(title, formatted_en, formatted_zh, vocab_list, vocab_trans, sent_list, sent_trans, output_file)
 
     cleanup(translator, tokenizer)
     print("\n完成!")
