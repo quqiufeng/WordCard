@@ -67,8 +67,8 @@ def create_md(sections, output_path):
     left_col = vocab_lines[:len(vocab_lines)//2]
     right_col = vocab_lines[len(vocab_lines)//2:]
 
-    left_width = 35
-    right_width = 45
+    left_col_width = 40
+    right_col_width = 40
 
     for i in range(max(len(left_col), len(right_col))):
         left_en, left_cn = parse_vocab(left_col[i]) if i < len(left_col) else ("", "")
@@ -77,8 +77,8 @@ def create_md(sections, output_path):
         left_item = f"{left_en}{' ' * 15}{left_cn}"
         right_item = f"{right_en}{' ' * 15}{right_cn}"
 
-        left_str = f"{left_item:<{left_width}}"
-        right_str = f"{right_item:<{right_width}}"
+        left_str = f"{left_item:<{left_col_width}}"
+        right_str = f"{right_item:<{right_col_width}}"
 
         content += f"| {left_str} | {right_str} |\n"
 
