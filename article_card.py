@@ -76,7 +76,7 @@ def load_txt(txt_file):
         elif line == 'ORIGINAL:':
             current_section = 'original'
             current_content = []
-        elif line == 'EN-CH:' or line == '中英双语：':
+        elif line == 'EN-CH:' :
             current_section = 'en_ch'
             current_content = []
         elif line == 'VOCABULARY:':
