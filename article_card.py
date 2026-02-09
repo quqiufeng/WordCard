@@ -57,6 +57,13 @@ def create_md(sections, output_path):
     vocab_lines = sections.get('vocabulary', '').split('\n')
     vocab_lines = [line for line in vocab_lines if line.strip()]
 
+    def parse_vocab(line):
+        """解析 '1. word|中文' 格式，返回 (英文, 中文)"""
+        if '|' in line:
+            parts = line.split('|', 1)
+            return parts[0].strip(), parts[1].strip()
+        return line, ""
+
     left_col = vocab_lines[:len(vocab_lines)//2]
     right_col = vocab_lines[len(vocab_lines)//2:]
 
@@ -64,8 +71,11 @@ def create_md(sections, output_path):
     right_width = 45
 
     for i in range(max(len(left_col), len(right_col))):
-        left_item = left_col[i] if i < len(left_col) else ""
-        right_item = right_col[i] if i < len(right_col) else ""
+        left_en, left_cn = parse_vocab(left_col[i]) if i < len(left_col) else ("", "")
+        right_en, right_cn = parse_vocab(right_col[i]) if i < len(right_col) else ("", "")
+
+        left_item = f"{left_en}{' ' * 15}{left_cn}"
+        right_item = f"{right_en}{' ' * 15}{right_cn}"
 
         left_str = f"{left_item:<{left_width}}"
         right_str = f"{right_item:<{right_width}}"
