@@ -63,7 +63,6 @@ def create_md(sections, output_path):
             parts = line.split('|', 1)
             en = parts[0].strip()
             cn = parts[1].strip()
-            # 去掉开头的数字序号（如 "1." 或 "10."）
             import re
             en = re.sub(r'^\d+\.\s*', '', en)
             return en, cn
@@ -72,15 +71,14 @@ def create_md(sections, output_path):
     left_col = vocab_lines[:len(vocab_lines)//2]
     right_col = vocab_lines[len(vocab_lines)//2:]
 
-    left_col_width = 25
-    right_col_width = 25
+    en_width = 15  # 英文单词固定宽度
 
     for i in range(max(len(left_col), len(right_col))):
         left_en, left_cn = parse_vocab(left_col[i]) if i < len(left_col) else ("", "")
         right_en, right_cn = parse_vocab(right_col[i]) if i < len(right_col) else ("", "")
 
-        left_item = f"{left_en:<{left_col_width - 10}}{left_cn}"
-        right_item = f"{right_en:<{right_col_width - 10}}{right_cn}"
+        left_item = f"{left_en:<{en_width}}{' ' * 5}{left_cn}"
+        right_item = f"{right_en:<{en_width}}{' ' * 5}{right_cn}"
 
         content += f"| {left_item} | {right_item} |\n"
 
