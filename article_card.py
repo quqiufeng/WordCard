@@ -97,8 +97,8 @@ def load_txt(txt_file):
 
 def create_md(sections, output_path):
     """生成 MD 文件"""
-    ZH_WRAP = 25
-    EN_WRAP = 50
+    ZH_WRAP = 25  # 中文换行字符数
+    EN_WRAP = 50  # 英文换行字符数（单词边界断行）
 
     def is_chinese(text):
         return any('\u4e00' <= c <= '\u9fff' for c in text)
@@ -203,8 +203,8 @@ def create_png(sections, output_path):
     LINE_HEIGHT = 42
     LINE_HEIGHT_CN = 52
     CARD_WIDTH = 780
-    EN_WRAP = 50
-    ZH_WRAP = 25
+    EN_WRAP = 50  # 英文换行字符数（单词边界断行）
+    ZH_WRAP = 25  # 中文换行字符数
 
     def is_chinese(text):
         return any('\u4e00' <= c <= '\u9fff' for c in text)
