@@ -22,8 +22,8 @@ def load_txt(txt_file):
             sections['title'] = line.replace('TITLE:', '').strip()
         elif line == '---':
             if current_section:
-                # 原文和中英双语合并成一段，去掉换行
-                if current_section in ('original', 'en_ch'):
+                # 原文、中英双语、精彩句子合并成一段，去掉换行
+                if current_section in ('original', 'en_ch', 'sentences'):
                     sections[current_section] = ' '.join(current_content).strip()
                 else:
                     sections[current_section] = '\n'.join(current_content).strip()
@@ -41,7 +41,7 @@ def load_txt(txt_file):
             current_content.append(line)
 
     if current_section:
-        if current_section in ('original', 'en_ch'):
+        if current_section in ('original', 'en_ch', 'sentences'):
             sections[current_section] = ' '.join(current_content).strip()
         else:
             sections[current_section] = '\n'.join(current_content).strip()
