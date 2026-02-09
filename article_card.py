@@ -138,29 +138,18 @@ def create_png(article, output_path):
     y += 45
 
     en_zh_pairs = article.get('en_zh', [])
-    if en_zh_pairs:
-        for pair in en_zh_pairs:
-            lines = pair.split('\n')
-            for line in lines:
-                if line.strip():
-                    if any('a' <= c <= 'z' or 'A' <= c <= 'Z' for c in line[:10]):
-                        for l in wrap_text(line, LINE_CHARS):
-                            y += LINE_HEIGHT
-                    else:
-                        for l in wrap_text(line, LINE_CHARS_CN):
-                            y += LINE_HEIGHT_CN
-            y += 20
-    else:
-        for line in article['original'].split('\n'):
+    for pair in en_zh_pairs:
+        lines = pair.split('\n')
+        for line in lines:
             if line.strip():
-                for l in wrap_text(line, LINE_CHARS):
-                    y += LINE_HEIGHT
-        y += 30
-        y += 45
-        for line in article['translation'].split('\n'):
-            if line.strip():
-                for l in wrap_text(line, LINE_CHARS_CN):
-                    y += LINE_HEIGHT_CN
+                if any('a' <= c <= 'z' or 'A' <= c <= 'Z' for c in line[:10]):
+                    for l in wrap_text(line, LINE_CHARS):
+                        y += LINE_HEIGHT
+                else:
+                    for l in wrap_text(line, LINE_CHARS_CN):
+                        y += LINE_HEIGHT_CN
+        y += 15
+
     y += 30
     y += 45
 
@@ -229,13 +218,21 @@ def create_png(article, output_path):
                 y += LINE_HEIGHT
 
     y += 30
-    draw.text((MARGIN, y), "译文", font=font_section, fill='#27AE60')
+    draw.text((MARGIN, y), "中英双语", font=font_section, fill='#27AE60')
     y += 45
-    for line in article['translation'].split('\n'):
-        if line.strip():
-            for l in wrap_text(line, LINE_CHARS_CN):
-                draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
-                y += LINE_HEIGHT_CN
+    en_zh_pairs = article.get('en_zh', [])
+    for pair in en_zh_pairs:
+        for line in pair.split('\n'):
+            if line.strip():
+                if any('a' <= c <= 'z' or 'A' <= c <= 'Z' for c in line[:10]):
+                    for l in wrap_text(line, LINE_CHARS):
+                        draw.text((MARGIN + 10, y), l, font=font_en, fill='#34495E')
+                        y += LINE_HEIGHT
+                else:
+                    for l in wrap_text(line, LINE_CHARS_CN):
+                        draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
+                        y += LINE_HEIGHT_CN
+        y += 15
 
     y += 30
     draw.text((MARGIN, y), "词汇表", font=font_section, fill='#27AE60')
@@ -323,11 +320,16 @@ def create_md(article, output_path):
 
 ---
 
-## 译文
+## 中英双语
 
-{article['translation']}
+"""
 
----
+    en_zh_pairs = article.get('en_zh', [])
+    for pair in en_zh_pairs:
+        content += pair
+        content += "\n\n"
+
+    content += """---
 
 ## 词汇表
 
@@ -415,15 +417,17 @@ def create_pdf(article, output_path):
 
     pdf.add_page()
     pdf.set_font('LXGW', '', 12)
-    pdf.cell(0, 10, '译文 / Translation', 0, 1, 'L')
+    pdf.cell(0, 10, '中英双语 / EN-CH', 0, 1, 'L')
     pdf.line(10, pdf.get_y(), 90, pdf.get_y())
     pdf.ln(3)
 
     pdf.set_font('LXGW', '', 9)
-    trans_lines = article['translation'].replace('\n', ' ').split('. ')
-    for para in trans_lines:
-        pdf.multi_cell(0, 5, para + '.')
-        pdf.ln(2)
+    en_zh_pairs = article.get('en_zh', [])
+    for pair in en_zh_pairs:
+        for line in pair.split('\n'):
+            if line.strip():
+                pdf.multi_cell(0, 5, line)
+        pdf.ln(3)
 
     pdf.add_page()
     pdf.set_font('LXGW', '', 12)
@@ -474,27 +478,29 @@ def create_pdf(article, output_path):
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python article_card.py article.txt")
-        sys.exit(1)
-
-    input_file = sys.argv[1]
-    if input_file.endswith('_trans.txt'):
-        txt_file = input_file
+        print("用法: python article_card.py solar_system_trans.txt")
+        print("默认从 output 目录读取")
+        txt_file = "output/solar_system_trans.txt"
     else:
-        txt_file = input_file.replace('.txt', '') + '_trans.txt'
+        input_file = sys.argv[1]
+        if input_file.endswith('_trans.txt'):
+            txt_file = f"output/{input_file}"
+        else:
+            txt_file = f"output/{input_file}_trans.txt"
+
     if not os.path.exists(txt_file):
         print(f"错误: 文件不存在 {txt_file}")
-        print("请先生成翻译文件（包含 EN-ZH 区块）")
         sys.exit(1)
-    article = load_bilingual_txt(txt_file)
 
+    article = load_bilingual_txt(txt_file)
     base_name = os.path.splitext(txt_file)[0]
+    base_name = os.path.basename(base_name)
 
     os.makedirs('output', exist_ok=True)
 
-    create_png(article, f"output/{os.path.basename(base_name)}.png")
-    create_md(article, f"output/{os.path.basename(base_name)}.md")
-    create_pdf(article, f"output/{os.path.basename(base_name)}.pdf")
+    create_png(article, f"output/{base_name}.png")
+    create_md(article, f"output/{base_name}.md")
+    create_pdf(article, f"output/{base_name}.pdf")
 
 if __name__ == '__main__':
     main()
