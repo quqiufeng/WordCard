@@ -479,14 +479,14 @@ def create_pdf(article, output_path):
 def main():
     if len(sys.argv) < 2:
         print("用法: python article_card.py solar_system_trans.txt")
-        print("默认从 output 目录读取")
-        txt_file = "output/solar_system_trans.txt"
+        print("文件放在 output 目录")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
+    if input_file.endswith('_trans.txt'):
+        txt_file = f"output/{input_file}"
     else:
-        input_file = sys.argv[1]
-        if input_file.endswith('_trans.txt'):
-            txt_file = f"output/{input_file}"
-        else:
-            txt_file = f"output/{input_file}_trans.txt"
+        txt_file = f"output/{input_file}_trans.txt"
 
     if not os.path.exists(txt_file):
         print(f"错误: 文件不存在 {txt_file}")
