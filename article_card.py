@@ -103,7 +103,7 @@ def load_txt(txt_file):
 def create_md(sections, output_path):
     """生成 MD 文件"""
     ZH_WRAP = 25  # 中文换行字符数
-    EN_WRAP = 50  # 英文换行字符数（单词边界断行）
+    EN_WRAP = 52  # 英文换行字符数（单词边界断行）
 
     def is_chinese(text):
         return any('\u4e00' <= c <= '\u9fff' for c in text)
@@ -267,8 +267,8 @@ def create_png(sections, output_path):
     MARGIN = 40
     LINE_HEIGHT = 42
     LINE_HEIGHT_CN = 52
-    CARD_WIDTH = 780
-    EN_WRAP = 50  # 英文换行字符数（单词边界断行）
+    CARD_WIDTH = 780  # PNG图片宽度
+    EN_WRAP = 52  # 英文换行字符数（单词边界断行）
     ZH_WRAP = 25  # 中文换行字符数
 
     def is_chinese(text):
@@ -343,31 +343,34 @@ def create_png(sections, output_path):
                 y += LINE_HEIGHT
     y += 30
     y += 45  # 中英双语标题
-    for line in sections.get('en_ch', '').split('\n'):
+    en_ch_lines = sections.get('en_ch', '').split('\n')
+    for line in en_ch_lines:
         if line.strip():
             if is_chinese(line):
-                for l in wrap_chinese(line, ZH_WRAP):
-                    y += LINE_HEIGHT_CN
+                wrapped = wrap_chinese(line, ZH_WRAP)
+                y += len(wrapped) * LINE_HEIGHT_CN
             else:
-                for l in wrap_english(line, EN_WRAP):
-                    y += LINE_HEIGHT
+                wrapped = wrap_english(line, EN_WRAP)
+                y += len(wrapped) * LINE_HEIGHT
     y += 30
     y += 45  # 词汇表标题
+    vocab_lines = sections.get('vocabulary', [])
     left_col = vocab_lines[:len(vocab_lines)//2]
     right_col = vocab_lines[len(vocab_lines)//2:]
     for _ in range(max(len(left_col), len(right_col))):
         y += LINE_HEIGHT_CN
     y += 30
     y += 45  # 精彩句子标题
-    for line in sections.get('sentences', '').split('\n'):
+    sent_lines = sections.get('sentences', '').split('\n')
+    for line in sent_lines:
         if line.strip():
             if is_chinese(line):
-                for l in wrap_chinese(line, ZH_WRAP):
-                    y += LINE_HEIGHT_CN
+                wrapped = wrap_chinese(line, ZH_WRAP)
+                y += len(wrapped) * LINE_HEIGHT_CN
             else:
-                for l in wrap_english(line, EN_WRAP):
-                    y += LINE_HEIGHT
-    y += MARGIN
+                wrapped = wrap_english(line, EN_WRAP)
+                y += len(wrapped) * LINE_HEIGHT
+    y += 200  # 底部余量
 
     img = Image.new('RGB', (CARD_WIDTH, int(y)), '#F5F5F5')
     draw = ImageDraw.Draw(img)
