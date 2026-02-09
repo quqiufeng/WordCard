@@ -17,34 +17,81 @@ def load_txt(txt_file):
     current_section = None
     current_content = []
 
+    def is_chinese_line(line):
+        return any('\u4e00' <= c <= '\u9fff' for c in line)
+
+    def merge_lines(lines):
+        merged = []
+        for l in lines:
+            l = l.strip()
+            if l:
+                merged.append(l)
+        return ' '.join(merged)
+
+    def split_bilingual(lines):
+        """分离英文段和中文段，交替排列"""
+        para_lines = []
+        temp_lines = []
+        is_chinese = None
+
+        for l in lines:
+            l = l.strip()
+            if not l:
+                continue
+
+            line_is_chinese = is_chinese_line(l)
+
+            if is_chinese is None:
+                is_chinese = line_is_chinese
+                temp_lines.append(l)
+            elif line_is_chinese == is_chinese:
+                temp_lines.append(l)
+            else:
+                # 切换语言，保存当前段
+                para_lines.append(merge_lines(temp_lines))
+                temp_lines = [l]
+                is_chinese = line_is_chinese
+
+        if temp_lines:
+            para_lines.append(merge_lines(temp_lines))
+
+        return '\n'.join(para_lines)
+
     for line in content.split('\n'):
         if line.startswith('TITLE:'):
             sections['title'] = line.replace('TITLE:', '').strip()
         elif line == '---':
             if current_section:
-                # 原文、中英双语、精彩句子合并成一段，去掉换行
-                if current_section in ('original', 'en_ch', 'sentences'):
-                    sections[current_section] = ' '.join(current_content).strip()
+                if current_section == 'original':
+                    sections['original'] = merge_lines(current_content)
+                elif current_section in ('en_ch', 'sentences'):
+                    sections[current_section] = split_bilingual(current_content)
                 else:
-                    sections[current_section] = '\n'.join(current_content).strip()
+                    sections[current_section] = merge_lines(current_content)
                 current_content = []
             current_section = None
         elif line == 'ORIGINAL:':
             current_section = 'original'
+            current_content = []
         elif line == 'EN-CH:':
             current_section = 'en_ch'
+            current_content = []
         elif line == 'VOCABULARY:':
             current_section = 'vocabulary'
+            current_content = []
         elif line == 'SENTENCES:':
             current_section = 'sentences'
+            current_content = []
         elif current_section:
             current_content.append(line)
 
     if current_section:
-        if current_section in ('original', 'en_ch', 'sentences'):
-            sections[current_section] = ' '.join(current_content).strip()
+        if current_section == 'original':
+            sections['original'] = merge_lines(current_content)
+        elif current_section in ('en_ch', 'sentences'):
+            sections[current_section] = split_bilingual(current_content)
         else:
-            sections[current_section] = '\n'.join(current_content).strip()
+            sections[current_section] = merge_lines(current_content)
 
     return sections
 
