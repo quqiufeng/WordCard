@@ -221,6 +221,9 @@ def extract_sentences(text, vocab_list, max_sents=20):
         if len(good_sents) >= max_sents:
             break
 
+    # 对句子应用词汇高亮
+    good_sents = [highlight_vocab_in_text(sent, vocab_list) for sent in good_sents]
+
     return good_sents
 
 def highlight_vocab_in_text(text, vocab_list):
