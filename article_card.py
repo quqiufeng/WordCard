@@ -109,10 +109,10 @@ def create_md(sections, output_path):
         return any('\u4e00' <= c <= '\u9fff' for c in text)
 
     def get_text_width(text):
-        """计算显示宽度：英文字符=1，中文字符=2"""
+        """计算显示宽度：英文字符=1，中文字符=2，[ ] 也按2处理避免在括号处换行"""
         width = 0
         for c in text:
-            if is_chinese(c):
+            if is_chinese(c) or c in '[]':
                 width += 2
             else:
                 width += 1
@@ -243,10 +243,10 @@ def create_png(sections, output_path):
         return any('\u4e00' <= c <= '\u9fff' for c in text)
 
     def get_text_width(text):
-        """计算显示宽度：英文字符=1，中文字符=2"""
+        """计算显示宽度：英文字符=1，中文字符=2，[ ] 也按2处理避免在括号处换行"""
         width = 0
         for c in text:
-            if is_chinese(c):
+            if is_chinese(c) or c in '[]':
                 width += 2
             else:
                 width += 1
