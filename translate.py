@@ -15,8 +15,8 @@ from pathlib import Path
 
 MODEL_DIR = "E:/cuda/nllb-200-3.3B-ct2-float16"
 
-EN_WRAP_WORDS = 10  # 英文每行单词数
-ZH_WRAP_CHARS = 40  # 中文每行汉字数
+EN_WRAP = 65  # 英文每行字符数（与中文40字符宽度对齐）
+ZH_WRAP = 40  # 中文每行字符数
 
 LANG_CODE_MAP = {
     'en': 'eng_Latn',
@@ -43,8 +43,6 @@ def load_article(txt_path):
     with open(txt_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    print(f"[调试] 原始内容行数: {len(content.split(chr(10)))}")
-
     lines = content.strip().split('\n')
     title = lines[0].strip()
 
@@ -57,10 +55,7 @@ def load_article(txt_path):
             current_para.append(line)
         else:
             if current_para:
-                para_text = ' '.join(current_para)
-                word_count = len(para_text.split())
-                print(f"[调试] 段落单词数: {word_count}")
-                paragraphs.append(para_text)
+                paragraphs.append(' '.join(current_para))
                 current_para = []
     
     if current_para:
@@ -108,17 +103,26 @@ def translate_batch(translator, tokenizer, texts, source_lang="eng_Latn", target
 
     return all_results
 
-EN_WRAP = EN_WRAP_WORDS
-ZH_WRAP = ZH_WRAP_CHARS
-
-def wrap_english(text, max_words=15):
-    """英文按单词数换行"""
+def wrap_english(text):
+    """英文按字符数换行，在单词边界处断行"""
     if not text:
         return ""
+
     words = text.split()
     lines = []
-    for i in range(0, len(words), max_words):
-        lines.append(' '.join(words[i:i+max_words]))
+    current_line = ""
+
+    for word in words:
+        if len(current_line) + len(word) + 1 <= EN_WRAP:
+            current_line += word + " "
+        else:
+            if current_line:
+                lines.append(current_line.rstrip())
+            current_line = word + " "
+
+    if current_line:
+        lines.append(current_line.rstrip())
+
     return '\n'.join(lines)
 
 def wrap_chinese(text, max_chars=40):
@@ -131,10 +135,10 @@ def wrap_chinese(text, max_chars=40):
     return '\n'.join(lines)
 
 def format_translation(original_texts, translation_texts):
-    """格式化译文，英文按单词，中文按汉字"""
+    """格式化译文，英文按字符数，中文按汉字"""
     formatted_en = []
     for para in original_texts:
-        formatted_en.append(wrap_english(para, EN_WRAP))
+        formatted_en.append(wrap_english(para))
 
     formatted_zh = []
     for trans in translation_texts:
