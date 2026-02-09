@@ -71,7 +71,11 @@ def translate_text(translator, tokenizer, text, source_lang="eng_Latn", target_l
     encoded = tokenizer.encode(text)
     tokens = tokenizer.convert_ids_to_tokens(encoded)
 
-    results = translator.translate_batch([tokens], target_prefix=[[target_lang]])
+    results = translator.translate_batch(
+        [tokens],
+        target_prefix=[[target_lang]],
+        max_decoding_length=512  # 增加解码长度
+    )
 
     result_tokens = results[0].hypotheses[0]
     if result_tokens and result_tokens[0] == target_lang:
@@ -249,7 +253,6 @@ def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, 
     content += '\n\n'
     content += "---\n\n"
     content += "EN-CH:\n"
-    content += "中英双语：\n\n"
     
     for i, (en_para, zh_para) in enumerate(zip(formatted_en, formatted_zh), 1):
         content += f"{en_para}\n\n{zh_para}\n\n"
@@ -262,7 +265,7 @@ def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, 
     content += "---\n\n"
     content += "SENTENCES:\n"
     for i in range(len(sent_list)):
-        content += f"{i+1}. {wrap_english(sent_list[i])}\n\n{wrap_chinese(sent_trans[i])}\n\n"
+        content += f"{i+1}. {wrap_english(sent_list[i])}\n\n{sent_trans[i]}\n\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
