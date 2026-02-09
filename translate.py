@@ -192,35 +192,53 @@ def extract_vocabulary(text, max_words=20):
 
     return unique_words[:max_words]
 
-def extract_sentences(text, max_sents=12):
-    """从文章中提取完整句子"""
+def extract_sentences(text, vocab_list, max_sents=20):
+    """从文章中提取包含词汇表中词汇的句子"""
     import re
 
     text_clean = text.replace('!', '.').replace('?', '.')
     sents = re.split(r'(?<=[.!?])\s+', text_clean)
 
-    keywords = ['solar', 'planet', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter',
-                'Saturn', 'Uranus', 'Neptune', 'gravity', 'million', 'billion',
-                'formed', 'discovered', 'explore', 'spacecraft', 'telescope']
-
     good_sents = []
+    matched_words = set()
+
     for sent in sents:
         sent = sent.strip()
-        if len(sent) > 80 and len(sent) < 250:
-            sent_lower = sent.lower()
-            if any(kw in sent_lower for kw in keywords):
-                if sent not in good_sents:
-                    good_sents.append(sent)
+        if len(sent) < 80 or len(sent) > 250:
+            continue
 
-    return good_sents[:max_sents]
+        sent_lower = sent.lower()
+
+        for word in vocab_list:
+            if word in sent_lower and word not in matched_words:
+                good_sents.append(sent)
+                matched_words.add(word)
+                break
+
+        if len(good_sents) >= max_sents:
+            break
+
+    return good_sents
+
+def highlight_vocab_in_text(text, vocab_list):
+    """将原文中的词汇表单词替换为 [单词] 格式"""
+    import re
+    result = text
+    for word in vocab_list:
+        pattern = r'\b' + re.escape(word) + r'\b'
+        replacement = f'[{word}]'
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    return result
 
 def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, sent_list, sent_trans, output_path):
     """生成 trans 格式文件"""
     content = f"TITLE: {title}\n\n"
     
+    # 处理原文，标记词汇表单词
     formatted_en = []
     for para in paragraphs:
-        formatted_en.append(wrap_english(para))
+        highlighted = highlight_vocab_in_text(para, vocab_list)
+        formatted_en.append(wrap_english(highlighted))
     
     formatted_zh = []
     for trans in translations:
@@ -239,12 +257,12 @@ def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, 
     content += "---\n\n"
     content += "VOCABULARY:\n"
     for i in range(len(vocab_list)):
-        content += f"{i+1}. {vocab_list[i]}|n.|{vocab_trans[i]}\n"
+        content += f"[{i+1}] {vocab_list[i]}|n.|{vocab_trans[i]}\n"
     content += '\n'
     content += "---\n\n"
     content += "SENTENCES:\n"
     for i in range(len(sent_list)):
-        content += f"{i+1}. {sent_list[i]}|{sent_trans[i]}\n"
+        content += f"[{sent_list[i]}]|{sent_trans[i]}\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
@@ -280,7 +298,7 @@ def main():
 
     print("\n" + "=" * 50)
     print("提取词汇表...")
-    vocab_list = extract_vocabulary(' '.join(paragraphs), 20)
+    vocab_list = extract_vocabulary(' '.join(paragraphs), 15)
     print(f"词汇数量: {len(vocab_list)}")
 
     print("翻译词汇表...")
@@ -290,7 +308,7 @@ def main():
         vocab_trans.append(trans)
 
     print("提取精彩句子...")
-    sent_list = extract_sentences(' '.join(paragraphs), 12)
+    sent_list = extract_sentences(' '.join(paragraphs), vocab_list, 15)
     print(f"句子数量: {len(sent_list)}")
 
     print("翻译精彩句子...")
