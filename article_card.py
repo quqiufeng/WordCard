@@ -278,18 +278,16 @@ def create_png(sections, output_path):
     right_y = y
 
     for i in range(max(len(left_col), len(right_col))):
+        # 左列
         left_en, left_cn = parse_vocab(left_col[i]) if i < len(left_col) else ("", "")
-        right_en, right_cn = parse_vocab(right_col[i]) if i < len(right_col) else ("", "")
-
         if left_en or left_cn:
             draw.text((MARGIN + 10, left_y), f"{left_en}  {left_cn}", font=font_text, fill='#E74C3C')
             left_y += LINE_HEIGHT_CN
         draw.line((MARGIN, left_y, center_x - 10, left_y), fill='#E0E0E0')
         left_y += 10
 
-    for i in range(max(len(left_col), len(right_col))):
+        # 右列
         right_en, right_cn = parse_vocab(right_col[i]) if i < len(right_col) else ("", "")
-
         if right_en or right_cn:
             draw.text((center_x + 20, right_y), f"{right_en}  {right_cn}", font=font_text, fill='#E74C3C')
             right_y += LINE_HEIGHT_CN
