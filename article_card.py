@@ -326,7 +326,35 @@ def create_md(article, output_path):
 
 ---
 
+## 词汇表
+
 """
+
+    vocab = article['vocabulary']
+    half = (len(vocab) + 1) // 2
+    left_col = vocab[:half]
+    right_col = vocab[half:]
+
+    word_width = 25
+    col_width = 45
+    for i in range(max(len(left_col), len(right_col))):
+        left_item = left_col[i] if i < len(left_col) else None
+        right_item = right_col[i] if i < len(right_col) else None
+
+        left_str = ""
+        right_str = ""
+
+        if left_item:
+            left_str = f"{left_item['word']:<{word_width}}  {left_item['meaning']}"
+            left_str = f"{left_str:<{col_width}}"
+
+        if right_item:
+            right_str = f"{right_item['word']:<{word_width}}  {right_item['meaning']}"
+            right_str = f"{right_str:<{col_width}}"
+
+        content += f"| {left_str} | {right_str} |\n"
+
+    content += "\n---\n\n## 精彩句子\n\n"
 
     for i, s in enumerate(article['sentences'], 1):
         content += f"> **{s['original']}**\n>\n> {s['translation']}\n\n"
