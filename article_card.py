@@ -108,6 +108,34 @@ def create_md(sections, output_path):
     def is_chinese(text):
         return any('\u4e00' <= c <= '\u9fff' for c in text)
 
+    def get_text_width(text):
+        """计算显示宽度：英文字符=1，中文字符=2"""
+        width = 0
+        for c in text:
+            if is_chinese(c):
+                width += 2
+            else:
+                width += 1
+        return width
+
+    def wrap_english_md(text, max_width):
+        """英文换行（单词边界断行）"""
+        if not text:
+            return ""
+        words = text.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            if get_text_width(current_line) + get_text_width(word) + 1 <= max_width:
+                current_line += word + " "
+            else:
+                if current_line:
+                    lines.append(current_line.rstrip())
+                current_line = word + " "
+        if current_line:
+            lines.append(current_line.rstrip())
+        return '\n'.join(lines)
+
     def wrap_md(text, max_chars):
         """MD格式换行"""
         if not text:
@@ -121,7 +149,7 @@ def create_md(sections, output_path):
     content += f"> 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     content += "---\n\n"
     content += "## 原文\n\n"
-    content += wrap_md(sections.get('original', ''), EN_WRAP) + "\n\n"
+    content += wrap_english_md(sections.get('original', ''), EN_WRAP) + "\n\n"
     content += "---\n\n"
     content += "## 中英双语\n\n"
     en_ch_lines = sections.get('en_ch', '').split('\n')
@@ -129,7 +157,7 @@ def create_md(sections, output_path):
         if is_chinese(line):
             content += wrap_md(line, ZH_WRAP * 2) + "\n"
         else:
-            content += wrap_md(line, EN_WRAP) + "\n"
+            content += wrap_english_md(line, EN_WRAP) + "\n"
     content += "\n---\n\n"
     content += "## 词汇表\n\n"
 
