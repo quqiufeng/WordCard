@@ -474,7 +474,11 @@ def main():
         print("用法: python article_card.py article.txt")
         sys.exit(1)
 
-    txt_file = sys.argv[1].replace('.txt', '') + '_trans.txt'
+    input_file = sys.argv[1]
+    if input_file.endswith('_trans.txt'):
+        txt_file = input_file
+    else:
+        txt_file = input_file.replace('.txt', '') + '_trans.txt'
     if not os.path.exists(txt_file):
         print(f"错误: 文件不存在 {txt_file}")
         print("请先生成翻译文件（包含 EN-ZH 区块）")
