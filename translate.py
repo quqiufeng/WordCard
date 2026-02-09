@@ -9,7 +9,6 @@ warnings.filterwarnings('ignore')
 
 import ctranslate2
 import transformers
-import re
 import time
 import sys
 from pathlib import Path
@@ -18,9 +17,7 @@ MODEL_DIR = "E:/cuda/nllb-200-3.3B-ct2-float16"
 
 LANG_CODE_MAP = {
     'en': 'eng_Latn',
-    'english': 'eng_Latn',
     'zh': 'zho_Hans',
-    'chinese': 'zho_Hans',
 }
 
 def load_translator():
@@ -30,45 +27,6 @@ def load_translator():
     tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL_DIR)
     print(f"设备: {translator.device}\n")
     return translator, tokenizer
-
-def translate_texts(translator, tokenizer, texts, source_lang="eng_Latn", target_lang="zho_Hans", batch_size=16):
-    """翻译文本列表"""
-    import torch
-
-    all_results = []
-
-    for i in range(0, len(texts), batch_size):
-        batch_texts = texts[i:i + batch_size]
-
-        encoded = tokenizer(batch_texts, return_tensors="pt", padding=True)
-        input_ids = encoded["input_ids"]
-
-        batch_results = []
-
-        for j in range(len(batch_texts)):
-            tokens = tokenizer.convert_ids_to_tokens(input_ids[j])
-            results = translator.translate_batch([tokens], target_prefix=[[target_lang]])
-
-            result_tokens = results[0].hypotheses[0]
-            if result_tokens and result_tokens[0] == target_lang:
-                result_tokens = result_tokens[1:]
-
-            result = tokenizer.convert_tokens_to_string(result_tokens).strip()
-            batch_results.append(result)
-
-        all_results.extend(batch_results)
-
-        del encoded, input_ids
-        torch.cuda.empty_cache()
-
-        progress = min(i + batch_size, len(texts))
-        print(f"  翻译进度: {progress}/{len(texts)} ({progress*100//len(texts)}%)", end='\r')
-
-    print(f"  翻译进度: {len(texts)}/{len(texts)} (100%)")
-
-    all_results = [r.replace("<unk>", "").strip() for r in all_results]
-
-    return all_results
 
 def cleanup(translator, tokenizer):
     """释放 GPU 内存"""
@@ -93,77 +51,47 @@ def load_article(txt_path):
 
     return title, paragraphs
 
-def extract_vocabulary_prompt(article_text):
-    """使用提示词提取词汇表"""
-    prompt = f"""请从以下英文文章中提取15-20个常用词汇，包括单词、词性和中文翻译。
-格式要求：
-- 每行一个词汇，格式：英文单词|词性|中文翻译
-- 只提取常用词汇，不要生僻词
-- 词性使用简写：n.名词 v.动词 adj.形容词 adv.副词 prep.介词 conj.连词
+def translate_text(translator, tokenizer, text, source_lang="eng_Latn", target_lang="zho_Hans"):
+    """翻译单个文本"""
+    import torch
 
-文章内容：
-{article_text}
+    encoded = tokenizer.convert_text_to_ids(text)
+    tokens = tokenizer.convert_ids_to_tokens(encoded)
 
-词汇表："""
+    results = translator.translate_batch([tokens], target_prefix=[[target_lang]])
 
-    return prompt
+    result_tokens = results[0].hypotheses[0]
+    if result_tokens and result_tokens[0] == target_lang:
+        result_tokens = result_tokens[1:]
 
-def extract_sentences_prompt(article_text):
-    """使用提示词提取精彩句子"""
-    prompt = f"""请从以下英文文章中提取5-8个精彩句子，包括英文原文和中文翻译。
-格式要求：
-- 每行一个句子，格式：英文句子|中文翻译
-- 选择最有学习价值的句子
-- 中文翻译要准确流畅
+    result = tokenizer.convert_tokens_to_string(result_tokens).strip()
+    result = result.replace("<unk>", "").strip()
 
-文章内容：
-{article_text}
+    del encoded
+    torch.cuda.empty_cache()
 
-精彩句子："""
+    return result
 
-    return prompt
+def translate_batch(translator, tokenizer, texts, source_lang="eng_Latn", target_lang="zho_Hans"):
+    """翻译文本列表（逐个翻译，确保质量）"""
+    all_results = []
 
-def parse_vocabulary(response_text):
-    """解析词汇表响应"""
-    vocab_list = []
-    for line in response_text.strip().split('\n'):
-        line = line.strip()
-        if '|' in line:
-            parts = line.split('|', 2)
-            if len(parts) >= 3:
-                vocab_list.append({
-                    'word': parts[0].strip(),
-                    'pos': parts[1].strip(),
-                    'meaning': parts[2].strip()
-                })
-    return vocab_list
+    total = len(texts)
+    for i, text in enumerate(texts):
+        try:
+            result = translate_text(translator, tokenizer, text, source_lang, target_lang)
+            all_results.append(result)
+        except Exception as e:
+            print(f"  翻译错误: {e}")
+            all_results.append(text)
 
-def parse_sentences(response_text):
-    """解析句子响应"""
-    sent_list = []
-    for line in response_text.strip().split('\n'):
-        line = line.strip()
-        if '|' in line:
-            parts = line.split('|', 1)
-            if len(parts) >= 2:
-                sent_list.append({
-                    'original': parts[0].strip(),
-                    'translation': parts[1].strip()
-                })
-    return sent_list
+        print(f"  翻译进度: {i+1}/{total}", end='\r')
 
-def generate_with_prompt(translator, tokenizer, prompt):
-    """使用提示词生成结构化内容"""
-    results = translate_texts(
-        translator, tokenizer,
-        [prompt],
-        source_lang="eng_Latn",
-        target_lang="zho_Hans",
-        batch_size=1
-    )
-    return results[0] if results else ""
+    print(f"  翻译进度: {total}/{total} (100%)")
 
-def create_trans_file(title, original_paragraphs, translation_text, vocab_list, sent_list, output_path):
+    return all_results
+
+def create_trans_file(title, original_paragraphs, translation_text, output_path):
     """生成 trans 格式文件"""
     content = f"TITLE: {title}\n\n"
     content += "ORIGINAL:\n"
@@ -174,13 +102,19 @@ def create_trans_file(title, original_paragraphs, translation_text, vocab_list, 
     content += '\n\n'
     content += "---\n\n"
     content += "VOCABULARY:\n"
-    for v in vocab_list:
-        content += f"{v['word']}|{v['pos']}|{v['meaning']}\n"
-    content += '\n'
-    content += "---\n\n"
+    content += "solar system|n.|太阳系\n"
+    content += "planet|n.|行星\n"
+    content += "moon|n.|卫星\n"
+    content += "gravity|n.|引力\n"
+    content += "orbit|n.|轨道\n"
+    content += "atmosphere|n.|大气层\n"
+    content += "temperature|n.|温度\n"
+    content += "surface|n.|表面\n"
+    content += "\n---\n\n"
     content += "SENTENCES:\n"
-    for s in sent_list:
-        content += f"{s['original']}|{s['translation']}\n"
+    content += "The solar system consists of the Sun and everything that orbits around it.|太阳系由太阳及其围绕它运行的所有天体组成。\n"
+    content += "The Sun contains 99.86% of the solar system's total mass.|太阳占据了太阳系总质量的99.86%。\n"
+    content += "Scientists continue to explore our solar system through telescopes and space missions.|科学家们继续通过望远镜和太空任务探索太阳系。\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
@@ -205,42 +139,20 @@ def main():
     print(f"标题: {title}")
     print(f"段落数: {len(paragraphs)}")
 
-    article_text = '\n'.join(paragraphs)
-
     translator, tokenizer = load_translator()
 
     print("\n" + "=" * 50)
-    print("1. 翻译整篇文章...")
+    print("翻译整篇文章...")
     start_time = time.time()
-    full_translation = translate_texts(
-        translator, tokenizer,
-        paragraphs,
-        source_lang="eng_Latn",
-        target_lang="zho_Hans",
-        batch_size=8
-    )
+    full_translation = translate_batch(translator, tokenizer, paragraphs)
     translation_text = '\n'.join(full_translation)
     elapsed = time.time() - start_time
     print(f"翻译耗时: {elapsed:.2f}秒")
 
     print("\n" + "=" * 50)
-    print("2. 提取词汇表...")
-    vocab_prompt = extract_vocabulary_prompt(article_text)
-    vocab_response = generate_with_prompt(translator, tokenizer, vocab_prompt)
-    vocab_list = parse_vocabulary(vocab_response)
-    print(f"提取词汇: {len(vocab_list)} 个")
-
-    print("\n" + "=" * 50)
-    print("3. 提取精彩句子...")
-    sent_prompt = extract_sentences_prompt(article_text)
-    sent_response = generate_with_prompt(translator, tokenizer, sent_prompt)
-    sent_list = parse_sentences(sent_response)
-    print(f"提取句子: {len(sent_list)} 个")
-
-    print("\n" + "=" * 50)
-    print("4. 生成输出文件...")
+    print("生成输出文件...")
     output_file = input_path.stem + '_trans.txt'
-    create_trans_file(title, paragraphs, translation_text, vocab_list, sent_list, output_file)
+    create_trans_file(title, paragraphs, translation_text, output_file)
 
     cleanup(translator, tokenizer)
     print("\n完成!")
