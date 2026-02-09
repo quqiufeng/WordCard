@@ -166,8 +166,8 @@ def extract_vocabulary(text, max_words=20):
         'about', 'into', 'out', 'off', 'down', 'up', 'one', 'two', 'first', 'last',
     }
 
-    # 过滤停用词
-    filtered = [w for w in words if w not in stop_words]
+    # 过滤停用词和短单词（<=5字符太简单）
+    filtered = [w for w in words if w not in stop_words and len(w) > 5]
 
     # 计算词频
     word_freq = Counter(filtered)
