@@ -115,13 +115,12 @@ def create_png(sections, output_path):
     from PIL import Image, ImageDraw, ImageFont
 
     font_path = "LXGWWenKaiMono-Bold.ttf"
-    font_path_en = "JetBrainsMono-Bold.ttf"
 
     try:
         font_title = ImageFont.truetype(font_path, 36)
         font_section = ImageFont.truetype(font_path, 26)
         font_text = ImageFont.truetype(font_path, 26)
-        font_en = ImageFont.truetype(font_path_en, 22)
+        font_en = ImageFont.truetype(font_path, 22)
     except Exception as e:
         print(f"字体加载失败: {e}")
         return False
@@ -130,33 +129,105 @@ def create_png(sections, output_path):
     LINE_HEIGHT = 42
     LINE_HEIGHT_CN = 52
     CARD_WIDTH = 780
+    EN_WRAP = 50
+    ZH_WRAP = 25
 
-    def get_text_height(text, is_chinese=False):
-        """计算文本高度"""
-        lines = text.split('\n')
-        height = 0
-        for line in lines:
-            if line.strip():
-                height += LINE_HEIGHT_CN if is_chinese else LINE_HEIGHT
-        return height
+    def is_chinese(text):
+        return any('\u4e00' <= c <= '\u9fff' for c in text)
+
+    def get_text_width(text):
+        """计算显示宽度：英文字符=1，中文字符=2"""
+        width = 0
+        for c in text:
+            if is_chinese(c):
+                width += 2
+            else:
+                width += 1
+        return width
+
+    def wrap_english(text, max_width):
+        """英文换行（单词边界断行）"""
+        if not text:
+            return []
+        words = text.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            if get_text_width(current_line) + get_text_width(word) + 1 <= max_width:
+                current_line += word + " "
+            else:
+                if current_line:
+                    lines.append(current_line.rstrip())
+                current_line = word + " "
+        if current_line:
+            lines.append(current_line.rstrip())
+        return lines
+
+    def wrap_chinese(text, max_chars):
+        """中文按字符数换行"""
+        if not text:
+            return []
+        lines = []
+        for i in range(0, len(text), max_chars):
+            lines.append(text[i:i + max_chars])
+        return lines
+
+    def text_display_width(text):
+        """计算文本显示需要多少像素宽度"""
+        return get_text_width(text) * 10
+
+    # 词汇表解析
+    vocab_lines = sections.get('vocabulary', '').split('\n')
+    vocab_lines = [l for l in vocab_lines if l.strip()]
+
+    def parse_vocab(line):
+        if '|' in line:
+            parts = line.split('|', 1)
+            en = parts[0].strip()
+            cn = parts[1].strip()
+            import re
+            en = re.sub(r'^\d+\.\s*', '', en)
+            return en, cn
+        return line, ""
 
     # 计算总高度
     y = MARGIN
     y += 45  # WordCard
-    y += 45 + 30  # 标题
+    for line in wrap_english(sections.get('title', ''), EN_WRAP):
+        y += LINE_HEIGHT + 5
+    y += 30
     y += 20
-    y += 45 + 45  # 原文
-    y += get_text_height(sections.get('original', ''), False)
+    y += 45  # 原文标题
+    for line in sections.get('original', '').split('\n'):
+        if line.strip():
+            for l in wrap_english(line, EN_WRAP):
+                y += LINE_HEIGHT
     y += 30
-    y += 45 + 45  # 中英双语
-    y += get_text_height(sections.get('en_ch', ''), True)
+    y += 45  # 中英双语标题
+    for line in sections.get('en_ch', '').split('\n'):
+        if line.strip():
+            if is_chinese(line):
+                for l in wrap_chinese(line, ZH_WRAP):
+                    y += LINE_HEIGHT_CN
+            else:
+                for l in wrap_english(line, EN_WRAP):
+                    y += LINE_HEIGHT
     y += 30
-    y += 45 + 45  # 词汇表
-    vocab_lines = sections.get('vocabulary', '').split('\n')
-    y += len([l for l in vocab_lines if l.strip()]) * LINE_HEIGHT_CN
+    y += 45  # 词汇表标题
+    left_col = vocab_lines[:len(vocab_lines)//2]
+    right_col = vocab_lines[len(vocab_lines)//2:]
+    for _ in range(max(len(left_col), len(right_col))):
+        y += LINE_HEIGHT_CN
     y += 30
-    y += 45 + 45  # 精彩句子
-    y += get_text_height(sections.get('sentences', ''), True)
+    y += 45  # 精彩句子标题
+    for line in sections.get('sentences', '').split('\n'):
+        if line.strip():
+            if is_chinese(line):
+                for l in wrap_chinese(line, ZH_WRAP):
+                    y += LINE_HEIGHT_CN
+            else:
+                for l in wrap_english(line, EN_WRAP):
+                    y += LINE_HEIGHT
     y += MARGIN
 
     img = Image.new('RGB', (CARD_WIDTH, int(y)), '#F5F5F5')
@@ -168,9 +239,9 @@ def create_png(sections, output_path):
     y += 45
 
     # 标题
-    for line in sections.get('title', '').split('\n'):
+    for line in wrap_english(sections.get('title', ''), EN_WRAP):
         draw.text((MARGIN, y), line, font=font_title, fill='#34495E')
-        y += 45
+        y += LINE_HEIGHT + 5
     y += 30
 
     # 原文
@@ -179,8 +250,9 @@ def create_png(sections, output_path):
     y += 45
     for line in sections.get('original', '').split('\n'):
         if line.strip():
-            draw.text((MARGIN + 10, y), line, font=font_en, fill='#34495E')
-            y += LINE_HEIGHT
+            for l in wrap_english(line, EN_WRAP):
+                draw.text((MARGIN + 10, y), l, font=font_text, fill='#34495E')
+                y += LINE_HEIGHT
     y += 30
 
     # 中英双语
@@ -188,9 +260,14 @@ def create_png(sections, output_path):
     y += 45
     for line in sections.get('en_ch', '').split('\n'):
         if line.strip():
-            is_cn = any('\u4e00' <= c <= '\u9fff' for c in line)
-            draw.text((MARGIN + 10, y), line, font=font_text if is_cn else font_en, fill='#7F8C8D' if is_cn else '#34495E')
-            y += LINE_HEIGHT_CN if is_cn else LINE_HEIGHT
+            if is_chinese(line):
+                for l in wrap_chinese(line, ZH_WRAP):
+                    draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
+                    y += LINE_HEIGHT_CN
+            else:
+                for l in wrap_english(line, EN_WRAP):
+                    draw.text((MARGIN + 10, y), l, font=font_text, fill='#34495E')
+                    y += LINE_HEIGHT
     y += 30
 
     # 词汇表
@@ -199,19 +276,22 @@ def create_png(sections, output_path):
     center_x = CARD_WIDTH // 2
     left_y = y
     right_y = y
-    left_col = vocab_lines[:len(vocab_lines)//2]
-    right_col = vocab_lines[len(vocab_lines)//2:]
 
-    for i, line in enumerate(left_col):
-        if line.strip():
-            draw.text((MARGIN + 10, left_y), line, font=font_en, fill='#E74C3C')
+    for i in range(max(len(left_col), len(right_col))):
+        left_en, left_cn = parse_vocab(left_col[i]) if i < len(left_col) else ("", "")
+        right_en, right_cn = parse_vocab(right_col[i]) if i < len(right_col) else ("", "")
+
+        if left_en or left_cn:
+            draw.text((MARGIN + 10, left_y), f"{left_en}  {left_cn}", font=font_text, fill='#E74C3C')
             left_y += LINE_HEIGHT_CN
         draw.line((MARGIN, left_y, center_x - 10, left_y), fill='#E0E0E0')
         left_y += 10
 
-    for i, line in enumerate(right_col):
-        if line.strip():
-            draw.text((center_x + 20, right_y), line, font=font_en, fill='#E74C3C')
+    for i in range(max(len(left_col), len(right_col))):
+        right_en, right_cn = parse_vocab(right_col[i]) if i < len(right_col) else ("", "")
+
+        if right_en or right_cn:
+            draw.text((center_x + 20, right_y), f"{right_en}  {right_cn}", font=font_text, fill='#E74C3C')
             right_y += LINE_HEIGHT_CN
         draw.line((center_x + 10, right_y, CARD_WIDTH - MARGIN, right_y), fill='#E0E0E0')
         right_y += 10
@@ -225,9 +305,14 @@ def create_png(sections, output_path):
     y += 45
     for line in sections.get('sentences', '').split('\n'):
         if line.strip():
-            is_cn = any('\u4e00' <= c <= '\u9fff' for c in line)
-            draw.text((MARGIN + 10, y), line, font=font_text if is_cn else font_en, fill='#7F8C8D' if is_cn else '#34495E')
-            y += LINE_HEIGHT_CN if is_cn else LINE_HEIGHT
+            if is_chinese(line):
+                for l in wrap_chinese(line, ZH_WRAP):
+                    draw.text((MARGIN + 10, y), l, font=font_text, fill='#7F8C8D')
+                    y += LINE_HEIGHT_CN
+            else:
+                for l in wrap_english(line, EN_WRAP):
+                    draw.text((MARGIN + 10, y), l, font=font_text, fill='#34495E')
+                    y += LINE_HEIGHT
 
     img.save(output_path)
     print(f"PNG: {output_path}")
