@@ -298,7 +298,7 @@ def main():
 
     print("\n" + "=" * 50)
     print("提取词汇表...")
-    vocab_list = extract_vocabulary(' '.join(paragraphs), 15)
+    vocab_list = extract_vocabulary(' '.join(paragraphs), 20)
     print(f"词汇数量: {len(vocab_list)}")
 
     print("翻译词汇表...")
