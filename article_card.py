@@ -55,8 +55,11 @@ def load_bilingual_txt(txt_file):
             elif section == 'sent' and '|' in line:
                 parts = line.split('|', 1)
                 if len(parts) >= 2:
+                    import re
+                    sent_match = re.match(r'^\d+\.\s*(.+)', parts[0])
+                    sentence = sent_match.group(1) if sent_match else parts[0]
                     article['sentences'].append({
-                        'original': parts[0],
+                        'original': sentence,
                         'translation': parts[1]
                     })
     return article

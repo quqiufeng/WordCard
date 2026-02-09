@@ -262,7 +262,7 @@ def create_trans_file(title, paragraphs, translations, vocab_list, vocab_trans, 
     content += "---\n\n"
     content += "SENTENCES:\n"
     for i in range(len(sent_list)):
-        content += f"[{sent_list[i]}]|{sent_trans[i]}\n"
+        content += f"{i+1}. {sent_list[i]}|{sent_trans[i]}\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
