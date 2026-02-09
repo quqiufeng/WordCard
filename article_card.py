@@ -44,10 +44,13 @@ def load_bilingual_txt(txt_file):
                 section = 'sent'
             elif section == 'vocab' and '|' in line:
                 parts = line.split('|', 3)
-                if len(parts) >= 3:
+                if len(parts) >= 2:
+                    import re
+                    word_match = re.match(r'^\d+\.\s*(.+)', parts[0])
+                    word = word_match.group(1) if word_match else parts[0]
                     article['vocabulary'].append({
-                        'word': parts[0],
-                        'meaning': parts[2]
+                        'word': word,
+                        'meaning': parts[1]
                     })
             elif section == 'sent' and '|' in line:
                 parts = line.split('|', 1)
