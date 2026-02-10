@@ -47,13 +47,10 @@ python generate_cards.py solar_system.txt "太阳系学习卡片"
 ### 单独步骤
 
 ```bash
-# 1. 调用 LM Studio 生成内容
-python llm_one_shot.py article.txt
+# 1. 调用 LM Studio 生成并解析内容
+python llm_one_shot.py article.txt [标题]
 
-# 2. 解析输出格式
-python parse_one_shot.py output/article_one_shot.txt output/article_parsed.txt
-
-# 3. 生成卡片
+# 2. 生成卡片
 python article_card.py output/article_parsed.txt
 ```
 
@@ -224,8 +221,7 @@ Markdown 格式，词汇表双列显示：
 | 文件 | 说明 |
 |------|------|
 | `generate_cards.py` | 一键生成卡片入口脚本 |
-| `llm_one_shot.py` | LM Studio API 调用 |
-| `parse_one_shot.py` | 输出格式解析 |
+| `llm_one_shot.py` | LM Studio API 调用 + 格式解析 |
 | `article_card.py` | 卡片生成（PNG/PDF/MD） |
 | `solar_system.txt` | 示例英文文章 |
 | `output/` | 生成的卡片文件目录 |

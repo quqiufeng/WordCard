@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-一次性提示词生成所有内容
-不需要翻译，直接让模型输出格式化的内容
+调用 LM Studio 生成英文学习内容，并解析输出为 article_card.py 期望的格式
 """
 
 import warnings
@@ -12,13 +11,11 @@ import sys
 import os
 from pathlib import Path
 
-# LM Studio 配置
 OLLAMA_HOST = "http://localhost:1234/v1"
 MODEL = "qwen2.5-7b-instruct"
 
-
 def generate_content(text):
-    """调用 Ollama 生成所有内容"""
+    """调用 LM Studio 生成所有内容"""
     url = f"{OLLAMA_HOST}/chat/completions"
 
     prompt = f"""请阅读以下英文文章，按格式输出4个部分：
@@ -69,16 +66,76 @@ def generate_content(text):
         print(f"错误: {e}")
         return None
 
+def parse_content(content):
+    """解析 one_shot 格式的内容"""
+    sections = {
+        'title': '',
+        'original': '',
+        'en_ch': '',
+        'vocabulary': [],
+        'sentences': ''
+    }
+
+    current_section = None
+    current_content = []
+
+    section_markers = {
+        '【英文原文】': 'original',
+        '【中英双语】': 'en_ch',
+        '【英文单词列表】': 'vocabulary',
+        '【精彩句子】': 'sentences'
+    }
+
+    for line in content.split('\n'):
+        stripped = line.strip()
+
+        if stripped in section_markers:
+            if current_section:
+                sections[current_section] = '\n'.join(current_content).strip()
+            current_section = section_markers[stripped]
+            current_content = []
+        elif current_section:
+            current_content.append(line)
+
+    if current_section:
+        sections[current_section] = '\n'.join(current_content).strip()
+
+    return sections
+
+def format_for_article_card(sections, title):
+    """转换为 article_card.py 期望的格式"""
+    lines = []
+    lines.append(f"TITLE: {title}")
+    lines.append("---")
+    lines.append("ORIGINAL:")
+    lines.append(sections.get('original', ''))
+    lines.append("---")
+    lines.append("EN-CH:")
+    lines.append(sections.get('en_ch', ''))
+    lines.append("---")
+    lines.append("VOCABULARY:")
+    vocab = sections.get('vocabulary', [])
+    if isinstance(vocab, str):
+        vocab = vocab.split('\n')
+    for v in vocab:
+        v = v.strip()
+        if v:
+            lines.append(v)
+    lines.append("---")
+    lines.append("SENTENCES:")
+    lines.append(sections.get('sentences', ''))
+    return '\n'.join(lines)
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python ollama_one_shot.py article.txt")
+        print("用法: python llm_one_shot.py article.txt [标题]")
         print(f"LM Studio: {OLLAMA_HOST}")
         print(f"模型: {MODEL}")
         sys.exit(1)
 
     input_file = sys.argv[1]
     input_path = Path(input_file)
+    title = sys.argv[2] if len(sys.argv) > 2 else input_path.stem.replace('_', ' ').title()
 
     if not input_path.exists():
         print(f"错误: 文件不存在 {input_file}")
@@ -90,28 +147,46 @@ def main():
 
     print(f"\n发送提示词到 LM Studio...")
     print(f"模型: {MODEL}")
-    print("\n" + "=" * 50)
+    print("=" * 50)
 
-    result = generate_content(text)
+    content = generate_content(text)
 
-    if result:
-        print("\n" + "=" * 50)
-        print("生成内容预览：")
-        print("-" * 50)
-        print(result[:3000])
-        if len(result) > 3000:
-            print(f"\n... (共 {len(result)} 字符)")
-
-        # 保存原始输出
-        os.makedirs('output', exist_ok=True)
-        output_path = f"output/{input_path.stem}_one_shot.txt"
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(result)
-
-        print(f"\n完成！文件: {output_path}")
-    else:
+    if not content:
         print("生成失败")
+        sys.exit(1)
 
+    print("生成完成！")
+    print("=" * 50)
+
+    os.makedirs('output', exist_ok=True)
+    base_name = input_path.stem
+
+    # 保存原始输出
+    one_shot_file = f"output/{base_name}_one_shot.txt"
+    with open(one_shot_file, 'w', encoding='utf-8') as f:
+        f.write(content)
+    print(f"原始输出: {one_shot_file}")
+
+    # 解析并保存
+    sections = parse_content(content)
+    parsed_file = f"output/{base_name}_parsed.txt"
+    formatted = format_for_article_card(sections, title)
+    with open(parsed_file, 'w', encoding='utf-8') as f:
+        f.write(formatted)
+
+    print(f"\n内容统计:")
+    print(f"  原文: {len(sections.get('original', ''))} 字符")
+    print(f"  双语: {len(sections.get('en_ch', ''))} 字符")
+    vocab = sections.get('vocabulary', [])
+    if isinstance(vocab, str):
+        vocab = vocab.split('\n')
+    print(f"  词汇: {len([v for v in vocab if v.strip()])} 个")
+    sentences = sections.get('sentences', '')
+    sentence_count = len([s for s in sentences.split('\n') if s.strip()])
+    print(f"  句子: {sentence_count} 个")
+
+    print(f"\n解析输出: {parsed_file}")
+    print("\n完成！")
 
 if __name__ == "__main__":
     main()

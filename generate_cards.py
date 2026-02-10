@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 """
 完整流程：一键生成学习卡片
-1. 读取文章
-2. 调用 LM Studio 生成内容
-3. 解析输出
-4. 生成 MD/PNG/PDF
+1. 调用 LM Studio 生成内容
+2. 解析输出
+3. 生成 MD/PNG/PDF
 """
 
 import sys
 import os
-import requests
 from pathlib import Path
 
-# LM Studio 配置
 OLLAMA_HOST = "http://localhost:1234/v1"
 MODEL = "qwen2.5-7b-instruct"
 
 def generate_content(text):
     """调用 LM Studio 生成所有内容"""
+    import requests
     url = f"{OLLAMA_HOST}/chat/completions"
 
     prompt = f"""请阅读以下英文文章，按格式输出4个部分：
@@ -68,7 +66,7 @@ def generate_content(text):
         print(f"错误: {e}")
         return None
 
-def parse_one_shot(content):
+def parse_content(content):
     """解析 one_shot 格式的内容"""
     sections = {
         'title': '',
@@ -126,7 +124,6 @@ def format_for_article_card(sections, title):
     lines.append("---")
     lines.append("SENTENCES:")
     lines.append(sections.get('sentences', ''))
-
     return '\n'.join(lines)
 
 def create_cards(parsed_file, base_name):
@@ -158,9 +155,9 @@ def main():
     print(f"模型: {MODEL}")
     print("=" * 50)
 
-    result = generate_content(text)
+    content = generate_content(text)
 
-    if not result:
+    if not content:
         print("生成失败")
         sys.exit(1)
 
@@ -172,10 +169,10 @@ def main():
 
     print(f"\n保存原始输出: {one_shot_file}")
     with open(one_shot_file, 'w', encoding='utf-8') as f:
-        f.write(result)
+        f.write(content)
 
     print("\n解析内容...")
-    sections = parse_one_shot(result)
+    sections = parse_content(content)
     print(f"  原文: {len(sections.get('original', ''))} 字符")
     print(f"  双语: {len(sections.get('en_ch', ''))} 字符")
     vocab = sections.get('vocabulary', [])
