@@ -33,25 +33,12 @@ pip install pillow fpdf requests
 
 ## 使用方法
 
-### 一键生成所有卡片
-
 ```bash
-python generate_cards.py article.txt [标题]
-```
+# 1. 调用 LM Studio 生成翻译 txt
+python llm.py article.txt [标题]
 
-示例：
-```bash
-python generate_cards.py solar_system.txt "太阳系学习卡片"
-```
-
-### 单独步骤
-
-```bash
-# 1. 调用 LM Studio 生成并解析内容
-python llm_one_shot.py article.txt [标题]
-
-# 2. 生成卡片
-python article_card.py output/article_parsed.txt
+# 2. 生成卡片（处理 output 下所有 txt）
+python article_card.py
 ```
 
 ## 输出示例
@@ -60,20 +47,18 @@ python article_card.py output/article_parsed.txt
 
 | 文件 | 说明 |
 |------|------|
-| `article_one_shot.txt` | LM Studio 原始输出 |
-| `article_parsed.txt` | 解析后的格式化文件 |
-| `article_parsed.md` | Markdown 格式 |
-| `article_parsed.png` | PNG 图片卡片 |
-| `article_parsed.pdf` | PDF 文档卡片 |
+| `article_trans.txt` | 翻译后的格式化文件 |
+| `article_trans.md` | Markdown 格式 |
+| `article_trans.png` | PNG 图片卡片 |
+| `article_trans.pdf` | PDF 文档卡片 |
 
 ## 配置说明
 
-### translate.py 参数
+### llm.py 参数
 
 ```python
-MODEL_DIR = "E:/cuda/nllb-200-3.3B-ct2-float16"  # 模型路径
-EN_WRAP = 65  # 英文每行字符数
-ZH_WRAP = 40  # 中文每行字符数
+LLMS_HOST = "http://192.168.124.3:11434/v1"  # LM Studio 地址
+MODEL = "qwen2.5-7b-instruct"  # 模型名称
 ```
 
 ### article_card.py 参数
@@ -88,6 +73,46 @@ ZH_WRAP = 25  # 中文换行字符数
 
 ### 核心模块
 
+```
+llm.py                 # 调用 LM Studio，生成翻译 txt
+└── generate_content() # 调用 LM Studio API
+└── parse_content()    # 解析 AI 输出
+
+article_card.py
+├── load_txt()         # 解析 _trans.txt 文件
+├── create_md()        # 生成 Markdown 文件
+├── create_png()       # 生成 PNG 图片卡片
+└── create_pdf()       # 生成 PDF 文档卡片
+```
+
+### 处理流程
+
+```
+输入文件 (article.txt)
+         │
+         ▼
+┌─────────────────────┐
+│ llm.py              │  调用 LM Studio
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 1. 读取文章         │
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 2. LM Studio 生成内容 │  一次性提示词
+└─────────┬───────────┘
+          ▼
+┌─────────────────────┐
+│ 3. 解析输出         │  分离4个区块
+└─────────┬───────────┘
+          ▼
+    output/xxx_trans.txt
+         │
+         ▼
+┌─────────────────────┐
+│ article_card.py     │  生成卡片
+└─────────────────────┘
 ```
 generate_cards.py      # 统一入口，一键完成所有步骤
 ├── generate_content()  # 调用 LM Studio API
@@ -220,9 +245,9 @@ Markdown 格式，词汇表双列显示：
 
 | 文件 | 说明 |
 |------|------|
-| `generate_cards.py` | 一键生成卡片入口脚本 |
-| `llm_one_shot.py` | LM Studio API 调用 + 格式解析 |
+| `llm.py` | LM Studio API 调用 + 格式解析 |
 | `article_card.py` | 卡片生成（PNG/PDF/MD） |
+| `translate_nllb.py` | NLLB 翻译脚本（保留备用） |
 | `solar_system.txt` | 示例英文文章 |
 | `output/` | 生成的卡片文件目录 |
 | `*.ttf` | 中英文字体文件 |

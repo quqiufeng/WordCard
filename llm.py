@@ -11,12 +11,12 @@ import sys
 import os
 from pathlib import Path
 
-OLLAMA_HOST = "http://192.168.124.3:11434/v1"
+LLMS_HOST = "http://192.168.124.3:11434/v1"
 MODEL = "qwen2.5-7b-instruct"
 
 def generate_content(text):
     """调用 LM Studio 生成所有内容"""
-    url = f"{OLLAMA_HOST}/chat/completions"
+    url = f"{LLMS_HOST}/chat/completions"
 
     prompt = f"""请阅读以下英文文章，按格式输出4个部分：
 
@@ -128,8 +128,8 @@ def format_for_article_card(sections, title):
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python llm_one_shot.py article.txt [标题]")
-        print(f"LM Studio: {OLLAMA_HOST}")
+        print("用法: python llm.py article.txt [标题]")
+        print(f"LM Studio: {LLMS_HOST}")
         print(f"模型: {MODEL}")
         sys.exit(1)
 
