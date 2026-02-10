@@ -2,7 +2,7 @@
 """
 完整流程：一键生成学习卡片
 1. 读取文章
-2. 调用 Ollama 生成内容
+2. 调用 LM Studio 生成内容
 3. 解析输出
 4. 生成 MD/PNG/PDF
 """
@@ -17,7 +17,7 @@ OLLAMA_HOST = "http://localhost:1234/v1"
 MODEL = "qwen2.5-7b-instruct"
 
 def generate_content(text):
-    """调用 Ollama 生成所有内容"""
+    """调用 LM Studio 生成所有内容"""
     url = f"{OLLAMA_HOST}/chat/completions"
 
     prompt = f"""请阅读以下英文文章，按格式输出4个部分：

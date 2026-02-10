@@ -27,9 +27,9 @@
 pip install pillow fpdf requests
 ```
 
-**Ollama 要求**：
-- Ollama 服务器运行中
-- 模型已拉取：`qwen2.5-7b-instruct`
+**LM Studio 要求**：
+- LM Studio 服务器运行中
+- 模型已加载：`qwen2.5-7b-instruct`
 
 ## 使用方法
 
@@ -48,7 +48,7 @@ python generate_cards.py solar_system.txt "太阳系学习卡片"
 
 ```bash
 # 1. 调用 LM Studio 生成内容
-python ollama_one_shot.py article.txt
+python llm_one_shot.py article.txt
 
 # 2. 解析输出格式
 python parse_one_shot.py output/article_one_shot.txt output/article_parsed.txt
@@ -63,7 +63,7 @@ python article_card.py output/article_parsed.txt
 
 | 文件 | 说明 |
 |------|------|
-| `article_one_shot.txt` | Ollama 原始输出 |
+| `article_one_shot.txt` | LM Studio 原始输出 |
 | `article_parsed.txt` | 解析后的格式化文件 |
 | `article_parsed.md` | Markdown 格式 |
 | `article_parsed.png` | PNG 图片卡片 |
@@ -93,7 +93,7 @@ ZH_WRAP = 25  # 中文换行字符数
 
 ```
 generate_cards.py      # 统一入口，一键完成所有步骤
-├── generate_content()  # 调用 Ollama API
+├── generate_content()  # 调用 LM Studio API
 ├── parse_one_shot()   # 解析 AI 输出
 └── create_cards()     # 调用 article_card.py
 
@@ -119,7 +119,7 @@ article_card.py
 └─────────┬───────────┘
           ▼
 ┌─────────────────────┐
-│ 2. Ollama 生成内容  │  一次性提示词
+│ 2. LM Studio 生成内容  │  一次性提示词
 └─────────┬───────────┘
           ▼
 ┌─────────────────────┐
@@ -224,7 +224,7 @@ Markdown 格式，词汇表双列显示：
 | 文件 | 说明 |
 |------|------|
 | `generate_cards.py` | 一键生成卡片入口脚本 |
-| `ollama_one_shot.py` | Ollama API 调用 |
+| `llm_one_shot.py` | LM Studio API 调用 |
 | `parse_one_shot.py` | 输出格式解析 |
 | `article_card.py` | 卡片生成（PNG/PDF/MD） |
 | `solar_system.txt` | 示例英文文章 |
