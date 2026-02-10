@@ -556,10 +556,10 @@ def main():
     txt_files = []
 
     if len(sys.argv) < 2:
-        # 不传参数，扫描 output 目录下所有 txt 文件
+        # 不传参数，扫描 output 目录下所有 _trans.txt 文件
         if os.path.exists('output'):
             for f in os.listdir('output'):
-                if f.endswith('.txt') and not f.endswith('.md') and not f.endswith('.png') and not f.endswith('.pdf'):
+                if f.endswith('_trans.txt'):
                     txt_files.append(f"output/{f}")
         if not txt_files:
             print("错误: output 目录下没有 txt 文件")

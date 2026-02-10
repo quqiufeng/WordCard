@@ -127,60 +127,81 @@ def format_for_article_card(sections, title):
     return '\n'.join(lines)
 
 def main():
-    if len(sys.argv) < 2:
+    txt_files = []
+
+    if len(sys.argv) < 1:
         print("用法: python llm.py article.txt [标题]")
         print(f"LM Studio: {LLMS_HOST}")
         print(f"模型: {MODEL}")
         sys.exit(1)
 
-    input_file = sys.argv[1]
-    input_path = Path(input_file)
-    title = sys.argv[2] if len(sys.argv) > 2 else input_path.stem.replace('_', ' ').title()
-
-    if not input_path.exists():
-        print(f"错误: 文件不存在 {input_file}")
-        sys.exit(1)
-
-    print(f"读取文章: {input_path.name}")
-    with open(input_path, 'r', encoding='utf-8') as f:
-        text = f.read()
-
-    print(f"\n发送提示词到 LM Studio...")
-    print(f"模型: {MODEL}")
-    print("=" * 50)
-
-    content = generate_content(text)
-
-    if not content:
-        print("生成失败")
-        sys.exit(1)
-
-    print("生成完成！")
-    print("=" * 50)
+    if len(sys.argv) == 1:
+        # 不传参数，扫描 res 目录下所有 txt 文件
+        if os.path.exists('res'):
+            for f in os.listdir('res'):
+                if f.endswith('.txt'):
+                    txt_files.append(f"res/{f}")
+        if not txt_files:
+            print("错误: res 目录下没有 txt 文件")
+            sys.exit(1)
+        print(f"扫描到 {len(txt_files)} 个文件，将全部处理")
+    else:
+        # 处理指定的文件
+        for arg in sys.argv[1:]:
+            if arg.startswith('res/'):
+                txt_files.append(arg)
+            else:
+                txt_files.append(f"res/{arg}")
 
     os.makedirs('output', exist_ok=True)
-    base_name = input_path.stem
 
-    # 解析并保存
-    sections = parse_content(content)
-    parsed_file = f"output/{base_name}_trans.txt"
-    formatted = format_for_article_card(sections, title)
-    with open(parsed_file, 'w', encoding='utf-8') as f:
-        f.write(formatted)
+    for input_file in txt_files:
+        if not os.path.exists(input_file):
+            print(f"跳过: 文件不存在 {input_file}")
+            continue
 
-    print(f"\n内容统计:")
-    print(f"  原文: {len(sections.get('original', ''))} 字符")
-    print(f"  双语: {len(sections.get('en_ch', ''))} 字符")
-    vocab = sections.get('vocabulary', [])
-    if isinstance(vocab, str):
-        vocab = vocab.split('\n')
-    print(f"  词汇: {len([v for v in vocab if v.strip()])} 个")
-    sentences = sections.get('sentences', '')
-    sentence_count = len([s for s in sentences.split('\n') if s.strip()])
-    print(f"  句子: {sentence_count} 个")
+        input_path = Path(input_file)
+        title = input_path.stem.replace('_', ' ').title()
 
-    print(f"\n解析输出: {parsed_file}")
-    print("\n完成！")
+        print(f"\n读取文章: {input_path.name}")
+        with open(input_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+
+        print(f"发送提示词到 LM Studio...")
+        print(f"模型: {MODEL}")
+        print("=" * 50)
+
+        content = generate_content(text)
+
+        if not content:
+            print(f"生成失败: {input_path.name}")
+            continue
+
+        print("生成完成！")
+        print("=" * 50)
+
+        base_name = input_path.stem
+
+        sections = parse_content(content)
+        trans_file = f"output/{base_name}_trans.txt"
+        formatted = format_for_article_card(sections, title)
+        with open(trans_file, 'w', encoding='utf-8') as f:
+            f.write(formatted)
+
+        print(f"\n内容统计:")
+        print(f"  原文: {len(sections.get('original', ''))} 字符")
+        print(f"  双语: {len(sections.get('en_ch', ''))} 字符")
+        vocab = sections.get('vocabulary', [])
+        if isinstance(vocab, str):
+            vocab = vocab.split('\n')
+        print(f"  词汇: {len([v for v in vocab if v.strip()])} 个")
+        sentences = sections.get('sentences', '')
+        sentence_count = len([s for s in sentences.split('\n') if s.strip()])
+        print(f"  句子: {sentence_count} 个")
+
+        print(f"\n输出: {trans_file}")
+
+    print(f"\n完成！处理了 {len(txt_files)} 个文件")
 
 if __name__ == "__main__":
     main()

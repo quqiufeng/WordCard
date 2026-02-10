@@ -34,11 +34,15 @@ pip install pillow fpdf requests
 ## 使用方法
 
 ```bash
-# 1. 调用 LM Studio 生成翻译 txt
-python llm.py article.txt [标题]
+# 1. 调用 LM Studio 生成翻译 txt（从 res 目录读取）
+# 不传参数，处理 res 下所有 txt
+python llm.py
 
-# 2. 生成卡片（处理 output 下所有 txt）
-python article_card.py
+# 传参数，处理指定的文件（文件名从 res 目录读取）
+python llm.py article1.txt article2.txt
+
+# 2. 生成卡片（处理 output 下所有 _trans.txt）
+python card.py
 ```
 
 ## 输出示例
@@ -245,10 +249,10 @@ Markdown 格式，词汇表双列显示：
 
 | 文件 | 说明 |
 |------|------|
-| `llm.py` | LM Studio API 调用 + 格式解析 |
-| `article_card.py` | 卡片生成（PNG/PDF/MD） |
+| `llm.py` | LM Studio API 调用 + 格式解析（从 res 目录读取） |
+| `card.py` | 卡片生成（PNG/PDF/MD） |
 | `translate_nllb.py` | NLLB 翻译脚本（保留备用） |
-| `solar_system.txt` | 示例英文文章 |
+| `res/` | 原始文章目录 |
 | `output/` | 生成的卡片文件目录 |
 | `*.ttf` | 中英文字体文件 |
 
