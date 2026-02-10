@@ -161,12 +161,6 @@ def main():
     os.makedirs('output', exist_ok=True)
     base_name = input_path.stem
 
-    # 保存原始输出
-    one_shot_file = f"output/{base_name}_one_shot.txt"
-    with open(one_shot_file, 'w', encoding='utf-8') as f:
-        f.write(content)
-    print(f"原始输出: {one_shot_file}")
-
     # 解析并保存
     sections = parse_content(content)
     parsed_file = f"output/{base_name}_trans.txt"

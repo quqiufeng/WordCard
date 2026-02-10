@@ -165,11 +165,6 @@ def main():
     print("=" * 50)
 
     base_name = input_path.stem
-    one_shot_file = f"output/{base_name}_one_shot.txt"
-
-    print(f"\n保存原始输出: {one_shot_file}")
-    with open(one_shot_file, 'w', encoding='utf-8') as f:
-        f.write(content)
 
     print("\n解析内容...")
     sections = parse_content(content)
