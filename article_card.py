@@ -553,28 +553,44 @@ def create_pdf(sections, output_path):
     return True
 
 def main():
+    txt_files = []
+
     if len(sys.argv) < 2:
-        print("用法: python article_card.py solar_system_trans.txt")
-        print("文件放在 output 目录")
-        sys.exit(1)
+        # 不传参数，扫描 output 目录下所有 txt 文件
+        if os.path.exists('output'):
+            for f in os.listdir('output'):
+                if f.endswith('.txt') and not f.endswith('.md') and not f.endswith('.png') and not f.endswith('.pdf'):
+                    txt_files.append(f"output/{f}")
+        if not txt_files:
+            print("错误: output 目录下没有 txt 文件")
+            sys.exit(1)
+        print(f"扫描到 {len(txt_files)} 个文件，将全部处理")
+    else:
+        # 处理指定的文件
+        for arg in sys.argv[1:]:
+            if arg.startswith('output/'):
+                txt_files.append(arg)
+            else:
+                txt_files.append(f"output/{arg}")
 
-    input_file = sys.argv[1]
-    txt_file = f"output/{input_file}" if not input_file.startswith('output/') else input_file
-
-    if not os.path.exists(txt_file):
-        print(f"错误: 文件不存在 {txt_file}")
-        sys.exit(1)
-
-    print(f"读取: {txt_file}")
-    sections = load_txt(txt_file)
-    print(f"标题: {sections.get('title', '')}")
-
-    base_name = os.path.splitext(os.path.basename(txt_file))[0]
     os.makedirs('output', exist_ok=True)
 
-    create_md(sections, f"output/{base_name}.md")
-    create_png(sections, f"output/{base_name}.png")
-    create_pdf(sections, f"output/{base_name}.pdf")
+    for txt_file in txt_files:
+        if not os.path.exists(txt_file):
+            print(f"跳过: 文件不存在 {txt_file}")
+            continue
+
+        print(f"\n读取: {txt_file}")
+        sections = load_txt(txt_file)
+        title = sections.get('title', '')
+        print(f"标题: {title}")
+
+        base_name = os.path.splitext(os.path.basename(txt_file))[0]
+        create_md(sections, f"output/{base_name}.md")
+        create_png(sections, f"output/{base_name}.png")
+        create_pdf(sections, f"output/{base_name}.pdf")
+
+    print(f"\n完成！处理了 {len(txt_files)} 个文件")
 
 if __name__ == '__main__':
     main()
