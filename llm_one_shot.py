@@ -11,7 +11,7 @@ import sys
 import os
 from pathlib import Path
 
-OLLAMA_HOST = "http://localhost:1234/v1"
+OLLAMA_HOST = "http://192.168.124.3:11434/v1"
 MODEL = "qwen2.5-7b-instruct"
 
 def generate_content(text):
@@ -169,7 +169,7 @@ def main():
 
     # 解析并保存
     sections = parse_content(content)
-    parsed_file = f"output/{base_name}_parsed.txt"
+    parsed_file = f"output/{base_name}_trans.txt"
     formatted = format_for_article_card(sections, title)
     with open(parsed_file, 'w', encoding='utf-8') as f:
         f.write(formatted)

@@ -7,7 +7,7 @@
 - **模型**: [mradermacher/Qwen2.5-7B-Instruct-GGUF](https://huggingface.co/mradermacher/Qwen2.5-7B-Instruct-GGUF)
 - **量化版本**: `Qwen2.5-7B-Instruct.Q5_K_M.gguf`
 - **模型路径**: `E:\model\mradermacher\Qwen2.5-7B-Instruct-GGUF`
-- **服务器**: `http://localhost:1234/v1` (OpenAI 兼容 API)
+- **服务器**: `http://192.168.124.3:11434/v1` (OpenAI 兼容 API)
 
 ---
 
