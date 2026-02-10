@@ -21,7 +21,7 @@ WordCard/
 
 ## 使用方法
 
-### 1. 调用 LM Studio 生成翻译
+### 方式1: LM Studio 在线翻译（推荐）
 
 ```bash
 # 处理 res 目录下所有 txt 文件
@@ -31,7 +31,14 @@ python llm.py
 python llm.py article1.txt article2.txt
 ```
 
-### 2. 生成卡片
+### 方式2: NLLB 离线翻译（备用）
+
+```bash
+# 处理单个文件
+python translate_nllb.py res/article.txt
+```
+
+### 生成卡片
 
 ```bash
 # 处理 output 目录下所有 _trans.txt 文件
@@ -63,6 +70,47 @@ python card.py article1_trans.txt article2_trans.txt
 - 指令遵循能力强
 - 适合内容生成和翻译任务
 - GGUF 量化版在消费级硬件上推理速度快
+
+## NLLB 翻译模型 (离线备用)
+
+虽然当前默认使用 LM Studio，但 NLLB 模型作为离线翻译方案仍然保留。
+
+- **模型**: [NLLB-200 3.3B](https://huggingface.co/facebook/nllb-200-distilled-3.3B)
+- **模型路径**: `E:/cuda/nllb-200-3.3B-ct2-float16`
+- **格式**: CTranslate2 量化 (FP16)
+- **加速**: CUDA GPU 推理
+
+### NLLB 模型介绍
+
+**官方链接**: https://huggingface.co/facebook/nllb-200-distilled-3.3B
+
+**模型架构**:
+- 类型: Encoder-Decoder Transformer
+- 参数规模: 3.3B (33亿参数，蒸馏版)
+- 语言支持: 200 种语言
+- 训练数据: 多语言平行语料
+
+**性能特点**:
+- **支持 200 种语言**，包括罕见语言
+- 翻译质量高，尤其是英中互译
+- **离线运行**，无需网络
+- CTranslate2 量化加速，GPU 推理
+
+**使用场景**:
+- 网络不可用时
+- 需要批量离线翻译
+- 对翻译质量有极高要求
+
+### NLLB 配置要求
+
+```bash
+# 安装依赖
+pip install ctranslate2 transformers torch pillow fpdf tqdm
+```
+
+**硬件要求**:
+- CUDA GPU (8GB+ 显存)
+- 或 CPU 模式（较慢）
 
 ## 字体文件
 
@@ -155,8 +203,23 @@ SENTENCES:
 ### 处理流程
 
 ```
+# 方式1: LM Studio 在线翻译（推荐）
 res/*.txt → llm.py → output/*_trans.txt → card.py → output/*.{md,png,pdf}
+
+# 方式2: NLLB 离线翻译（备用）
+res/*.txt → translate_nllb.py → output/*_trans.txt → card.py → output/*.{md,png,pdf}
 ```
+
+### 翻译方案对比
+
+| 特性 | LM Studio (Qwen2.5) | NLLB-200 |
+|------|---------------------|----------|
+| 部署方式 | 本地 API 服务 | 本地模型文件 |
+| 硬件要求 | 16GB+ 内存 | 8GB+ GPU 显存 |
+| 翻译质量 | 优秀 | 高 |
+| 速度 | 快 | 依赖 GPU |
+| 网络依赖 | 无 | 无 |
+| 语言支持 | 多语言 | 200 种语言 |
 
 ### 核心模块
 
@@ -192,8 +255,16 @@ card.py
 
 ## 安装依赖
 
+### 基础依赖（LM Studio 方案）
+
 ```bash
 pip install pillow fpdf requests
+```
+
+### NLLB 离线翻译依赖
+
+```bash
+pip install ctranslate2 transformers torch tqdm
 ```
 
 **PDF 依赖**:
@@ -203,7 +274,16 @@ pip install fpdf
 
 ## 运行环境
 
+### LM Studio 方案
+
 - Python 3.8+
-- LM Studio (Windows) / 或其他 OpenAI 兼容 API
+- LM Studio (Windows)
 - 16GB+ 内存
+- Windows
+
+### NLLB 离线方案
+
+- Python 3.8+
+- CUDA 11.x + cuDNN 8.x
+- 8GB+ GPU 显存
 - Windows / Linux
