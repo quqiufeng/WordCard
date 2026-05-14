@@ -710,9 +710,6 @@ user_vocab_mastery_t* wc_find_mastery(wordcard_db_t *db,
 void wc_sm2_update(user_vocab_mastery_t *mastery, uint8_t quality) {
     if (!mastery || quality > 5) return;
     
-    /* quality 是 uint8_t，范围天然为 0-255，但调用者应保证 <= 5 */
-    if (quality > 5) quality = 5;
-    
     mastery->total_reviews++;
     mastery->last_review = wc_now();
     
@@ -805,8 +802,6 @@ void wc_recalc_overall(user_vocab_mastery_t *mastery) {
                     mastery->listening * 0.15f +
                     mastery->pronunciation * 0.10f +
                     mastery->usage * 0.10f;
-    if (overall < 0) overall = 0;
-    if (overall > 100) overall = 100;
     mastery->overall = (uint8_t)overall;
 }
 

@@ -233,7 +233,7 @@ class WordCardDB:
         with self._lock:
             return _lib.wc_create_user(self._db, 
                                         dingtalk_uid.encode('utf-8'),
-                                        name.encode('utf-8') if name else None)
+                                        name.encode('utf-8'))
     
     def find_user(self, dingtalk_uid: str = None, user_id: int = None):
         """查找用户"""
@@ -613,7 +613,6 @@ def main():
     # 预加载数据库
     db = get_db("data/wordcard.db")
     print(f"Database loaded: {db.db_path}")
-    print(f"Vocab count: {len([i for i in range(_lib.wc_now())])}")  # 占位
     
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
