@@ -49,6 +49,7 @@ WordCard/
 │
 ├── llm.py                         # LLM 翻译引擎（已有，复用）
 ├── card.py                        # 卡片渲染 MD/PNG/PDF（已有，复用）
+├── build_llama_cpp.sh             # llama.cpp CUDA 编译脚本（RTX 3080 优化版）
 ├── run_qwen3.sh                   # llama.cpp 服务启动脚本
 ├── res/                           # 原始英文文章目录
 │   └── *.txt
@@ -357,18 +358,49 @@ python card.py solar_system_trans.txt
 
 ## 安装依赖
 
+### 1. 系统依赖
+
 ```bash
 # Python 依赖
 pip install fastapi uvicorn pydantic pillow fpdf requests
 
 # C 编译环境（gcc + make）
-sudo apt-get install build-essential
+sudo apt-get install build-essential cmake
+```
 
-# llama.cpp 环境（如需使用 llm.py）
-git clone https://github.com/ggerganov/llama.cpp
-cd llama.cpp
-cmake -B build -DGGML_CUDA=ON
-cmake --build build --config Release
+### 2. 编译 llama.cpp（GPU 加速版）
+
+使用项目自带的 RTX 3080 优化编译脚本：
+
+```bash
+# 赋予执行权限
+chmod +x build_llama_cpp.sh
+
+# 运行编译脚本（自动检测 GPU 架构、启用 Flash Attention、CUDA Graphs 等优化）
+./build_llama_cpp.sh
+```
+
+**脚本功能**：
+- 自动检测 CUDA 环境和 GPU 型号（RTX 3080/3090/4090 等）
+- 自动设置正确的 CUDA 架构（sm_86 等）
+- 启用 Flash Attention 内核优化
+- 启用 CUDA Graphs 加速小 batch 推理
+- 启用 mmq kernels（消费级显卡小 batch 更快）
+- 编译 llama-server（API 服务）、llama-cli、llama-llava-cli（多模态）
+
+**编译完成后**：
+- 可执行文件位于 `$HOME/llama.cpp/build/bin/`
+- API 服务：`llama-server`
+- 命令行工具：`llama-cli`
+- 多模态工具：`llama-llava-cli`
+
+### 3. 下载模型
+
+```bash
+# 下载 Qwen3-8B 模型（约 5.5GB）
+mkdir -p /opt/image
+wget -O /opt/image/Qwen3-8B-Q5_K_M.gguf \
+  "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/qwen3-8b-q5_k_m.gguf"
 ```
 
 ---
