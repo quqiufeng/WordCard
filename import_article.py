@@ -102,14 +102,10 @@ def import_article(file_path: str, db_path: str = "data/wordcard.db"):
         print(f"LLM translation failed: {e}")
         print("Using basic import without LLM translation...")
     
-    # 创建 content_source
-    source_id = db.add_vocab(
-        word=f"__ARTICLE_{title[:50]}",  # 占位，实际应该创建 content_source
-        meaning=content[:200],
-        source_id=0
-    )
-    
     # 导入词汇（简化版：使用占位释义）
+    # TODO: 应调用 wc_add_source() 创建真正的 content_source_t 记录
+    source_id = 0  # 临时使用 0，表示无特定来源
+    
     imported = 0
     for word, freq in top_words[:30]:  # 最多30个词
         # 检查是否已存在

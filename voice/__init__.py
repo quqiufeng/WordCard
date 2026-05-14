@@ -15,16 +15,16 @@ from pathlib import Path
 # 配置路径（从现有系统复用）
 # ========================================================================
 
-# SenseVoice 配置
-SENSEVOICE_SO = os.path.expanduser("~/my-agent/libs/libsensevoice.so")
-SENSEVOICE_MODEL = "/opt/sensevoice-model/sensevoice-small-encoder-int8-llm-f16.gguf"
-SENSEVOICE_GGML_PATH = "/opt/sensevoice-model"
+# SenseVoice 配置（优先环境变量，其次默认值）
+SENSEVOICE_SO = os.environ.get("SENSEVOICE_SO", os.path.expanduser("~/my-agent/libs/libsensevoice.so"))
+SENSEVOICE_MODEL = os.environ.get("SENSEVOICE_MODEL", "/opt/sensevoice-model/sensevoice-small-encoder-int8-llm-f16.gguf")
+SENSEVOICE_GGML_PATH = os.environ.get("SENSEVOICE_GGML_PATH", "/opt/sensevoice-model")
 
-# Piper TTS 配置（可选，如果系统已安装）
-PIPER_LIB = "/opt/piper-src/build/libpiper_tts.so"
-PIPER_MODEL_PATH = "/opt/piper- voices/en_US-lessac-medium.onnx"
-PIPER_MODEL_CONFIG = "/opt/piper-voices/en_US-lessac-medium.onnx.json"
-PIPER_ESPEAK_DATA = "/usr/share/espeak-ng-data"
+# Piper TTS 配置（优先环境变量，其次默认值）
+PIPER_LIB = os.environ.get("PIPER_LIB", "/opt/piper-src/build/libpiper_tts.so")
+PIPER_MODEL_PATH = os.environ.get("PIPER_MODEL_PATH", "/opt/piper-voices/en_US-lessac-medium.onnx")
+PIPER_MODEL_CONFIG = os.environ.get("PIPER_MODEL_CONFIG", "/opt/piper-voices/en_US-lessac-medium.onnx.json")
+PIPER_ESPEAK_DATA = os.environ.get("PIPER_ESPEAK_DATA", "/usr/share/espeak-ng-data")
 
 # ========================================================================
 # ASR (自动语音识别) - SenseVoice

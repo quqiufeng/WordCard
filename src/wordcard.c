@@ -340,91 +340,98 @@ wordcard_db_t* wc_load_db(const char *path) {
     strncpy(db->db_path, path, sizeof(db->db_path)-1);
     db->db_path[sizeof(db->db_path)-1] = '\0';
     
+    int ok = 1;
+    
     /* 加载词汇表 */
-    if (header.vocab_count > 0) {
+    if (ok && header.vocab_count > 0) {
         db->vocab_count = header.vocab_count;
         while (db->vocab_capacity < db->vocab_count) {
             db->vocab_capacity *= WC_GROWTH_FACTOR;
         }
         db->vocab = realloc(db->vocab, db->vocab_capacity * sizeof(vocab_entry_t));
-        if (fread(db->vocab, sizeof(vocab_entry_t), db->vocab_count, fp) != db->vocab_count) {
-            wc_db_free(db); fclose(fp); return NULL;
+        if (!db->vocab || fread(db->vocab, sizeof(vocab_entry_t), db->vocab_count, fp) != db->vocab_count) {
+            ok = 0;
         }
     }
     
     /* 加载载体表 */
-    if (header.source_count > 0) {
+    if (ok && header.source_count > 0) {
         db->source_count = header.source_count;
         while (db->source_capacity < db->source_count) {
             db->source_capacity *= WC_GROWTH_FACTOR;
         }
         db->sources = realloc(db->sources, db->source_capacity * sizeof(content_source_t));
-        if (fread(db->sources, sizeof(content_source_t), db->source_count, fp) != db->source_count) {
-            wc_db_free(db); fclose(fp); return NULL;
+        if (!db->sources || fread(db->sources, sizeof(content_source_t), db->source_count, fp) != db->source_count) {
+            ok = 0;
         }
     }
     
     /* 加载章节表 */
-    if (header.chapter_count > 0) {
+    if (ok && header.chapter_count > 0) {
         db->chapter_count = header.chapter_count;
         while (db->chapter_capacity < db->chapter_count) {
             db->chapter_capacity *= WC_GROWTH_FACTOR;
         }
         db->chapters = realloc(db->chapters, db->chapter_capacity * sizeof(chapter_t));
-        if (fread(db->chapters, sizeof(chapter_t), db->chapter_count, fp) != db->chapter_count) {
-            wc_db_free(db); fclose(fp); return NULL;
+        if (!db->chapters || fread(db->chapters, sizeof(chapter_t), db->chapter_count, fp) != db->chapter_count) {
+            ok = 0;
         }
     }
     
     /* 加载用户表 */
-    if (header.user_count > 0) {
+    if (ok && header.user_count > 0) {
         db->user_count = header.user_count;
         while (db->user_capacity < db->user_count) {
             db->user_capacity *= WC_GROWTH_FACTOR;
         }
         db->users = realloc(db->users, db->user_capacity * sizeof(user_t));
-        if (fread(db->users, sizeof(user_t), db->user_count, fp) != db->user_count) {
-            wc_db_free(db); fclose(fp); return NULL;
+        if (!db->users || fread(db->users, sizeof(user_t), db->user_count, fp) != db->user_count) {
+            ok = 0;
         }
     }
     
     /* 加载掌握度表 */
-    if (header.mastery_count > 0) {
+    if (ok && header.mastery_count > 0) {
         db->mastery_count = header.mastery_count;
         while (db->mastery_capacity < db->mastery_count) {
             db->mastery_capacity *= WC_GROWTH_FACTOR;
         }
         db->mastery = realloc(db->mastery, db->mastery_capacity * sizeof(user_vocab_mastery_t));
-        if (fread(db->mastery, sizeof(user_vocab_mastery_t), db->mastery_count, fp) != db->mastery_count) {
-            wc_db_free(db); fclose(fp); return NULL;
+        if (!db->mastery || fread(db->mastery, sizeof(user_vocab_mastery_t), db->mastery_count, fp) != db->mastery_count) {
+            ok = 0;
         }
     }
     
     /* 加载阅读进度 */
-    if (header.progress_count > 0) {
+    if (ok && header.progress_count > 0) {
         db->progress_count = header.progress_count;
         while (db->progress_capacity < db->progress_count) {
             db->progress_capacity *= WC_GROWTH_FACTOR;
         }
         db->progress = realloc(db->progress, db->progress_capacity * sizeof(reading_progress_t));
-        if (fread(db->progress, sizeof(reading_progress_t), db->progress_count, fp) != db->progress_count) {
-            wc_db_free(db); fclose(fp); return NULL;
+        if (!db->progress || fread(db->progress, sizeof(reading_progress_t), db->progress_count, fp) != db->progress_count) {
+            ok = 0;
         }
     }
     
     /* 加载每日统计 */
-    if (header.stat_count > 0) {
+    if (ok && header.stat_count > 0) {
         db->stat_count = header.stat_count;
         while (db->stat_capacity < db->stat_count) {
             db->stat_capacity *= WC_GROWTH_FACTOR;
         }
         db->stats = realloc(db->stats, db->stat_capacity * sizeof(daily_stat_t));
-        if (fread(db->stats, sizeof(daily_stat_t), db->stat_count, fp) != db->stat_count) {
-            wc_db_free(db); fclose(fp); return NULL;
+        if (!db->stats || fread(db->stats, sizeof(daily_stat_t), db->stat_count, fp) != db->stat_count) {
+            ok = 0;
         }
     }
     
     fclose(fp);
+    
+    if (!ok) {
+        wc_db_free(db);
+        return NULL;
+    }
     
     /* 重建哈希索引 */
     rebuild_indexes(db);
@@ -703,8 +710,8 @@ user_vocab_mastery_t* wc_find_mastery(wordcard_db_t *db,
 void wc_sm2_update(user_vocab_mastery_t *mastery, uint8_t quality) {
     if (!mastery || quality > 5) return;
     
-    /* 确保质量在 0-5 范围 */
-    if (quality < 0) quality = 0;
+    /* quality 是 uint8_t，范围天然为 0-255，但调用者应保证 <= 5 */
+    if (quality > 5) quality = 5;
     
     mastery->total_reviews++;
     mastery->last_review = wc_now();
