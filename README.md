@@ -1,22 +1,41 @@
-# WordCard v2.0 — 基于记忆曲线的智能单词记忆系统
+# WordCard v3.0 — 基于记忆曲线的通用学习引擎
 
-> 从"文章翻译工具"升级为"个人记忆曲线追踪引擎"
+> 从"单词记忆系统"进化为"任意知识的间隔重复引擎"
 >
-> **核心卖点**：每个人的记忆过程都被记录，算法根据记忆曲线和资料载体输出最合适的记忆资料——可以是卡片、考试题目、听写练习等。
+> **核心定位**：SM-2 记忆曲线不只能背单词——法条、口语话题、数学公式、医学术语，一切需要记忆的内容都可以被追踪、被优化、被记住。
 
 ---
 
 ## 项目定位
 
-WordCard 是一个**极简架构**的英文单词记忆系统：
+WordCard 是一个**极简架构**的**通用间隔重复学习系统**：
 
 - **C 语言内存数据库**：自定义数据结构，全部驻留内存，结构体直写磁盘 bin 文件，零依赖零配置
-- **SM-2 间隔重复算法**：科学记忆曲线，追踪每个人的学习过程
-- **多维度掌握度**：不只记录"会不会"，还记录"认不认识""会不会拼""听不听得懂""发音准不准"
+- **SM-2 间隔重复算法**：科学记忆曲线，追踪每个用户对每个知识点的记忆衰减
+- **多维度掌握度**：不只记录"会不会"，还记录"认不认识""会不会复现""听不听得懂""表达准不准"
+- **内容类型无关**：英语单词、司法法条、雅思口语、GRE数学、医学术语——同一套引擎
 - **智能推荐**：根据你的薄弱环节，自动推荐最适合的学习模式
-- **8 种学习模式**：闪卡/选择/填空/拼写/听写/朗读/配对/速闪
-- **语音集成**：SenseVoice 语音识别 + Piper 语音合成
+- **8 种学习模式**：闪卡/选择/填空/默写/听辨/表达/配对/速闪
+- **语音集成**：SenseVoice 语音识别 + Piper 语音合成（可选）
 - **FastAPI HTTP 服务**：一行命令启动，钉钉机器人可直接对接
+
+---
+
+## 通用学习场景
+
+同一份代码，支持任意备考需求：
+
+| 考试/领域 | 内容类型 | question 示例 | answer 示例 |
+|-----------|---------|--------------|------------|
+| **英语词汇** | `CAT_ENGLISH_VOCAB` | `abandon` | `放弃；抛弃` |
+| **司法考试** | `CAT_LEGAL_LAW` | `【刑法】第266条 诈骗罪` | `诈骗公私财物，数额较大的，处三年以下有期徒刑...` |
+| **雅思口语** | `CAT_IELTS_SPEAKING` | `Describe a memorable journey` | `高分框架：1. 背景 2. 经过 3. 感受...` |
+| **雅思写作** | `CAT_IELTS_WRITING` | `讨论远程办公的利弊` | `论点结构：利-节省通勤/工作生活平衡；弊-团队协作困难...` |
+| **GRE 语文** | `CAT_GRE_VERBAL` | `abstemious` | `adj. 节制的，节俭的（根：abs-离开 + temetum-烈酒）` |
+| **GRE 数学** | `CAT_GRE_QUANT` | `若 x² + 3x - 10 = 0，求 x` | `x = 2 或 x = -5（因式分解：(x+5)(x-2)=0）` |
+| **医学术语** | `CAT_MEDICAL_TERM` | `Myocardial infarction` | `心肌梗死（病理：冠状动脉急性闭塞→心肌缺血坏死）` |
+| **注册会计师** | `CAT_CPA` | `企业合并中商誉的确认条件` | `合并成本 > 可辨认净资产公允价值份额时确认...` |
+| **自定义** | `CAT_CUSTOM` | `任意问题` | `任意答案` |
 
 ---
 
@@ -25,33 +44,29 @@ WordCard 是一个**极简架构**的英文单词记忆系统：
 ```
 WordCard/
 ├── src/                           # C 核心库
-│   ├── wordcard.h                 # 数据结构定义 + API 声明
+│   ├── wordcard.h                 # 通用数据结构定义 + API 声明
 │   ├── wordcard.c                 # 数据库引擎（内存管理 + 磁盘IO + 哈希索引）
 │   ├── modes.c                    # 智能推荐算法
-│   ├── test_sm2.c                 # 单元测试
+│   ├── test_sm2.c                 # 单元测试（11个测试全部通过）
 │   ├── Makefile                   # 编译脚本
 │   └── libwordcard.so             # 编译后的共享库
 │
 ├── api.py                         # FastAPI HTTP 服务 + Python ctypes FFI 绑定
-├── import_article.py              # 文章导入工具（res/*.txt → 提取词汇 → 写入C DB）
+├── import_article.py              # 通用导入工具（res/*.txt → 提取内容 → 写入C DB）
 ├── voice/                         # 语音系统集成
-│   ├── __init__.py                # ASR (SenseVoice) + TTS (Piper) + 发音评分
-│   ├── wrappers/                  # C++ 语音包装器
-│   │   ├── sensevoice_wrapper.cpp
-│   │   ├── piper_wrapper.cpp
-│   │   └── README.md
+│   └── __init__.py                # ASR (SenseVoice) + TTS (Piper) + 发音评分
 │
 ├── data/                          # 数据目录
 │   └── wordcard.db                # 二进制数据库文件（结构体直写，启动时载入内存）
 │
-├── design.md                      # 完整架构设计文档（1741行）
+├── design.md                      # 完整架构设计文档
 ├── task.md                        # 开发进度跟踪
 │
-├── llm.py                         # LLM 翻译引擎（已有，复用）
+├── llm.py                         # LLM 内容生成引擎（已有，复用）
 ├── card.py                        # 卡片渲染 MD/PNG/PDF（已有，复用）
 ├── build_llama_cpp.sh             # llama.cpp CUDA 编译脚本（RTX 3080 优化版）
 ├── run_qwen3.sh                   # llama.cpp 服务启动脚本
-├── res/                           # 原始英文文章目录
+├── res/                           # 原始学习材料目录
 │   └── *.txt
 └── output/                        # 输出目录
     └── *.{md,png,pdf}
@@ -63,40 +78,42 @@ WordCard/
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    用户选择学习场景                            │
-│  (文章精读 / PDF书籍 / 词汇表 / 影视台词 / 真题语境...)          │
+│              用户选择学习内容（任意领域）                        │
+│  (英语词汇 / 司法法条 / 雅思口语 / GRE数学 / 医学术语...)        │
 └──────────────────────┬──────────────────────────────────────┘
-                       │ 语料导入
+                       │ 内容导入
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              C 核心库 (libwordcard.so)                        │
-│  ├─ 内存数据结构（7种结构体，全部定长，无指针）                 │
-│  ├─ SM-2 间隔重复算法                                         │
+│              C 核心库 (libwordcard.so) v3.0                   │
+│  ├─ 通用学习项 item_entry_t（question/answer/explanation/      │
+│  │                         hint/category/tags）               │
+│  ├─ SM-2 间隔重复算法（与用户×学习项绑定）                     │
 │  ├─ 多维度掌握度（recognition/recall/spelling/listening/       │
 │  │               pronunciation/usage + overall 加权）          │
-│  ├─ 文件持久化（结构体直写磁盘 bin，启动时 fread 载入）         │
-│  └─ 运行时哈希索引（word/id/source/user/mastery 五种）         │
+│  ├─ 文件持久化 v3（结构体直写磁盘 bin，启动时 fread 载入）     │
+│  ├─ 运行时哈希索引（question/id/source/user/mastery/stat 六种）│
+│  └─ 到期复习排序索引（惰性重建，二分查找）                     │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              8 种记忆模式 (modes.c)                           │
-│  闪卡 → 选择 → 填空 → 拼写 → 听写 → 朗读 → 配对 → 速闪        │
-│  （算法根据掌握度自动推荐最适合的模式）                         │
+│  闪卡 → 选择 → 填空 → 默写 → 听辨 → 表达 → 配对 → 速闪        │
+│  （算法根据掌握度自动推荐最适合的模式）                        │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Python FastAPI (api.py)                          │
-│  ├─ RESTful API（用户/词汇/学习/复习/统计）                    │
+│  ├─ RESTful API（用户/学习项/复习/统计）                      │
 │  ├─ ctypes FFI 绑定（Python ↔ C 共享库）                      │
-│  ├─ 异步保存（后台线程每60秒自动保存 + 退出时保存）              │
-│  └─ 语音端点（ASR/TTS/发音评分）                              │
+│  ├─ 异步保存（后台线程每60秒自动保存 + 退出时保存）            │
+│  └─ 语音端点（ASR/TTS/发音评分，可选）                        │
 └──────────────────────┬──────────────────────────────────────┘
                        │ HTTP API
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              前端入口（钉钉机器人 / 浏览器 / 其他客户端）         │
+│              前端入口（钉钉机器人 / 浏览器 / 其他客户端）       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -104,32 +121,41 @@ WordCard/
 
 ## 核心功能详解
 
-### 1. C 内存数据库引擎
+### 1. C 内存数据库引擎（通用版）
 
 **文件**：`src/wordcard.c` + `src/wordcard.h`
 
-- **7 种核心数据结构**：`vocab_entry_t`（单词）、`user_vocab_mastery_t`（掌握度）、`user_t`（用户）、`content_source_t`（载体）、`chapter_t`（章节）、`reading_progress_t`（阅读进度）、`daily_stat_t`（每日统计）
-- **文件格式 v2**：64 字节文件头（魔数 `"WCD\x02"`）+ 按顺序排列的定长结构体数组
+- **通用学习项 `item_entry_t`**：6 个字段承载任意知识
+  - `question[512]` — 问题/题目/提示（如单词、法条编号、口语话题）
+  - `answer[512]` — 答案/释义/解答（如中文翻译、法条内容、回答框架）
+  - `explanation[1024]` — 详细解析/例句/案例/记忆技巧
+  - `hint[256]` — 提示/音标/关键词/公式
+  - `category` — 内容类型（`CAT_ENGLISH_VOCAB`、`CAT_LEGAL_LAW` 等）
+  - `tags[128]` — 标签（逗号分隔，如 `"english,vocab,cet4"`）
+
+- **文件格式 v3**：64 字节文件头（魔数 `"WCD\x03"`）+ 按顺序排列的定长结构体数组
 - **零拷贝加载**：启动时 `fread` 直接读入内存数组，运行时全内存操作，性能最大化
 - **原子写入**：保存时先写 `.tmp` 临时文件，再 `rename` 覆盖原文件，保证数据完整性
-- **运行时哈希索引**：`word → id`、`user_id+vocab_id → mastery_index` 等五种哈希表，查询 O(1)
-- **线程安全**：全局 `pthread_mutex` 锁保护所有写操作
+- **运行时哈希索引**：`question → index`、`item_id → index`、`(user_id,item_id) → mastery_index` 等六种哈希表，查询 O(1)
+- **动态扩容**：哈希表在 load_factor > 0.75 时自动 2 倍扩容
+- **到期复习索引**：`mastery_due_sorted` 按 `next_review` 排序，惰性重建，二分查找
+- **线程安全**：全局 `pthread_mutex` 锁保护所有写操作 + Python 层 `threading.Lock`
 
 ```bash
 cd src
 make clean && make          # 编译 libwordcard.so
-./test_sm2                   # 运行单元测试（7个测试全部通过）
+make test                    # 运行单元测试（11个测试全部通过）
 ```
 
 ### 2. SM-2 间隔重复算法
 
 **文件**：`src/wordcard.c`（`wc_sm2_update` 函数）
 
-标准 SuperMemo-2 算法实现：
+标准 SuperMemo-2 算法实现，与内容类型无关：
 
 | 场景 | 行为 |
 |------|------|
-| 新词首次学习 | interval = 1 天，repetitions = 1 |
+| 新项首次学习 | interval = 1 天，repetitions = 1 |
 | 第二次记住 | interval = 6 天 |
 | 第三次记住 | interval = interval × ease_factor |
 | 忘记（Again）| interval 重置为 1 天，repetitions 重置为 0 |
@@ -142,17 +168,17 @@ make clean && make          # 编译 libwordcard.so
 
 **文件**：`src/wordcard.c`（`wc_update_mastery_dimension` + `wc_recalc_overall`）
 
-每个单词对每个用户追踪 6 个维度：
+每个学习项对每个用户追踪 6 个维度：
 
-| 维度 | 权重 | 含义 | 测试方式 |
-|------|------|------|----------|
-| recognition | 25% | 看英文→知中文 | 闪卡/选择 |
-| recall | 20% | 看中文→想英文 | 填空 |
-| spelling | 20% | 拼写准确度 | 拼写练习 |
-| listening | 15% | 听音辨词 | 听写 |
-| pronunciation | 10% | 发音评分 | ASR 朗读 |
-| usage | 10% | 语境中使用 | 造句/配对 |
-| **overall** | 加权平均 | **综合掌握度** | — |
+| 维度 | 权重 | 含义 | 英语场景 | 司法场景 |
+|------|------|------|----------|----------|
+| recognition | 25% | 看到问题→知答案 | 看英文知中文 | 看到法条编号知内容 |
+| recall | 20% | 看到提示→想答案 | 看中文想英文 | 看到案例知适用法条 |
+| spelling | 20% | 默写/复现准确度 | 拼写单词 | 默写条文原文 |
+| listening | 15% | 听辨/理解 | 听音辨词 | 听案情分析要点 |
+| pronunciation | 10% | 表达/发音评分 | ASR 朗读 | 口头陈述法条（可选） |
+| usage | 10% | 应用/实践 | 语境造句 | 案例分析判断 |
+| **overall** | 加权平均 | **综合掌握度** | — | — |
 
 更新规则：正确 +10 分，错误 -15 分，滑动平均，clamp 到 0-100。
 
@@ -160,23 +186,23 @@ make clean && make          # 编译 libwordcard.so
 
 **文件**：`src/modes.c`（`wc_recommend_mode` 函数）
 
-根据掌握度自动推荐学习模式：
+根据掌握度自动推荐学习模式（与内容类型无关）：
 
 ```
-新词（total_reviews == 0）
+新项（total_reviews == 0）
     → 闪卡模式（建立初步认知）
 
 连续忘记 3 次以上（forget_count >= 3）
     → 闪卡模式 + 标记困难
 
-识别高(>80) 但拼写差(<50)
-    → 拼写模式
+识别高(>80) 但复现差(<50)
+    → 默写模式
 
-能认(>70) 但不能读(<60)
-    → 朗读模式（ASR评分）
+能认(>70) 但表达差(<60)
+    → 表达模式（ASR评分，可选）
 
-能认(>70) 但不能听(<50)
-    → 听写模式
+能认(>70) 但听辨差(<50)
+    → 听辨模式
 
 全面掌握(overall>85, streak>=5)
     → 速闪模式（维持记忆）
@@ -204,27 +230,31 @@ python api.py
 | `/api/v1/user/register` | POST | 注册用户（dingtalk_uid） |
 | `/api/v1/user/{id}/stats` | GET | 用户学习统计 |
 | `/api/v1/user/{id}/daily-queue` | GET | 今日学习队列（自动推荐模式） |
-| `/api/v1/vocab` | POST | 添加单词 |
-| `/api/v1/vocab/{id}` | GET | 查询单词 |
+| `/api/v1/item` | POST | 添加学习项 |
+| `/api/v1/item/{id}` | GET | 查询学习项 |
+| `/api/v1/item/search/{question}` | GET | 按问题文本搜索 |
 | `/api/v1/study/review` | POST | 提交复习结果（更新SM-2+掌握度） |
-| `/api/v1/mastery/{user_id}/{vocab_id}` | GET | 查询掌握度 |
+| `/api/v1/mastery/{user_id}/{item_id}` | GET | 查询掌握度 |
 | `/api/v1/db/save` | POST | 强制保存数据库 |
 
 Python 封装类 `WordCardDB`：
-- `add_vocab()` / `find_vocab()` — 词汇操作
+- `add_item()` / `find_item()` — 学习项操作
+- `add_source()` — 添加内容载体
 - `create_user()` / `find_user()` — 用户管理
 - `review()` — 提交复习（自动更新 SM-2 + 多维度掌握度 + 每日统计）
 - `get_daily_queue()` — 获取今日学习队列
 - `get_mastery()` — 查询掌握度详情
 - 后台自动保存线程（每 60 秒 + 程序退出时）
 
-### 6. 语音系统集成
+### 6. 语音系统集成（可选）
 
 **文件**：`voice/__init__.py`
 
 - **ASR（语音识别）**：封装 SenseVoice 共享库，支持 amr/wav/mp3 → 文本
 - **TTS（语音合成）**：封装 Piper 共享库，文本 → WAV 音频
 - **发音评分**：对比用户读音（ASR 结果）和标准文本的相似度，返回 0-100 分
+
+语音模块为可选依赖，未安装时系统仍可正常运行（仅朗读/发音功能不可用）。
 
 ```python
 from voice import get_asr, get_tts, pronunciation_score
@@ -239,14 +269,14 @@ path = get_tts().synthesize("Hello world", "/tmp/output.wav")
 score = pronunciation_score(user_text="hello", standard_text="hello world")
 ```
 
-### 7. 文章导入工具
+### 7. 内容导入工具
 
 **文件**：`import_article.py`
 
-自动提取文章中的高频词汇并导入数据库：
+自动提取学习材料中的内容并导入数据库：
 
 ```bash
-# 导入单篇文章
+# 导入单篇文章（自动调用 LLM 生成翻译和词汇）
 python import_article.py res/solar_system.txt
 
 # 导入所有文章
@@ -257,11 +287,10 @@ python import_article.py --db data/wordcard.db res/*.txt
 ```
 
 处理流程：
-1. 读取 `res/*.txt` 文章
-2. 提取单词频率（排除停用词和短词）
-3. 取高频 Top 30
-4. 写入 C 数据库（`vocab_entry_t` + `content_source_t`）
-5. 调用 `llm.py` 生成翻译（需要 llama-server 运行）
+1. 读取 `res/*.txt` 学习材料
+2. 调用 `llm.py` 生成结构化内容（问题/答案/解析）
+3. 创建 `content_source_t` 载体记录
+4. 写入 C 数据库（`item_entry_t` + 掌握度记录）
 
 ---
 
@@ -279,20 +308,51 @@ make clean && make
 
 ```bash
 cd src
-./test_sm2
-# 预期输出：7 tests passed, 0 failed
+make test
+# 预期输出：11 tests passed, 0 failed
 ```
 
-### 3. 导入文章词汇
+### 3. 导入学习内容
 
 ```bash
-# 导入 res/ 目录下所有文章
+# 英语词汇示例
 python import_article.py --all
 
-# 预期输出：
-# Importing: The Solar System: Our Cosmic Neighborhood
-# Found 189 unique words, top 50 selected
-# Import complete: 30 words added
+# 也可以直接调用 Python API 添加任意内容
+python -c "
+from api import get_db
+db = get_db()
+
+# 添加英语单词
+db.add_item('abandon', '放弃', category=1)
+
+# 添加司法法条
+db.add_item(
+    '【刑法】第266条 诈骗罪',
+    '诈骗公私财物，数额较大的，处三年以下有期徒刑...',
+    category=2,
+    tags='刑法,法条'
+)
+
+# 添加雅思口语话题
+db.add_item(
+    'Describe a memorable journey',
+    '高分框架：1. 背景 2. 经过 3. 感受...',
+    category=3,
+    tags='ielts,speaking'
+)
+
+# 添加 GRE 数学题
+db.add_item(
+    '若 x² + 3x - 10 = 0，求 x',
+    'x = 2 或 x = -5（因式分解：(x+5)(x-2)=0）',
+    category=6,
+    tags='gre,math,quadratic'
+)
+
+db.save()
+print('导入完成！')
+"
 ```
 
 ### 4. 启动 HTTP API 服务
@@ -311,6 +371,27 @@ curl -X POST http://localhost:8000/api/v1/user/register \
   -d '{"dingtalk_uid": "user001", "name": "TestUser"}'
 # {"user_id": 1, "dingtalk_uid": "user001"}
 
+# 添加学习项（英语）
+curl -X POST http://localhost:8000/api/v1/item \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "ephemeral",
+    "answer": "短暂的，朝生暮死的",
+    "explanation": "例句：Fashions are ephemeral.",
+    "category": 1,
+    "tags": "english,vocab"
+  }'
+
+# 添加学习项（司法）
+curl -X POST http://localhost:8000/api/v1/item \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "【民法典】第1165条",
+    "answer": "行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任...",
+    "category": 2,
+    "tags": "civil,law"
+  }'
+
 # 获取今日学习队列
 curl http://localhost:8000/api/v1/user/1/daily-queue
 # {"user_id": 1, "count": 10, "queue": [...]}
@@ -320,7 +401,7 @@ curl -X POST http://localhost:8000/api/v1/study/review \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": 1,
-    "vocab_id": 1,
+    "item_id": 1,
     "quality": 4,
     "dimension": "r",
     "correct": true
@@ -332,15 +413,15 @@ curl -X POST http://localhost:8000/api/v1/study/review \
 
 ## 原有功能（保持不变）
 
-### llm.py —— LLM 翻译引擎
+### llm.py —— LLM 内容生成引擎
 
-读取 `res/*.txt`，调用本地 llama.cpp API 生成结构化双语学习内容。
+读取 `res/*.txt`，调用本地 llama.cpp API 生成结构化学习内容。
 
 ```bash
 # 启动 llama.cpp 服务
 setsid ./run_qwen3.sh > /tmp/qwen3_8b.log 2>&1 &
 
-# 生成翻译
+# 生成翻译和词汇
 python llm.py solar_system.txt
 # 输出：output/solar_system_trans.txt
 ```
@@ -368,7 +449,7 @@ pip install fastapi uvicorn pydantic pillow fpdf requests
 sudo apt-get install build-essential cmake
 ```
 
-### 2. 编译 llama.cpp（GPU 加速版）
+### 2. 编译 llama.cpp（GPU 加速版，可选）
 
 使用项目自带的 RTX 3080 优化编译脚本：
 
@@ -394,7 +475,7 @@ chmod +x build_llama_cpp.sh
 - 命令行工具：`llama-cli`
 - 多模态工具：`llama-llava-cli`
 
-### 3. 下载模型
+### 3. 下载模型（可选）
 
 ```bash
 # 下载 Qwen3-8B 模型（约 5.5GB）
@@ -420,8 +501,11 @@ wget -O /opt/image/Qwen3-8B-Q5_K_M.gguf \
 
 | 特性 | 实现方式 | 性能 |
 |------|----------|------|
-| **内存数据库** | C 结构体数组 + 哈希索引 | 单次查询 < 1ms |
-| **磁盘持久化** | 结构体直写 bin 文件 | 10万词加载 < 1秒 |
+| **通用学习引擎** | 单一 `item_entry_t` 承载任意知识 | 零拷贝，无序列化开销 |
+| **内存数据库** | C 结构体数组 + 6种哈希索引 | 单次查询 < 1ms |
+| **动态哈希扩容** | load_factor > 0.75 时自动 2 倍扩容 | 持续高效，无性能衰减 |
+| **到期复习索引** | 惰性重建的排序数组 + 二分查找 | 避免全表扫描 |
+| **磁盘持久化 v3** | 结构体直写 bin 文件（`WCD\x03`） | 10万项加载 < 1秒 |
 | **SM-2 算法** | 标准 SuperMemo-2 | 与 Anki 行为一致 |
 | **多维度掌握度** | 6维度滑动平均 + 加权 overall | 精准定位薄弱环节 |
 | **智能推荐** | 7条规则决策树 | 毫秒级响应 |
@@ -430,26 +514,39 @@ wget -O /opt/image/Qwen3-8B-Q5_K_M.gguf \
 
 ---
 
+## 版本历史
+
+| 版本 | 时间 | 核心变更 |
+|------|------|----------|
+| v1.0 | 2024 | 文章翻译工具（llm.py + card.py） |
+| v2.0 | 2025-05 | C + Python 架构，SM-2 单词记忆系统（`WCD\x02`） |
+| **v3.0** | **2025-05** | **通用学习引擎（`WCD\x03`），支持任意知识类型** |
+
+---
+
 ## 项目状态
 
-**当前完成度：76%（核心系统已可用）**
+**当前版本：v3.0.0 — 通用学习引擎（已可用）**
 
 ✅ **已完成**：
-- C 内存数据库引擎（加载/保存/哈希索引/线程安全）
+- C 内存数据库引擎（v3 通用数据结构，加载/保存/哈希索引/线程安全）
+- 6 种运行时哈希索引 + 动态扩容机制
+- 到期复习排序索引（惰性重建，避免全表扫描）
 - SM-2 间隔重复算法（标准实现 + 单元测试）
 - 多维度掌握度系统（6维度 + 加权 overall）
 - 智能推荐算法（7条规则覆盖所有场景）
-- FastAPI HTTP 服务（用户/词汇/学习/复习端点）
-- 语音系统集成（ASR/TTS/发音评分框架）
-- 文章导入工具（自动提取高频词汇）
-- C 单元测试（7个测试全部通过）
+- FastAPI HTTP 服务（用户/学习项/复习/统计端点）
+- 语音系统集成（ASR/TTS/发音评分框架，可选）
+- 内容导入工具（文章→通用学习项）
+- C 单元测试（11个测试全部通过）
 
-📋 **待完成**：
-- PDF 导入（PyMuPDF + 词汇频率分析）
-- 词表导入（CET-4/6/IELTS）
-- 钉钉机器人回调集成
-- 性能测试（10万词基准）
-- 端到端集成测试
+📋 **待扩展**（欢迎贡献）：
+- 司法考试题库批量导入（PDF/Word 解析）
+- 雅思口语话题模板库
+- GRE 数学公式卡片
+- 医学 Anki 牌组迁移工具
+- 钉钉机器人多场景回调
+- 性能基准测试（10万项/百万项）
 
 ---
 
@@ -457,19 +554,19 @@ wget -O /opt/image/Qwen3-8B-Q5_K_M.gguf \
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| `design.md` | 完整架构设计文档（1741行） | ✅ |
-| `src/wordcard.h` | C 头文件（7种数据结构 + API声明） | ✅ |
-| `src/wordcard.c` | C 核心库（数据库 + SM-2 + IO + 哈希索引） | ✅ |
-| `src/modes.c` | 智能推荐算法（7条规则） | ✅ |
-| `src/test_sm2.c` | C 单元测试（7个测试） | ✅ |
+| `design.md` | 完整架构设计文档 | ✅ |
+| `src/wordcard.h` | C 头文件（通用数据结构 + API声明） | ✅ v3 |
+| `src/wordcard.c` | C 核心库（数据库 + SM-2 + IO + 哈希索引） | ✅ v3 |
+| `src/modes.c` | 智能推荐算法（7条规则） | ✅ v3 |
+| `src/test_sm2.c` | C 单元测试（11个测试） | ✅ v3 |
 | `src/Makefile` | 编译脚本 | ✅ |
-| `api.py` | Python FastAPI + ctypes FFI | ✅ |
-| `import_article.py` | 文章导入工具 | ✅ |
+| `api.py` | Python FastAPI + ctypes FFI | ✅ v3 |
+| `import_article.py` | 通用内容导入工具 | ✅ v3 |
 | `voice/__init__.py` | 语音系统集成 | ✅ |
-| `llm.py` | LLM 翻译引擎 | ✅ |
+| `llm.py` | LLM 内容生成引擎 | ✅ |
 | `card.py` | 卡片渲染 MD/PNG/PDF | ✅ |
 | `task.md` | 开发进度跟踪 | ✅ |
 
 ---
 
-*最后更新: 2026-05-14*
+*最后更新: 2026-05-15（v3.0 通用学习引擎）*
