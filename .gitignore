@@ -205,3 +205,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# WordCard runtime data
+data/
+*.db
+
+# C build artifacts in src/
+src/*.o
+src/*.so
+src/test_sm2

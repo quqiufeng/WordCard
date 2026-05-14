@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-调用 LM Studio 生成英文学习内容，并解析输出为 article_card.py 期望的格式
+调用 llama.cpp 生成英文学习内容，并解析输出为 article_card.py 期望的格式
 """
 
 import warnings
@@ -12,10 +12,10 @@ import os
 from pathlib import Path
 
 LLMS_HOST = "http://192.168.124.3:11434/v1"
-MODEL = "qwen2.5-7b-instruct"
+MODEL = "Qwen3-8B-Q5_K_M.gguf"
 
 def generate_content(text):
-    """调用 LM Studio 生成所有内容"""
+    """调用 llama.cpp 生成所有内容"""
     url = f"{LLMS_HOST}/chat/completions"
 
     prompt = f"""请阅读以下英文文章，按格式输出4个部分：
@@ -131,7 +131,7 @@ def main():
 
     if len(sys.argv) < 1:
         print("用法: python llm.py article.txt [标题]")
-        print(f"LM Studio: {LLMS_HOST}")
+        print(f"llama.cpp: {LLMS_HOST}")
         print(f"模型: {MODEL}")
         sys.exit(1)
 
@@ -167,7 +167,7 @@ def main():
         with open(input_path, 'r', encoding='utf-8') as f:
             text = f.read()
 
-        print(f"发送提示词到 LM Studio...")
+        print(f"发送提示词到 llama.cpp...")
         print(f"模型: {MODEL}")
         print("=" * 50)
 
