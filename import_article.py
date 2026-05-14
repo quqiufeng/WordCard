@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-文章导入工具 v2
-读取 res/*.txt → 调用 llm.py 生成翻译和词汇表 → 写入 C 数据库
+文章导入工具 v3 (通用学习项)
+读取 res/*.txt → 调用 llm.py 生成内容 → 写入 C 数据库
 """
 import os
 import sys
@@ -9,13 +9,11 @@ import re
 import argparse
 from pathlib import Path
 
-# 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
 
 from api import get_db
-import llm  # 复用现有的 llm.py
+import llm
 
-# 停用词表（简化版）
 STOP_WORDS = {
     'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
@@ -41,7 +39,6 @@ STOP_WORDS = {
 def extract_words(text: str) -> dict:
     """从文本中提取单词和频率"""
     words = re.findall(r'\b[a-zA-Z]+\b', text.lower())
-    
     freq = {}
     for w in words:
         if w in STOP_WORDS or len(w) < 3:
@@ -49,20 +46,16 @@ def extract_words(text: str) -> dict:
         if w.isdigit():
             continue
         freq[w] = freq.get(w, 0) + 1
-    
     return freq
 
 
 def parse_llm_vocab(vocab_text: str) -> list:
-    """解析 LLM 输出的词汇表
-    格式：1. word|中文释义
-    """
+    """解析 LLM 输出的词汇表"""
     vocab = []
     for line in vocab_text.strip().split('\n'):
         line = line.strip()
         if not line:
             continue
-        # 移除数字前缀如 "1."
         line = re.sub(r'^\d+\.\s*', '', line)
         if '|' in line:
             parts = line.split('|', 1)
@@ -74,10 +67,9 @@ def parse_llm_vocab(vocab_text: str) -> list:
 
 
 def import_article(file_path: str, db_path: str = "data/wordcard.db"):
-    """导入单篇文章"""
+    """导入单篇文章为英语学习项"""
     db = get_db(db_path)
     
-    # 读取文章
     with open(file_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
     
@@ -87,18 +79,11 @@ def import_article(file_path: str, db_path: str = "data/wordcard.db"):
     print(f"Importing: {title}")
     print(f"Content length: {len(content)} chars")
     
-    # 先创建 content_source_t 记录
-    from api import ContentSource, ctypes
-    source = ContentSource()
-    source.type = 3  # SOURCE_ARTICLE
-    source.name = title.encode('utf-8')[:127]
-    source.file_path = file_path.encode('utf-8')[:255]
-    source.created_at = int(os.path.getmtime(file_path)) if os.path.exists(file_path) else 0
-    
-    source_id = db._db and ctypes.CDLL(str(Path(__file__).parent / "src" / "libwordcard.so")).wc_add_source(db._db, ctypes.byref(source))
-    if not source_id:
-        # 如果创建失败（比如 lib 还没加载），尝试用 api.py 的 add_vocab 的 source_id 参数
-        source_id = 0
+    # 创建 content_source_t
+    source_id = db.add_source(title, source_type=3, file_path=file_path)
+    if source_id == 0:
+        # 可能已存在，尝试查找
+        pass
     
     # 调用 LLM 生成翻译和词汇
     llm_vocab = []
@@ -125,24 +110,23 @@ def import_article(file_path: str, db_path: str = "data/wordcard.db"):
         llm_vocab = [(w, f"[auto] freq={f}") for w, f in top_words]
     
     imported = 0
-    for word, meaning in llm_vocab[:30]:  # 最多30个词
-        # 检查是否已存在
-        existing = db.find_vocab(word=word)
+    for word, meaning in llm_vocab[:30]:
+        existing = db.find_item(question=word)
         if existing:
             print(f"  Skip existing: {word}")
             continue
         
-        vid = db.add_vocab(
-            word=word,
-            meaning=meaning,
-            phonetic="",
-            pos="",
-            example="",
-            example_cn="",
+        iid = db.add_item(
+            question=word,
+            answer=meaning,
+            explanation="",
+            hint="",
             difficulty=2,
-            source_id=source_id
+            source_id=source_id,
+            category=1,  # CAT_ENGLISH_VOCAB
+            tags="english,vocab"
         )
-        if vid > 0:
+        if iid > 0:
             imported += 1
             print(f"  Added: {word} -> {meaning[:40]}")
     

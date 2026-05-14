@@ -8,7 +8,7 @@
  * 根据多维度掌握度推荐最合适的学习模式
  * ======================================================================== */
 
-study_mode_t wc_recommend_mode(const user_vocab_mastery_t *mastery, uint32_t now) {
+study_mode_t wc_recommend_mode(const user_item_mastery_t *mastery, uint32_t now) {
     if (!mastery) return MODE_FLASHCARD;
     
     /* 规则1: 新词 → 闪卡模式（建立初步认知） */
@@ -77,10 +77,10 @@ size_t wc_generate_daily_queue(wordcard_db_t *db, uint32_t user_id, uint32_t now
     uint32_t *due_buffer = malloc(sizeof(uint32_t) * max_count);
     if (!due_buffer) return 0;
     
-    size_t due_count = wc_get_due_words(db, user_id, now, due_buffer, max_count);
+    size_t due_count = wc_get_due_items(db, user_id, now, due_buffer, max_count);
     
     for (size_t i = 0; i < due_count && count < max_count; i++) {
-        user_vocab_mastery_t *m = wc_find_mastery(db, user_id, due_buffer[i]);
+        user_item_mastery_t *m = wc_find_mastery(db, user_id, due_buffer[i]);
         if (m) {
             out_ids[count] = due_buffer[i];
             out_modes[count] = (uint8_t)wc_recommend_mode(m, now);
@@ -95,7 +95,7 @@ size_t wc_generate_daily_queue(wordcard_db_t *db, uint32_t user_id, uint32_t now
     if (count < max_count && new_limit > 0) {
         uint32_t *new_buffer = malloc(sizeof(uint32_t) * new_limit);
         if (new_buffer) {
-            size_t new_count = wc_get_new_words(db, user_id, 0, new_buffer, new_limit);
+            size_t new_count = wc_get_new_items(db, user_id, 0, new_buffer, new_limit);
             for (size_t i = 0; i < new_count && count < max_count; i++) {
                 out_ids[count] = new_buffer[i];
                 out_modes[count] = MODE_FLASHCARD; /* 新词一律闪卡 */

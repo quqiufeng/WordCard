@@ -7,7 +7,6 @@
 
 /* ========================================================================
  * 简单哈希表实现（链地址法）
- * 不依赖外部库，极简实现
  * ======================================================================== */
 
 #define HASH_LOAD_FACTOR 0.75f
@@ -342,16 +341,16 @@ static void rebuild_due_index(wordcard_db_t *db) {
 static void rebuild_indexes(wordcard_db_t *db) {
     /* 重建 id_hash */
     int_hash_free((int_hash_t*)db->id_hash);
-    db->id_hash = int_hash_new(db->vocab_capacity * 2 + 1);
-    for (size_t i = 0; i < db->vocab_count; i++) {
-        int_hash_set((int_hash_t*)db->id_hash, db->vocab[i].id, (int)i);
+    db->id_hash = int_hash_new(db->item_capacity * 2 + 1);
+    for (size_t i = 0; i < db->item_count; i++) {
+        int_hash_set((int_hash_t*)db->id_hash, db->items[i].id, (int)i);
     }
     
-    /* 重建 word_hash */
-    str_hash_free((str_hash_t*)db->word_hash);
-    db->word_hash = str_hash_new(db->vocab_capacity * 2 + 1);
-    for (size_t i = 0; i < db->vocab_count; i++) {
-        str_hash_set((str_hash_t*)db->word_hash, db->vocab[i].word, (int)i);
+    /* 重建 question_hash */
+    str_hash_free((str_hash_t*)db->question_hash);
+    db->question_hash = str_hash_new(db->item_capacity * 2 + 1);
+    for (size_t i = 0; i < db->item_count; i++) {
+        str_hash_set((str_hash_t*)db->question_hash, db->items[i].question, (int)i);
     }
     
     /* 重建 source_hash */
@@ -380,7 +379,7 @@ static void rebuild_indexes(wordcard_db_t *db) {
     db->mastery_hash = pair_hash_new(db->mastery_capacity * 2 + 1);
     for (size_t i = 0; i < db->mastery_count; i++) {
         pair_hash_set((pair_hash_t*)db->mastery_hash, 
-                      db->mastery[i].user_id, db->mastery[i].vocab_id, (int)i);
+                      db->mastery[i].user_id, db->mastery[i].item_id, (int)i);
     }
     
     /* 重建 stat_hash */
@@ -404,8 +403,8 @@ wordcard_db_t* wc_db_init(void) {
     wordcard_db_t *db = calloc(1, sizeof(wordcard_db_t));
     if (!db) return NULL;
     
-    db->vocab_capacity = WC_INIT_CAPACITY;
-    db->vocab = calloc(db->vocab_capacity, sizeof(vocab_entry_t));
+    db->item_capacity = WC_INIT_CAPACITY;
+    db->items = calloc(db->item_capacity, sizeof(item_entry_t));
     
     db->source_capacity = 64;
     db->sources = calloc(db->source_capacity, sizeof(content_source_t));
@@ -417,7 +416,7 @@ wordcard_db_t* wc_db_init(void) {
     db->users = calloc(db->user_capacity, sizeof(user_t));
     
     db->mastery_capacity = WC_INIT_CAPACITY;
-    db->mastery = calloc(db->mastery_capacity, sizeof(user_vocab_mastery_t));
+    db->mastery = calloc(db->mastery_capacity, sizeof(user_item_mastery_t));
     
     db->progress_capacity = WC_INIT_CAPACITY;
     db->progress = calloc(db->progress_capacity, sizeof(reading_progress_t));
@@ -429,14 +428,14 @@ wordcard_db_t* wc_db_init(void) {
     db->db_path[0] = '\0';
     db->mastery_due_dirty = 1;
     
-    if (!db->vocab || !db->sources || !db->chapters || 
+    if (!db->items || !db->sources || !db->chapters || 
         !db->users || !db->mastery || !db->progress || !db->stats) {
         wc_db_free(db);
         return NULL;
     }
     
     /* 创建空哈希表 */
-    db->word_hash = str_hash_new(1024);
+    db->question_hash = str_hash_new(1024);
     db->id_hash = int_hash_new(1024);
     db->source_hash = int_hash_new(128);
     db->user_hash = str_hash_new(1024);
@@ -453,7 +452,7 @@ wordcard_db_t* wc_db_init(void) {
 void wc_db_free(wordcard_db_t *db) {
     if (!db) return;
     
-    str_hash_free((str_hash_t*)db->word_hash);
+    str_hash_free((str_hash_t*)db->question_hash);
     int_hash_free((int_hash_t*)db->id_hash);
     int_hash_free((int_hash_t*)db->source_hash);
     str_hash_free((str_hash_t*)db->user_hash);
@@ -463,7 +462,7 @@ void wc_db_free(wordcard_db_t *db) {
     
     free(db->mastery_due_sorted);
     
-    free(db->vocab);
+    free(db->items);
     free(db->sources);
     free(db->chapters);
     free(db->users);
@@ -501,14 +500,14 @@ wordcard_db_t* wc_load_db(const char *path) {
     
     int ok = 1;
     
-    /* 加载词汇表 */
-    if (ok && header.vocab_count > 0) {
-        db->vocab_count = header.vocab_count;
-        while (db->vocab_capacity < db->vocab_count) {
-            db->vocab_capacity *= WC_GROWTH_FACTOR;
+    /* 加载学习项表 */
+    if (ok && header.item_count > 0) {
+        db->item_count = header.item_count;
+        while (db->item_capacity < db->item_count) {
+            db->item_capacity *= WC_GROWTH_FACTOR;
         }
-        db->vocab = realloc(db->vocab, db->vocab_capacity * sizeof(vocab_entry_t));
-        if (!db->vocab || fread(db->vocab, sizeof(vocab_entry_t), db->vocab_count, fp) != db->vocab_count) {
+        db->items = realloc(db->items, db->item_capacity * sizeof(item_entry_t));
+        if (!db->items || fread(db->items, sizeof(item_entry_t), db->item_count, fp) != db->item_count) {
             ok = 0;
         }
     }
@@ -555,8 +554,8 @@ wordcard_db_t* wc_load_db(const char *path) {
         while (db->mastery_capacity < db->mastery_count) {
             db->mastery_capacity *= WC_GROWTH_FACTOR;
         }
-        db->mastery = realloc(db->mastery, db->mastery_capacity * sizeof(user_vocab_mastery_t));
-        if (!db->mastery || fread(db->mastery, sizeof(user_vocab_mastery_t), db->mastery_count, fp) != db->mastery_count) {
+        db->mastery = realloc(db->mastery, db->mastery_capacity * sizeof(user_item_mastery_t));
+        if (!db->mastery || fread(db->mastery, sizeof(user_item_mastery_t), db->mastery_count, fp) != db->mastery_count) {
             ok = 0;
         }
     }
@@ -616,7 +615,7 @@ int wc_save_db(wordcard_db_t *db, const char *path) {
     memset(&header, 0, sizeof(header));
     memcpy(header.magic, WC_MAGIC, 4);
     header.version = WC_VERSION;
-    header.vocab_count = (uint32_t)db->vocab_count;
+    header.item_count = (uint32_t)db->item_count;
     header.source_count = (uint32_t)db->source_count;
     header.chapter_count = (uint32_t)db->chapter_count;
     header.user_count = (uint32_t)db->user_count;
@@ -629,8 +628,8 @@ int wc_save_db(wordcard_db_t *db, const char *path) {
     }
     
     /* 按顺序写入各数组 */
-    if (db->vocab_count > 0) {
-        if (fwrite(db->vocab, sizeof(vocab_entry_t), db->vocab_count, fp) != db->vocab_count)
+    if (db->item_count > 0) {
+        if (fwrite(db->items, sizeof(item_entry_t), db->item_count, fp) != db->item_count)
             goto fail;
     }
     if (db->source_count > 0) {
@@ -646,7 +645,7 @@ int wc_save_db(wordcard_db_t *db, const char *path) {
             goto fail;
     }
     if (db->mastery_count > 0) {
-        if (fwrite(db->mastery, sizeof(user_vocab_mastery_t), db->mastery_count, fp) != db->mastery_count)
+        if (fwrite(db->mastery, sizeof(user_item_mastery_t), db->mastery_count, fp) != db->mastery_count)
             goto fail;
     }
     if (db->progress_count > 0) {
@@ -681,64 +680,64 @@ void wc_mark_dirty(wordcard_db_t *db) {
 }
 
 /* ========================================================================
- * 词汇库操作
+ * 学习项操作
  * ======================================================================== */
 
-uint32_t wc_add_vocab(wordcard_db_t *db, const vocab_entry_t *entry) {
+uint32_t wc_add_item(wordcard_db_t *db, const item_entry_t *entry) {
     if (!db || !entry) return 0;
     
     LOCK();
     
     /* 检查是否已存在 */
     int idx;
-    if (str_hash_get((str_hash_t*)db->word_hash, entry->word, &idx)) {
+    if (str_hash_get((str_hash_t*)db->question_hash, entry->question, &idx)) {
         UNLOCK();
         return 0; /* 已存在 */
     }
     
     /* 扩容 */
-    void *new_arr = ensure_array(db->vocab, db->vocab_count, &db->vocab_capacity, 
-                                  sizeof(vocab_entry_t));
+    void *new_arr = ensure_array(db->items, db->item_count, &db->item_capacity, 
+                                  sizeof(item_entry_t));
     if (!new_arr) { UNLOCK(); return 0; }
-    db->vocab = new_arr;
+    db->items = new_arr;
     
     /* 分配新ID */
-    uint32_t new_id = (db->vocab_count > 0) ? db->vocab[db->vocab_count - 1].id + 1 : 1;
+    uint32_t new_id = (db->item_count > 0) ? db->items[db->item_count - 1].id + 1 : 1;
     
     /* 复制数据 */
-    vocab_entry_t *v = &db->vocab[db->vocab_count];
-    memcpy(v, entry, sizeof(vocab_entry_t));
+    item_entry_t *v = &db->items[db->item_count];
+    memcpy(v, entry, sizeof(item_entry_t));
     v->id = new_id;
-    db->vocab_count++;
+    db->item_count++;
     
     /* 更新索引 */
-    str_hash_set((str_hash_t*)db->word_hash, v->word, (int)(db->vocab_count - 1));
-    int_hash_set((int_hash_t*)db->id_hash, v->id, (int)(db->vocab_count - 1));
+    str_hash_set((str_hash_t*)db->question_hash, v->question, (int)(db->item_count - 1));
+    int_hash_set((int_hash_t*)db->id_hash, v->id, (int)(db->item_count - 1));
     
     wc_mark_dirty(db);
     UNLOCK();
     return new_id;
 }
 
-vocab_entry_t* wc_find_vocab_by_word(wordcard_db_t *db, const char *word) {
-    if (!db || !word) return NULL;
+item_entry_t* wc_find_item_by_question(wordcard_db_t *db, const char *question) {
+    if (!db || !question) return NULL;
     LOCK();
     int idx;
-    if (str_hash_get((str_hash_t*)db->word_hash, word, &idx)) {
+    if (str_hash_get((str_hash_t*)db->question_hash, question, &idx)) {
         UNLOCK();
-        return &db->vocab[idx];
+        return &db->items[idx];
     }
     UNLOCK();
     return NULL;
 }
 
-vocab_entry_t* wc_find_vocab_by_id(wordcard_db_t *db, uint32_t vocab_id) {
+item_entry_t* wc_find_item_by_id(wordcard_db_t *db, uint32_t item_id) {
     if (!db) return NULL;
     LOCK();
     int idx;
-    if (int_hash_get((int_hash_t*)db->id_hash, vocab_id, &idx)) {
+    if (int_hash_get((int_hash_t*)db->id_hash, item_id, &idx)) {
         UNLOCK();
-        return &db->vocab[idx];
+        return &db->items[idx];
     }
     UNLOCK();
     return NULL;
@@ -875,15 +874,15 @@ user_t* wc_find_user_by_id(wordcard_db_t *db, uint32_t user_id) {
  * 掌握度操作
  * ======================================================================== */
 
-user_vocab_mastery_t* wc_get_or_create_mastery(wordcard_db_t *db, 
-                                                uint32_t user_id, 
-                                                uint32_t vocab_id) {
+user_item_mastery_t* wc_get_or_create_mastery(wordcard_db_t *db, 
+                                               uint32_t user_id, 
+                                               uint32_t item_id) {
     if (!db) return NULL;
     
     LOCK();
     
     int idx;
-    if (pair_hash_get((pair_hash_t*)db->mastery_hash, user_id, vocab_id, &idx)) {
+    if (pair_hash_get((pair_hash_t*)db->mastery_hash, user_id, item_id, &idx)) {
         UNLOCK();
         return &db->mastery[idx];
     }
@@ -891,7 +890,7 @@ user_vocab_mastery_t* wc_get_or_create_mastery(wordcard_db_t *db,
     /* 创建新记录 */
     size_t old_cap = db->mastery_capacity;
     void *new_arr = ensure_array(db->mastery, db->mastery_count, 
-                                  &db->mastery_capacity, sizeof(user_vocab_mastery_t));
+                                  &db->mastery_capacity, sizeof(user_item_mastery_t));
     if (!new_arr) { UNLOCK(); return NULL; }
     db->mastery = new_arr;
     
@@ -901,14 +900,14 @@ user_vocab_mastery_t* wc_get_or_create_mastery(wordcard_db_t *db,
         if (new_due) db->mastery_due_sorted = new_due;
     }
     
-    user_vocab_mastery_t *m = &db->mastery[db->mastery_count];
-    memset(m, 0, sizeof(user_vocab_mastery_t));
+    user_item_mastery_t *m = &db->mastery[db->mastery_count];
+    memset(m, 0, sizeof(user_item_mastery_t));
     m->user_id = user_id;
-    m->vocab_id = vocab_id;
+    m->item_id = item_id;
     m->ease_factor = WC_DEFAULT_EF;
     m->first_seen = wc_now();
     
-    pair_hash_set((pair_hash_t*)db->mastery_hash, user_id, vocab_id, (int)db->mastery_count);
+    pair_hash_set((pair_hash_t*)db->mastery_hash, user_id, item_id, (int)db->mastery_count);
     db->mastery_count++;
     db->mastery_due_dirty = 1; /* 新记录可能影响排序 */
     
@@ -917,13 +916,13 @@ user_vocab_mastery_t* wc_get_or_create_mastery(wordcard_db_t *db,
     return m;
 }
 
-user_vocab_mastery_t* wc_find_mastery(wordcard_db_t *db, 
-                                       uint32_t user_id, 
-                                       uint32_t vocab_id) {
+user_item_mastery_t* wc_find_mastery(wordcard_db_t *db, 
+                                      uint32_t user_id, 
+                                      uint32_t item_id) {
     if (!db) return NULL;
     LOCK();
     int idx;
-    if (pair_hash_get((pair_hash_t*)db->mastery_hash, user_id, vocab_id, &idx)) {
+    if (pair_hash_get((pair_hash_t*)db->mastery_hash, user_id, item_id, &idx)) {
         UNLOCK();
         return &db->mastery[idx];
     }
@@ -935,7 +934,7 @@ user_vocab_mastery_t* wc_find_mastery(wordcard_db_t *db,
  * SM-2 算法
  * ======================================================================== */
 
-void wc_sm2_update(user_vocab_mastery_t *mastery, uint8_t quality) {
+void wc_sm2_update(user_item_mastery_t *mastery, uint8_t quality) {
     if (!mastery || quality > 5) return;
     
     mastery->total_reviews++;
@@ -989,7 +988,7 @@ void wc_sm2_update(user_vocab_mastery_t *mastery, uint8_t quality) {
  * ======================================================================== */
 
 void wc_update_mastery_dimension(wordcard_db_t *db,
-                                  user_vocab_mastery_t *mastery,
+                                  user_item_mastery_t *mastery,
                                   char dimension,
                                   int correct,
                                   uint8_t score) {
@@ -1022,7 +1021,7 @@ void wc_update_mastery_dimension(wordcard_db_t *db,
     if (db) wc_mark_dirty(db);
 }
 
-void wc_recalc_overall(user_vocab_mastery_t *mastery) {
+void wc_recalc_overall(user_item_mastery_t *mastery) {
     if (!mastery) return;
     float overall = mastery->recognition * 0.25f +
                     mastery->recall * 0.20f +
@@ -1037,7 +1036,7 @@ void wc_recalc_overall(user_vocab_mastery_t *mastery) {
  * 查询接口
  * ======================================================================== */
 
-size_t wc_get_due_words(wordcard_db_t *db, uint32_t user_id, uint32_t now,
+size_t wc_get_due_items(wordcard_db_t *db, uint32_t user_id, uint32_t now,
                          uint32_t *out_ids, size_t max_count) {
     if (!db || !out_ids || max_count == 0) return 0;
     
@@ -1047,32 +1046,32 @@ size_t wc_get_due_words(wordcard_db_t *db, uint32_t user_id, uint32_t now,
     size_t count = 0;
     for (size_t i = 0; i < db->mastery_due_sorted_count && count < max_count; i++) {
         uint32_t m_idx = db->mastery_due_sorted[i];
-        user_vocab_mastery_t *m = &db->mastery[m_idx];
+        user_item_mastery_t *m = &db->mastery[m_idx];
         
         /* 按 next_review 排序，遇到未来时间直接退出 */
         if (m->next_review > now) break;
         
         if (m->user_id == user_id && m->sm2_status != SM2_NEW) {
-            out_ids[count++] = m->vocab_id;
+            out_ids[count++] = m->item_id;
         }
     }
     UNLOCK();
     return count;
 }
 
-size_t wc_get_new_words(wordcard_db_t *db, uint32_t user_id, uint32_t source_id,
+size_t wc_get_new_items(wordcard_db_t *db, uint32_t user_id, uint32_t source_id,
                          uint32_t *out_ids, size_t max_count) {
     if (!db || !out_ids || max_count == 0) return 0;
     
     LOCK();
     size_t count = 0;
     
-    /* 遍历词汇库，找到用户未学过的词 */
-    for (size_t i = 0; i < db->vocab_count && count < max_count; i++) {
-        uint32_t vid = db->vocab[i].id;
+    /* 遍历学习项库，找到用户未学过的项 */
+    for (size_t i = 0; i < db->item_count && count < max_count; i++) {
+        uint32_t vid = db->items[i].id;
         
         /* 如果指定了载体，过滤 */
-        if (source_id != 0 && db->vocab[i].source_id != source_id) continue;
+        if (source_id != 0 && db->items[i].source_id != source_id) continue;
         
         /* 检查用户是否已有掌握度记录 */
         int idx;
@@ -1127,15 +1126,15 @@ void wc_record_activity(wordcard_db_t *db, uint32_t user_id,
     if (!s) return;
     
     if (is_new) {
-        s->new_words++;
+        s->new_items++;
     } else {
-        s->reviewed_words++;
+        s->reviewed_items++;
     }
     
     if (is_correct) {
-        s->mastered_words++;
+        s->mastered_items++;
     } else {
-        s->wrong_words++;
+        s->wrong_items++;
     }
     
     s->study_time_sec += time_spent;
@@ -1163,5 +1162,5 @@ uint32_t wc_today(void) {
 }
 
 const char* wc_version_string(void) {
-    return "WordCard DB v2.0.1";
+    return "WordCard DB v3.0.0 (Universal)";
 }

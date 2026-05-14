@@ -10,17 +10,17 @@ import atexit
 # C 结构体定义 (ctypes)
 # ========================================================================
 
-class VocabEntry(Structure):
+class ItemEntry(Structure):
     _fields_ = [
         ("id", c_uint32),
-        ("word", c_char * 64),
-        ("phonetic", c_char * 64),
-        ("meaning", c_char * 256),
-        ("pos", c_char * 16),
-        ("example", c_char * 512),
-        ("example_cn", c_char * 512),
+        ("question", c_char * 512),
+        ("answer", c_char * 512),
+        ("explanation", c_char * 1024),
+        ("hint", c_char * 256),
         ("difficulty", c_uint8),
         ("source_id", c_uint32),
+        ("category", c_uint32),
+        ("tags", c_char * 128),
         ("frequency", c_uint32),
     ]
 
@@ -36,10 +36,10 @@ class User(Structure):
         ("last_active", c_uint32),
     ]
 
-class UserVocabMastery(Structure):
+class UserItemMastery(Structure):
     _fields_ = [
         ("user_id", c_uint32),
-        ("vocab_id", c_uint32),
+        ("item_id", c_uint32),
         ("sm2_status", c_uint8),
         ("interval_days", c_uint16),
         ("repetitions", c_uint16),
@@ -69,10 +69,10 @@ class DailyStat(Structure):
     _fields_ = [
         ("user_id", c_uint32),
         ("date", c_uint32),
-        ("new_words", c_uint16),
-        ("reviewed_words", c_uint16),
-        ("mastered_words", c_uint16),
-        ("wrong_words", c_uint16),
+        ("new_items", c_uint16),
+        ("reviewed_items", c_uint16),
+        ("mastered_items", c_uint16),
+        ("wrong_items", c_uint16),
         ("study_time_sec", c_uint32),
     ]
 
@@ -82,8 +82,8 @@ class ContentSource(Structure):
         ("type", c_uint8),
         ("name", c_char * 128),
         ("file_path", c_char * 256),
-        ("vocab_start", c_uint32),
-        ("vocab_count", c_uint32),
+        ("item_start", c_uint32),
+        ("item_count", c_uint32),
         ("created_at", c_uint32),
     ]
 
@@ -103,12 +103,19 @@ _lib.wc_save_db.argtypes = [ctypes.c_void_p, c_char_p]
 _lib.wc_save_db.restype = c_int
 _lib.wc_mark_dirty.argtypes = [ctypes.c_void_p]
 
-_lib.wc_add_vocab.argtypes = [ctypes.c_void_p, POINTER(VocabEntry)]
-_lib.wc_add_vocab.restype = c_uint32
-_lib.wc_find_vocab_by_word.argtypes = [ctypes.c_void_p, c_char_p]
-_lib.wc_find_vocab_by_word.restype = POINTER(VocabEntry)
-_lib.wc_find_vocab_by_id.argtypes = [ctypes.c_void_p, c_uint32]
-_lib.wc_find_vocab_by_id.restype = POINTER(VocabEntry)
+_lib.wc_add_item.argtypes = [ctypes.c_void_p, POINTER(ItemEntry)]
+_lib.wc_add_item.restype = c_uint32
+_lib.wc_find_item_by_question.argtypes = [ctypes.c_void_p, c_char_p]
+_lib.wc_find_item_by_question.restype = POINTER(ItemEntry)
+_lib.wc_find_item_by_id.argtypes = [ctypes.c_void_p, c_uint32]
+_lib.wc_find_item_by_id.restype = POINTER(ItemEntry)
+
+_lib.wc_add_source.argtypes = [ctypes.c_void_p, POINTER(ContentSource)]
+_lib.wc_add_source.restype = c_uint32
+_lib.wc_find_source_by_id.argtypes = [ctypes.c_void_p, c_uint32]
+_lib.wc_find_source_by_id.restype = ctypes.c_void_p
+_lib.wc_find_source_by_name.argtypes = [ctypes.c_void_p, c_char_p]
+_lib.wc_find_source_by_name.restype = ctypes.c_void_p
 
 _lib.wc_create_user.argtypes = [ctypes.c_void_p, c_char_p, c_char_p]
 _lib.wc_create_user.restype = c_uint32
@@ -118,29 +125,22 @@ _lib.wc_find_user_by_id.argtypes = [ctypes.c_void_p, c_uint32]
 _lib.wc_find_user_by_id.restype = POINTER(User)
 
 _lib.wc_get_or_create_mastery.argtypes = [ctypes.c_void_p, c_uint32, c_uint32]
-_lib.wc_get_or_create_mastery.restype = POINTER(UserVocabMastery)
+_lib.wc_get_or_create_mastery.restype = POINTER(UserItemMastery)
 _lib.wc_find_mastery.argtypes = [ctypes.c_void_p, c_uint32, c_uint32]
-_lib.wc_find_mastery.restype = POINTER(UserVocabMastery)
-_lib.wc_sm2_update.argtypes = [POINTER(UserVocabMastery), c_uint8]
-_lib.wc_update_mastery_dimension.argtypes = [ctypes.c_void_p, POINTER(UserVocabMastery), c_char, c_int, c_uint8]
-_lib.wc_recalc_overall.argtypes = [POINTER(UserVocabMastery)]
+_lib.wc_find_mastery.restype = POINTER(UserItemMastery)
+_lib.wc_sm2_update.argtypes = [POINTER(UserItemMastery), c_uint8]
+_lib.wc_update_mastery_dimension.argtypes = [ctypes.c_void_p, POINTER(UserItemMastery), c_char, c_int, c_uint8]
+_lib.wc_recalc_overall.argtypes = [POINTER(UserItemMastery)]
 
-_lib.wc_get_due_words.argtypes = [ctypes.c_void_p, c_uint32, c_uint32, POINTER(c_uint32), c_size_t]
-_lib.wc_get_due_words.restype = c_size_t
-_lib.wc_get_new_words.argtypes = [ctypes.c_void_p, c_uint32, c_uint32, POINTER(c_uint32), c_size_t]
-_lib.wc_get_new_words.restype = c_size_t
+_lib.wc_get_due_items.argtypes = [ctypes.c_void_p, c_uint32, c_uint32, POINTER(c_uint32), c_size_t]
+_lib.wc_get_due_items.restype = c_size_t
+_lib.wc_get_new_items.argtypes = [ctypes.c_void_p, c_uint32, c_uint32, POINTER(c_uint32), c_size_t]
+_lib.wc_get_new_items.restype = c_size_t
 _lib.wc_generate_daily_queue.argtypes = [ctypes.c_void_p, c_uint32, c_uint32, POINTER(c_uint32), POINTER(c_uint8), c_size_t]
 _lib.wc_generate_daily_queue.restype = c_size_t
 
-_lib.wc_recommend_mode.argtypes = [POINTER(UserVocabMastery), c_uint32]
+_lib.wc_recommend_mode.argtypes = [POINTER(UserItemMastery), c_uint32]
 _lib.wc_recommend_mode.restype = c_uint8
-
-_lib.wc_add_source.argtypes = [ctypes.c_void_p, POINTER(ContentSource)]
-_lib.wc_add_source.restype = c_uint32
-_lib.wc_find_source_by_id.argtypes = [ctypes.c_void_p, c_uint32]
-_lib.wc_find_source_by_id.restype = ctypes.c_void_p
-_lib.wc_find_source_by_name.argtypes = [ctypes.c_void_p, c_char_p]
-_lib.wc_find_source_by_name.restype = ctypes.c_void_p
 _lib.wc_notify_mastery_changed.argtypes = [ctypes.c_void_p]
 
 _lib.wc_get_or_create_daily_stat.argtypes = [ctypes.c_void_p, c_uint32, c_uint32]
@@ -156,7 +156,7 @@ _lib.wc_version_string.restype = c_char_p
 # ========================================================================
 
 class WordCardDB:
-    """WordCard 内存数据库 Python 封装"""
+    """WordCard 通用学习数据库 Python 封装"""
     
     def __init__(self, db_path: str = "data/wordcard.db"):
         self.db_path = db_path
@@ -179,7 +179,7 @@ class WordCardDB:
     def _start_auto_save(self):
         def auto_save():
             while not self._stop_event.is_set():
-                time.sleep(60)  # 每 60 秒检查一次
+                time.sleep(60)
                 if self._db:
                     _lib.wc_save_db(self._db, self.db_path.encode('utf-8'))
         
@@ -203,32 +203,32 @@ class WordCardDB:
             _lib.wc_db_free(self._db)
             self._db = None
     
-    # -------- 词汇操作 --------
+    # -------- 学习项操作 --------
     
-    def add_vocab(self, word: str, meaning: str, phonetic: str = "", 
-                  pos: str = "", example: str = "", example_cn: str = "",
-                  difficulty: int = 1, source_id: int = 0) -> int:
-        """添加单词，返回 vocab_id"""
-        entry = VocabEntry()
-        entry.word = word.encode('utf-8')[:63]
-        entry.meaning = meaning.encode('utf-8')[:255]
-        entry.phonetic = phonetic.encode('utf-8')[:63]
-        entry.pos = pos.encode('utf-8')[:15]
-        entry.example = example.encode('utf-8')[:511]
-        entry.example_cn = example_cn.encode('utf-8')[:511]
+    def add_item(self, question: str, answer: str, explanation: str = "",
+                 hint: str = "", difficulty: int = 1, source_id: int = 0,
+                 category: int = 1, tags: str = "") -> int:
+        """添加学习项，返回 item_id"""
+        entry = ItemEntry()
+        entry.question = question.encode('utf-8')[:511]
+        entry.answer = answer.encode('utf-8')[:511]
+        entry.explanation = explanation.encode('utf-8')[:1023]
+        entry.hint = hint.encode('utf-8')[:255]
         entry.difficulty = difficulty
         entry.source_id = source_id
+        entry.category = category
+        entry.tags = tags.encode('utf-8')[:127]
         
         with self._lock:
-            vid = _lib.wc_add_vocab(self._db, ctypes.byref(entry))
-        return vid
+            iid = _lib.wc_add_item(self._db, ctypes.byref(entry))
+        return iid
     
-    def find_vocab(self, word: str = None, vocab_id: int = None):
-        """查找单词"""
-        if word:
-            result = _lib.wc_find_vocab_by_word(self._db, word.encode('utf-8'))
-        elif vocab_id:
-            result = _lib.wc_find_vocab_by_id(self._db, vocab_id)
+    def find_item(self, question: str = None, item_id: int = None):
+        """查找学习项"""
+        if question:
+            result = _lib.wc_find_item_by_question(self._db, question.encode('utf-8'))
+        elif item_id:
+            result = _lib.wc_find_item_by_id(self._db, item_id)
         else:
             return None
         
@@ -236,12 +236,13 @@ class WordCardDB:
             v = result.contents
             return {
                 "id": v.id,
-                "word": v.word.decode('utf-8', errors='ignore').strip('\x00'),
-                "meaning": v.meaning.decode('utf-8', errors='ignore').strip('\x00'),
-                "phonetic": v.phonetic.decode('utf-8', errors='ignore').strip('\x00'),
-                "pos": v.pos.decode('utf-8', errors='ignore').strip('\x00'),
-                "example": v.example.decode('utf-8', errors='ignore').strip('\x00'),
+                "question": v.question.decode('utf-8', errors='ignore').strip('\x00'),
+                "answer": v.answer.decode('utf-8', errors='ignore').strip('\x00'),
+                "explanation": v.explanation.decode('utf-8', errors='ignore').strip('\x00'),
+                "hint": v.hint.decode('utf-8', errors='ignore').strip('\x00'),
                 "difficulty": v.difficulty,
+                "category": v.category,
+                "tags": v.tags.decode('utf-8', errors='ignore').strip('\x00'),
             }
         return None
     
@@ -288,14 +289,14 @@ class WordCardDB:
     
     # -------- 学习操作 --------
     
-    def get_mastery(self, user_id: int, vocab_id: int):
+    def get_mastery(self, user_id: int, item_id: int):
         """获取掌握度"""
-        m = _lib.wc_get_or_create_mastery(self._db, user_id, vocab_id)
+        m = _lib.wc_get_or_create_mastery(self._db, user_id, item_id)
         if not m:
             return None
         return self._mastery_to_dict(m.contents)
     
-    def review(self, user_id: int, vocab_id: int, quality: int, 
+    def review(self, user_id: int, item_id: int, quality: int, 
                dimension: str = None, correct: bool = True, score: int = 0):
         """
         提交复习结果
@@ -304,7 +305,7 @@ class WordCardDB:
                    'l' listening, 'p' pronunciation, 'u' usage
         """
         with self._lock:
-            m = _lib.wc_get_or_create_mastery(self._db, user_id, vocab_id)
+            m = _lib.wc_get_or_create_mastery(self._db, user_id, item_id)
             if not m:
                 return False
             
@@ -335,19 +336,19 @@ class WordCardDB:
         
         queue = []
         for i in range(count):
-            vocab = self.find_vocab(vocab_id=ids[i])
-            if vocab:
+            item = self.find_item(item_id=ids[i])
+            if item:
                 queue.append({
-                    "vocab_id": ids[i],
-                    "word": vocab["word"],
+                    "item_id": ids[i],
+                    "question": item["question"],
                     "mode": modes[i],
                     "mode_name": self._mode_name(modes[i]),
                 })
         return queue
     
-    def recommend_mode(self, user_id: int, vocab_id: int):
+    def recommend_mode(self, user_id: int, item_id: int):
         """推荐学习模式"""
-        m = _lib.wc_find_mastery(self._db, user_id, vocab_id)
+        m = _lib.wc_find_mastery(self._db, user_id, item_id)
         if not m:
             return "flashcard"
         mode = _lib.wc_recommend_mode(m, _lib.wc_now())
@@ -355,10 +356,10 @@ class WordCardDB:
     
     # -------- 内部工具 --------
     
-    def _mastery_to_dict(self, m: UserVocabMastery):
+    def _mastery_to_dict(self, m: UserItemMastery):
         return {
             "user_id": m.user_id,
-            "vocab_id": m.vocab_id,
+            "item_id": m.item_id,
             "sm2_status": m.sm2_status,
             "interval_days": m.interval_days,
             "repetitions": m.repetitions,
@@ -421,9 +422,9 @@ except ImportError:
 
 if FASTAPI_AVAILABLE:
     app = FastAPI(
-        title="WordCard API",
-        description="基于记忆曲线的智能单词记忆系统",
-        version="2.0.0"
+        title="WordCard Universal API",
+        description="基于记忆曲线的通用学习系统（支持英语/司法/雅思/GRE等）",
+        version="3.0.0"
     )
     
     # -------- 请求/响应模型 --------
@@ -432,32 +433,32 @@ if FASTAPI_AVAILABLE:
         dingtalk_uid: str = Field(..., min_length=1, max_length=63)
         name: Optional[str] = Field("", max_length=63)
     
-    class VocabAdd(BaseModel):
-        word: str = Field(..., min_length=1, max_length=63)
-        meaning: str = Field(..., max_length=255)
-        phonetic: Optional[str] = Field("", max_length=63)
-        pos: Optional[str] = Field("", max_length=15)
-        example: Optional[str] = Field("", max_length=511)
-        example_cn: Optional[str] = Field("", max_length=511)
+    class ItemAdd(BaseModel):
+        question: str = Field(..., min_length=1, max_length=511)
+        answer: str = Field(..., max_length=511)
+        explanation: Optional[str] = Field("", max_length=1023)
+        hint: Optional[str] = Field("", max_length=255)
         difficulty: Optional[int] = Field(1, ge=1, le=5)
+        category: Optional[int] = Field(1, ge=1, le=99)
+        tags: Optional[str] = Field("", max_length=127)
     
     class ReviewSubmit(BaseModel):
         user_id: int
-        vocab_id: int
+        item_id: int
         quality: int = Field(..., ge=0, le=5, description="SM-2 评级: 0=完全忘记, 5=完美回忆")
-        dimension: Optional[str] = Field(None, pattern="^[rcslpu]$", description="维度: r=识别 c=回忆 s=拼写 l=听力 p=发音 u=使用")
+        dimension: Optional[str] = Field(None, pattern="^[rcslpu]$", description="维度: r=识别 c=回忆 s=复现 l=听辨 p=表达 u=应用")
         correct: Optional[bool] = True
         score: Optional[int] = Field(0, ge=0, le=100)
     
     class ModeResponse(BaseModel):
-        vocab_id: int
-        word: str
+        item_id: int
+        question: str
         mode: int
         mode_name: str
     
     class MasteryResponse(BaseModel):
         user_id: int
-        vocab_id: int
+        item_id: int
         overall: int
         recognition: int
         recall: int
@@ -489,10 +490,10 @@ if FASTAPI_AVAILABLE:
     @app.get("/")
     async def root():
         return {
-            "name": "WordCard API",
-            "version": "2.0.0",
+            "name": "WordCard Universal API",
+            "version": "3.0.0",
             "status": "running",
-            "features": ["spaced-repetition", "multi-dimensional-mastery", "smart-recommendation"]
+            "features": ["spaced-repetition", "multi-dimensional-mastery", "smart-recommendation", "universal-learning"]
         }
     
     @app.post("/api/v1/user/register")
@@ -521,7 +522,6 @@ if FASTAPI_AVAILABLE:
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # 获取今日统计
         from ctypes import c_uint32
         today = _lib.wc_today()
         stat_ptr = _lib.wc_get_or_create_daily_stat(db._db, user_id, today)
@@ -536,10 +536,10 @@ if FASTAPI_AVAILABLE:
             s = stat_ptr.contents
             stats["today"] = {
                 "date": s.date,
-                "new_words": s.new_words,
-                "reviewed_words": s.reviewed_words,
-                "mastered_words": s.mastered_words,
-                "wrong_words": s.wrong_words,
+                "new_items": s.new_items,
+                "reviewed_items": s.reviewed_items,
+                "mastered_items": s.mastered_items,
+                "wrong_items": s.wrong_items,
                 "study_time_sec": s.study_time_sec,
             }
         
@@ -560,41 +560,41 @@ if FASTAPI_AVAILABLE:
             "queue": queue
         }
     
-    @app.post("/api/v1/vocab")
-    async def add_vocabulary(req: VocabAdd):
-        """添加单词"""
+    @app.post("/api/v1/item")
+    async def add_item_endpoint(req: ItemAdd):
+        """添加学习项"""
         db = get_api_db()
-        vocab_id = db.add_vocab(
-            req.word, req.meaning, req.phonetic, req.pos,
-            req.example, req.example_cn, req.difficulty
+        item_id = db.add_item(
+            req.question, req.answer, req.explanation, req.hint,
+            req.difficulty, 0, req.category, req.tags
         )
-        if vocab_id == 0:
-            raise HTTPException(status_code=409, detail="Word already exists")
-        return {"vocab_id": vocab_id, "word": req.word}
+        if item_id == 0:
+            raise HTTPException(status_code=409, detail="Item already exists")
+        return {"item_id": item_id, "question": req.question}
     
-    @app.get("/api/v1/vocab/{vocab_id}")
-    async def get_vocabulary(vocab_id: int):
-        """查询单词详情"""
+    @app.get("/api/v1/item/{item_id}")
+    async def get_item(item_id: int):
+        """查询学习项详情"""
         db = get_api_db()
-        vocab = db.find_vocab(vocab_id=vocab_id)
-        if not vocab:
-            raise HTTPException(status_code=404, detail="Vocabulary not found")
-        return vocab
+        item = db.find_item(item_id=item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return item
     
-    @app.get("/api/v1/vocab/search/{word}")
-    async def search_vocabulary(word: str):
-        """按单词文本搜索"""
+    @app.get("/api/v1/item/search/{question}")
+    async def search_item(question: str):
+        """按问题文本搜索"""
         db = get_api_db()
-        vocab = db.find_vocab(word=word)
-        if not vocab:
-            raise HTTPException(status_code=404, detail="Vocabulary not found")
-        return vocab
+        item = db.find_item(question=question)
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return item
     
-    @app.get("/api/v1/mastery/{user_id}/{vocab_id}")
-    async def get_mastery(user_id: int, vocab_id: int):
-        """获取用户对某词的掌握度"""
+    @app.get("/api/v1/mastery/{user_id}/{item_id}")
+    async def get_mastery(user_id: int, item_id: int):
+        """获取用户对某学习项的掌握度"""
         db = get_api_db()
-        mastery = db.get_mastery(user_id, vocab_id)
+        mastery = db.get_mastery(user_id, item_id)
         if not mastery:
             raise HTTPException(status_code=404, detail="Mastery record not found")
         return mastery
@@ -604,28 +604,27 @@ if FASTAPI_AVAILABLE:
         """提交复习结果"""
         db = get_api_db()
         success = db.review(
-            req.user_id, req.vocab_id, req.quality,
+            req.user_id, req.item_id, req.quality,
             req.dimension, req.correct, req.score
         )
         if not success:
             raise HTTPException(status_code=400, detail="Review failed")
         
-        # 返回更新后的掌握度
-        mastery = db.get_mastery(req.user_id, req.vocab_id)
+        mastery = db.get_mastery(req.user_id, req.item_id)
         return {
             "success": True,
             "mastery": mastery,
-            "recommended_next_mode": db.recommend_mode(req.user_id, req.vocab_id)
+            "recommended_next_mode": db.recommend_mode(req.user_id, req.item_id)
         }
     
-    @app.get("/api/v1/study/recommend/{user_id}/{vocab_id}")
-    async def recommend_study_mode(user_id: int, vocab_id: int):
+    @app.get("/api/v1/study/recommend/{user_id}/{item_id}")
+    async def recommend_study_mode(user_id: int, item_id: int):
         """获取推荐的学习模式"""
         db = get_api_db()
-        mode_name = db.recommend_mode(user_id, vocab_id)
+        mode_name = db.recommend_mode(user_id, item_id)
         return {
             "user_id": user_id,
-            "vocab_id": vocab_id,
+            "item_id": item_id,
             "recommended_mode": mode_name
         }
     
