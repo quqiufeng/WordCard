@@ -76,6 +76,17 @@ class DailyStat(Structure):
         ("study_time_sec", c_uint32),
     ]
 
+class ContentSource(Structure):
+    _fields_ = [
+        ("id", c_uint32),
+        ("type", c_uint8),
+        ("name", c_char * 128),
+        ("file_path", c_char * 256),
+        ("vocab_start", c_uint32),
+        ("vocab_count", c_uint32),
+        ("created_at", c_uint32),
+    ]
+
 # ========================================================================
 # 加载 C 共享库
 # ========================================================================
@@ -123,6 +134,14 @@ _lib.wc_generate_daily_queue.restype = c_size_t
 
 _lib.wc_recommend_mode.argtypes = [POINTER(UserVocabMastery), c_uint32]
 _lib.wc_recommend_mode.restype = c_uint8
+
+_lib.wc_add_source.argtypes = [ctypes.c_void_p, POINTER(ContentSource)]
+_lib.wc_add_source.restype = c_uint32
+_lib.wc_find_source_by_id.argtypes = [ctypes.c_void_p, c_uint32]
+_lib.wc_find_source_by_id.restype = ctypes.c_void_p
+_lib.wc_find_source_by_name.argtypes = [ctypes.c_void_p, c_char_p]
+_lib.wc_find_source_by_name.restype = ctypes.c_void_p
+_lib.wc_notify_mastery_changed.argtypes = [ctypes.c_void_p]
 
 _lib.wc_get_or_create_daily_stat.argtypes = [ctypes.c_void_p, c_uint32, c_uint32]
 _lib.wc_get_or_create_daily_stat.restype = POINTER(DailyStat)
@@ -226,6 +245,18 @@ class WordCardDB:
             }
         return None
     
+    def add_source(self, name: str, source_type: int = 3, file_path: str = "") -> int:
+        """添加内容载体，返回 source_id"""
+        source = ContentSource()
+        source.type = source_type
+        source.name = name.encode('utf-8')[:127]
+        source.file_path = file_path.encode('utf-8')[:255]
+        source.created_at = _lib.wc_now()
+        
+        with self._lock:
+            sid = _lib.wc_add_source(self._db, ctypes.byref(source))
+        return sid
+    
     # -------- 用户操作 --------
     
     def create_user(self, dingtalk_uid: str, name: str = "") -> int:
@@ -279,6 +310,7 @@ class WordCardDB:
             
             # 更新 SM-2
             _lib.wc_sm2_update(m, quality)
+            _lib.wc_notify_mastery_changed(self._db)
             
             # 更新维度掌握度
             if dimension:
@@ -356,16 +388,19 @@ class WordCardDB:
 
 
 # ========================================================================
-# 全局数据库实例（单例）
+# 全局数据库实例（单例 + 线程安全）
 # ========================================================================
 
 _db_instance = None
+_db_lock = threading.Lock()
+
 
 def get_db(db_path: str = "data/wordcard.db") -> WordCardDB:
     global _db_instance
-    if _db_instance is None:
-        _db_instance = WordCardDB(db_path)
-    return _db_instance
+    with _db_lock:
+        if _db_instance is None:
+            _db_instance = WordCardDB(db_path)
+        return _db_instance
 
 # ========================================================================
 # FastAPI HTTP 服务
@@ -440,12 +475,14 @@ if FASTAPI_AVAILABLE:
     # -------- 全局数据库实例 --------
     
     _api_db = None
+    _api_db_lock = threading.Lock()
     
     def get_api_db():
         global _api_db
-        if _api_db is None:
-            _api_db = get_db("data/wordcard.db")
-        return _api_db
+        with _api_db_lock:
+            if _api_db is None:
+                _api_db = get_db("data/wordcard.db")
+            return _api_db
     
     # -------- API 端点 --------
     

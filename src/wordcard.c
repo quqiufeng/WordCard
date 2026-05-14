@@ -10,6 +10,8 @@
  * 不依赖外部库，极简实现
  * ======================================================================== */
 
+#define HASH_LOAD_FACTOR 0.75f
+
 typedef struct int_node {
     uint32_t key;
     int value;
@@ -19,6 +21,7 @@ typedef struct int_node {
 typedef struct {
     int_node_t **buckets;
     size_t size;
+    size_t count;
 } int_hash_t;
 
 typedef struct str_node {
@@ -30,6 +33,7 @@ typedef struct str_node {
 typedef struct {
     str_node_t **buckets;
     size_t size;
+    size_t count;
 } str_hash_t;
 
 typedef struct pair_node {
@@ -42,6 +46,7 @@ typedef struct pair_node {
 typedef struct {
     pair_node_t **buckets;
     size_t size;
+    size_t count;
 } pair_hash_t;
 
 static int_hash_t* int_hash_new(size_t size) {
@@ -65,6 +70,8 @@ static void int_hash_free(int_hash_t *h) {
     free(h);
 }
 
+static void int_hash_resize(int_hash_t *h, size_t new_size);
+
 static void int_hash_set(int_hash_t *h, uint32_t key, int value) {
     size_t idx = key % h->size;
     int_node_t *n = h->buckets[idx];
@@ -76,6 +83,11 @@ static void int_hash_set(int_hash_t *h, uint32_t key, int value) {
     n->key = key; n->value = value;
     n->next = h->buckets[idx];
     h->buckets[idx] = n;
+    h->count++;
+    
+    if ((float)h->count / (float)h->size > HASH_LOAD_FACTOR) {
+        int_hash_resize(h, h->size * 2);
+    }
 }
 
 static int int_hash_get(int_hash_t *h, uint32_t key, int *out) {
@@ -86,6 +98,27 @@ static int int_hash_get(int_hash_t *h, uint32_t key, int *out) {
         n = n->next;
     }
     return 0;
+}
+
+static void int_hash_resize(int_hash_t *h, size_t new_size) {
+    if (new_size <= h->size) return;
+    int_node_t **old_buckets = h->buckets;
+    size_t old_size = h->size;
+    
+    h->buckets = calloc(new_size, sizeof(int_node_t*));
+    h->size = new_size;
+    
+    for (size_t i = 0; i < old_size; i++) {
+        int_node_t *n = old_buckets[i];
+        while (n) {
+            int_node_t *next = n->next;
+            size_t idx = n->key % h->size;
+            n->next = h->buckets[idx];
+            h->buckets[idx] = n;
+            n = next;
+        }
+    }
+    free(old_buckets);
 }
 
 static str_hash_t* str_hash_new(size_t size) {
@@ -109,10 +142,16 @@ static void str_hash_free(str_hash_t *h) {
     free(h);
 }
 
-static void str_hash_set(str_hash_t *h, const char *key, int value) {
+static void str_hash_resize(str_hash_t *h, size_t new_size);
+
+static size_t str_hash_idx(str_hash_t *h, const char *key) {
     size_t idx = 0;
     for (const char *p = key; *p; p++) idx = idx * 31 + *p;
-    idx %= h->size;
+    return idx % h->size;
+}
+
+static void str_hash_set(str_hash_t *h, const char *key, int value) {
+    size_t idx = str_hash_idx(h, key);
     str_node_t *n = h->buckets[idx];
     while (n) {
         if (strcmp(n->key, key) == 0) { n->value = value; return; }
@@ -124,18 +163,42 @@ static void str_hash_set(str_hash_t *h, const char *key, int value) {
     n->value = value;
     n->next = h->buckets[idx];
     h->buckets[idx] = n;
+    h->count++;
+    
+    if ((float)h->count / (float)h->size > HASH_LOAD_FACTOR) {
+        str_hash_resize(h, h->size * 2);
+    }
 }
 
 static int str_hash_get(str_hash_t *h, const char *key, int *out) {
-    size_t idx = 0;
-    for (const char *p = key; *p; p++) idx = idx * 31 + *p;
-    idx %= h->size;
+    size_t idx = str_hash_idx(h, key);
     str_node_t *n = h->buckets[idx];
     while (n) {
         if (strcmp(n->key, key) == 0) { *out = n->value; return 1; }
         n = n->next;
     }
     return 0;
+}
+
+static void str_hash_resize(str_hash_t *h, size_t new_size) {
+    if (new_size <= h->size) return;
+    str_node_t **old_buckets = h->buckets;
+    size_t old_size = h->size;
+    
+    h->buckets = calloc(new_size, sizeof(str_node_t*));
+    h->size = new_size;
+    
+    for (size_t i = 0; i < old_size; i++) {
+        str_node_t *n = old_buckets[i];
+        while (n) {
+            str_node_t *next = n->next;
+            size_t idx = str_hash_idx(h, n->key);
+            n->next = h->buckets[idx];
+            h->buckets[idx] = n;
+            n = next;
+        }
+    }
+    free(old_buckets);
 }
 
 static pair_hash_t* pair_hash_new(size_t size) {
@@ -159,9 +222,15 @@ static void pair_hash_free(pair_hash_t *h) {
     free(h);
 }
 
-static void pair_hash_set(pair_hash_t *h, uint32_t k1, uint32_t k2, int value) {
+static void pair_hash_resize(pair_hash_t *h, size_t new_size);
+
+static size_t pair_hash_idx(pair_hash_t *h, uint32_t k1, uint32_t k2) {
     uint64_t combined = ((uint64_t)k1 << 32) | k2;
-    size_t idx = (size_t)(combined % h->size);
+    return (size_t)(combined % h->size);
+}
+
+static void pair_hash_set(pair_hash_t *h, uint32_t k1, uint32_t k2, int value) {
+    size_t idx = pair_hash_idx(h, k1, k2);
     pair_node_t *n = h->buckets[idx];
     while (n) {
         if (n->key1 == k1 && n->key2 == k2) { n->value = value; return; }
@@ -171,17 +240,42 @@ static void pair_hash_set(pair_hash_t *h, uint32_t k1, uint32_t k2, int value) {
     n->key1 = k1; n->key2 = k2; n->value = value;
     n->next = h->buckets[idx];
     h->buckets[idx] = n;
+    h->count++;
+    
+    if ((float)h->count / (float)h->size > HASH_LOAD_FACTOR) {
+        pair_hash_resize(h, h->size * 2);
+    }
 }
 
 static int pair_hash_get(pair_hash_t *h, uint32_t k1, uint32_t k2, int *out) {
-    uint64_t combined = ((uint64_t)k1 << 32) | k2;
-    size_t idx = (size_t)(combined % h->size);
+    size_t idx = pair_hash_idx(h, k1, k2);
     pair_node_t *n = h->buckets[idx];
     while (n) {
         if (n->key1 == k1 && n->key2 == k2) { *out = n->value; return 1; }
         n = n->next;
     }
     return 0;
+}
+
+static void pair_hash_resize(pair_hash_t *h, size_t new_size) {
+    if (new_size <= h->size) return;
+    pair_node_t **old_buckets = h->buckets;
+    size_t old_size = h->size;
+    
+    h->buckets = calloc(new_size, sizeof(pair_node_t*));
+    h->size = new_size;
+    
+    for (size_t i = 0; i < old_size; i++) {
+        pair_node_t *n = old_buckets[i];
+        while (n) {
+            pair_node_t *next = n->next;
+            size_t idx = pair_hash_idx(h, n->key1, n->key2);
+            n->next = h->buckets[idx];
+            h->buckets[idx] = n;
+            n = next;
+        }
+    }
+    free(old_buckets);
 }
 
 /* ========================================================================
@@ -207,6 +301,42 @@ static void* ensure_array(void *arr, size_t count, size_t *cap, size_t elem_size
         return new_arr;
     }
     return arr;
+}
+
+static wordcard_db_t *g_sort_db = NULL;
+
+static int compare_mastery_by_due(const void *a, const void *b) {
+    uint32_t idx_a = *(const uint32_t*)a;
+    uint32_t idx_b = *(const uint32_t*)b;
+    uint32_t due_a = g_sort_db->mastery[idx_a].next_review;
+    uint32_t due_b = g_sort_db->mastery[idx_b].next_review;
+    if (due_a < due_b) return -1;
+    if (due_a > due_b) return 1;
+    return 0;
+}
+
+static void rebuild_due_index(wordcard_db_t *db) {
+    if (!db->mastery_due_dirty && db->mastery_due_sorted_count == db->mastery_count) {
+        return;
+    }
+    
+    if (db->mastery_capacity > 0 && !db->mastery_due_sorted) {
+        db->mastery_due_sorted = malloc(db->mastery_capacity * sizeof(uint32_t));
+    }
+    if (!db->mastery_due_sorted) return;
+    
+    db->mastery_due_sorted_count = db->mastery_count;
+    for (size_t i = 0; i < db->mastery_count; i++) {
+        db->mastery_due_sorted[i] = (uint32_t)i;
+    }
+    
+    if (db->mastery_count > 1) {
+        g_sort_db = db;
+        qsort(db->mastery_due_sorted, db->mastery_count, sizeof(uint32_t), compare_mastery_by_due);
+        g_sort_db = NULL;
+    }
+    
+    db->mastery_due_dirty = 0;
 }
 
 static void rebuild_indexes(wordcard_db_t *db) {
@@ -238,6 +368,13 @@ static void rebuild_indexes(wordcard_db_t *db) {
         str_hash_set((str_hash_t*)db->user_hash, db->users[i].dingtalk_uid, (int)i);
     }
     
+    /* 重建 user_id_hash */
+    int_hash_free((int_hash_t*)db->user_id_hash);
+    db->user_id_hash = int_hash_new(db->user_capacity * 2 + 1);
+    for (size_t i = 0; i < db->user_count; i++) {
+        int_hash_set((int_hash_t*)db->user_id_hash, db->users[i].id, (int)i);
+    }
+    
     /* 重建 mastery_hash */
     pair_hash_free((pair_hash_t*)db->mastery_hash);
     db->mastery_hash = pair_hash_new(db->mastery_capacity * 2 + 1);
@@ -245,6 +382,18 @@ static void rebuild_indexes(wordcard_db_t *db) {
         pair_hash_set((pair_hash_t*)db->mastery_hash, 
                       db->mastery[i].user_id, db->mastery[i].vocab_id, (int)i);
     }
+    
+    /* 重建 stat_hash */
+    pair_hash_free((pair_hash_t*)db->stat_hash);
+    db->stat_hash = pair_hash_new(db->stat_capacity * 2 + 1);
+    for (size_t i = 0; i < db->stat_count; i++) {
+        pair_hash_set((pair_hash_t*)db->stat_hash,
+                      db->stats[i].user_id, db->stats[i].date, (int)i);
+    }
+    
+    /* 重建到期复习索引 */
+    db->mastery_due_dirty = 1;
+    rebuild_due_index(db);
 }
 
 /* ========================================================================
@@ -278,6 +427,7 @@ wordcard_db_t* wc_db_init(void) {
     
     db->dirty = 0;
     db->db_path[0] = '\0';
+    db->mastery_due_dirty = 1;
     
     if (!db->vocab || !db->sources || !db->chapters || 
         !db->users || !db->mastery || !db->progress || !db->stats) {
@@ -290,7 +440,12 @@ wordcard_db_t* wc_db_init(void) {
     db->id_hash = int_hash_new(1024);
     db->source_hash = int_hash_new(128);
     db->user_hash = str_hash_new(1024);
+    db->user_id_hash = int_hash_new(1024);
     db->mastery_hash = pair_hash_new(1024);
+    db->stat_hash = pair_hash_new(1024);
+    
+    /* 分配到期复习排序数组 */
+    db->mastery_due_sorted = malloc(db->mastery_capacity * sizeof(uint32_t));
     
     return db;
 }
@@ -302,7 +457,11 @@ void wc_db_free(wordcard_db_t *db) {
     int_hash_free((int_hash_t*)db->id_hash);
     int_hash_free((int_hash_t*)db->source_hash);
     str_hash_free((str_hash_t*)db->user_hash);
+    int_hash_free((int_hash_t*)db->user_id_hash);
     pair_hash_free((pair_hash_t*)db->mastery_hash);
+    pair_hash_free((pair_hash_t*)db->stat_hash);
+    
+    free(db->mastery_due_sorted);
     
     free(db->vocab);
     free(db->sources);
@@ -586,6 +745,68 @@ vocab_entry_t* wc_find_vocab_by_id(wordcard_db_t *db, uint32_t vocab_id) {
 }
 
 /* ========================================================================
+ * 载体/内容源操作
+ * ======================================================================== */
+
+uint32_t wc_add_source(wordcard_db_t *db, const content_source_t *source) {
+    if (!db || !source) return 0;
+    
+    LOCK();
+    
+    /* 检查名称是否已存在 */
+    for (size_t i = 0; i < db->source_count; i++) {
+        if (strcmp(db->sources[i].name, source->name) == 0) {
+            UNLOCK();
+            return 0;
+        }
+    }
+    
+    void *new_arr = ensure_array(db->sources, db->source_count, &db->source_capacity, 
+                                  sizeof(content_source_t));
+    if (!new_arr) { UNLOCK(); return 0; }
+    db->sources = new_arr;
+    
+    uint32_t new_id = (db->source_count > 0) ? db->sources[db->source_count - 1].id + 1 : 1;
+    
+    content_source_t *s = &db->sources[db->source_count];
+    memcpy(s, source, sizeof(content_source_t));
+    s->id = new_id;
+    db->source_count++;
+    
+    int_hash_set((int_hash_t*)db->source_hash, s->id, (int)(db->source_count - 1));
+    
+    wc_mark_dirty(db);
+    UNLOCK();
+    return new_id;
+}
+
+content_source_t* wc_find_source_by_id(wordcard_db_t *db, uint32_t source_id) {
+    if (!db) return NULL;
+    LOCK();
+    int idx;
+    if (int_hash_get((int_hash_t*)db->source_hash, source_id, &idx)) {
+        UNLOCK();
+        return &db->sources[idx];
+    }
+    UNLOCK();
+    return NULL;
+}
+
+content_source_t* wc_find_source_by_name(wordcard_db_t *db, const char *name) {
+    if (!db || !name) return NULL;
+    /* 线性查找（source 数量通常很少） */
+    LOCK();
+    for (size_t i = 0; i < db->source_count; i++) {
+        if (strcmp(db->sources[i].name, name) == 0) {
+            UNLOCK();
+            return &db->sources[i];
+        }
+    }
+    UNLOCK();
+    return NULL;
+}
+
+/* ========================================================================
  * 用户操作
  * ======================================================================== */
 
@@ -619,6 +840,7 @@ uint32_t wc_create_user(wordcard_db_t *db, const char *dingtalk_uid, const char 
     
     db->user_count++;
     str_hash_set((str_hash_t*)db->user_hash, u->dingtalk_uid, (int)(db->user_count - 1));
+    int_hash_set((int_hash_t*)db->user_id_hash, u->id, (int)(db->user_count - 1));
     
     wc_mark_dirty(db);
     UNLOCK();
@@ -640,12 +862,10 @@ user_t* wc_find_user(wordcard_db_t *db, const char *dingtalk_uid) {
 user_t* wc_find_user_by_id(wordcard_db_t *db, uint32_t user_id) {
     if (!db) return NULL;
     LOCK();
-    /* 用户ID通常等于索引+1，但为安全起见遍历查找 */
-    for (size_t i = 0; i < db->user_count; i++) {
-        if (db->users[i].id == user_id) {
-            UNLOCK();
-            return &db->users[i];
-        }
+    int idx;
+    if (int_hash_get((int_hash_t*)db->user_id_hash, user_id, &idx)) {
+        UNLOCK();
+        return &db->users[idx];
     }
     UNLOCK();
     return NULL;
@@ -669,10 +889,17 @@ user_vocab_mastery_t* wc_get_or_create_mastery(wordcard_db_t *db,
     }
     
     /* 创建新记录 */
+    size_t old_cap = db->mastery_capacity;
     void *new_arr = ensure_array(db->mastery, db->mastery_count, 
                                   &db->mastery_capacity, sizeof(user_vocab_mastery_t));
     if (!new_arr) { UNLOCK(); return NULL; }
     db->mastery = new_arr;
+    
+    /* 同步扩容 due_sorted 数组 */
+    if (db->mastery_capacity > old_cap && db->mastery_due_sorted) {
+        uint32_t *new_due = realloc(db->mastery_due_sorted, db->mastery_capacity * sizeof(uint32_t));
+        if (new_due) db->mastery_due_sorted = new_due;
+    }
     
     user_vocab_mastery_t *m = &db->mastery[db->mastery_count];
     memset(m, 0, sizeof(user_vocab_mastery_t));
@@ -683,6 +910,7 @@ user_vocab_mastery_t* wc_get_or_create_mastery(wordcard_db_t *db,
     
     pair_hash_set((pair_hash_t*)db->mastery_hash, user_id, vocab_id, (int)db->mastery_count);
     db->mastery_count++;
+    db->mastery_due_dirty = 1; /* 新记录可能影响排序 */
     
     wc_mark_dirty(db);
     UNLOCK();
@@ -814,10 +1042,17 @@ size_t wc_get_due_words(wordcard_db_t *db, uint32_t user_id, uint32_t now,
     if (!db || !out_ids || max_count == 0) return 0;
     
     LOCK();
+    rebuild_due_index(db);
+    
     size_t count = 0;
-    for (size_t i = 0; i < db->mastery_count && count < max_count; i++) {
-        user_vocab_mastery_t *m = &db->mastery[i];
-        if (m->user_id == user_id && m->next_review <= now && m->sm2_status != SM2_NEW) {
+    for (size_t i = 0; i < db->mastery_due_sorted_count && count < max_count; i++) {
+        uint32_t m_idx = db->mastery_due_sorted[i];
+        user_vocab_mastery_t *m = &db->mastery[m_idx];
+        
+        /* 按 next_review 排序，遇到未来时间直接退出 */
+        if (m->next_review > now) break;
+        
+        if (m->user_id == user_id && m->sm2_status != SM2_NEW) {
             out_ids[count++] = m->vocab_id;
         }
     }
@@ -859,12 +1094,11 @@ daily_stat_t* wc_get_or_create_daily_stat(wordcard_db_t *db,
     if (!db) return NULL;
     
     LOCK();
-    /* 线性查找，通常数据量不大 */
-    for (size_t i = 0; i < db->stat_count; i++) {
-        if (db->stats[i].user_id == user_id && db->stats[i].date == date) {
-            UNLOCK();
-            return &db->stats[i];
-        }
+    /* O(1) 哈希查找 */
+    int idx;
+    if (pair_hash_get((pair_hash_t*)db->stat_hash, user_id, date, &idx)) {
+        UNLOCK();
+        return &db->stats[idx];
     }
     
     void *new_arr = ensure_array(db->stats, db->stat_count, 
@@ -876,6 +1110,8 @@ daily_stat_t* wc_get_or_create_daily_stat(wordcard_db_t *db,
     memset(s, 0, sizeof(daily_stat_t));
     s->user_id = user_id;
     s->date = date;
+    
+    pair_hash_set((pair_hash_t*)db->stat_hash, user_id, date, (int)db->stat_count);
     db->stat_count++;
     
     wc_mark_dirty(db);
@@ -907,8 +1143,12 @@ void wc_record_activity(wordcard_db_t *db, uint32_t user_id,
 }
 
 /* ========================================================================
- * 工具函数
+ * 通知与工具函数
  * ======================================================================== */
+
+void wc_notify_mastery_changed(wordcard_db_t *db) {
+    if (db) db->mastery_due_dirty = 1;
+}
 
 uint32_t wc_now(void) {
     return (uint32_t)time(NULL);
@@ -923,5 +1163,5 @@ uint32_t wc_today(void) {
 }
 
 const char* wc_version_string(void) {
-    return "WordCard DB v2.0.0";
+    return "WordCard DB v2.0.1";
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-文章导入工具
+文章导入工具 v2
 读取 res/*.txt → 调用 llm.py 生成翻译和词汇表 → 写入 C 数据库
 """
 import os
@@ -40,20 +40,37 @@ STOP_WORDS = {
 
 def extract_words(text: str) -> dict:
     """从文本中提取单词和频率"""
-    # 转为小写，只保留字母
     words = re.findall(r'\b[a-zA-Z]+\b', text.lower())
     
     freq = {}
     for w in words:
-        # 过滤停用词和短词
         if w in STOP_WORDS or len(w) < 3:
             continue
-        # 过滤纯数字
         if w.isdigit():
             continue
         freq[w] = freq.get(w, 0) + 1
     
     return freq
+
+
+def parse_llm_vocab(vocab_text: str) -> list:
+    """解析 LLM 输出的词汇表
+    格式：1. word|中文释义
+    """
+    vocab = []
+    for line in vocab_text.strip().split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        # 移除数字前缀如 "1."
+        line = re.sub(r'^\d+\.\s*', '', line)
+        if '|' in line:
+            parts = line.split('|', 1)
+            word = parts[0].strip()
+            meaning = parts[1].strip()
+            if word and meaning:
+                vocab.append((word, meaning))
+    return vocab
 
 
 def import_article(file_path: str, db_path: str = "data/wordcard.db"):
@@ -70,66 +87,65 @@ def import_article(file_path: str, db_path: str = "data/wordcard.db"):
     print(f"Importing: {title}")
     print(f"Content length: {len(content)} chars")
     
-    # 提取高频词汇
-    word_freq = extract_words(content)
-    top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:50]
+    # 先创建 content_source_t 记录
+    from api import ContentSource, ctypes
+    source = ContentSource()
+    source.type = 3  # SOURCE_ARTICLE
+    source.name = title.encode('utf-8')[:127]
+    source.file_path = file_path.encode('utf-8')[:255]
+    source.created_at = int(os.path.getmtime(file_path)) if os.path.exists(file_path) else 0
     
-    print(f"Found {len(word_freq)} unique words, top {len(top_words)} selected")
+    source_id = db._db and ctypes.CDLL(str(Path(__file__).parent / "src" / "libwordcard.so")).wc_add_source(db._db, ctypes.byref(source))
+    if not source_id:
+        # 如果创建失败（比如 lib 还没加载），尝试用 api.py 的 add_vocab 的 source_id 参数
+        source_id = 0
     
-    # 调用 llm.py 生成翻译（复用现有功能）
-    # 注意：llm.py 需要 llama.cpp 服务运行
-    print("Calling LLM for translation...")
+    # 调用 LLM 生成翻译和词汇
+    llm_vocab = []
     try:
-        # 简化：直接使用 llm.py 的生成逻辑
-        # 这里我们手动构造提示词，模拟 llm.py 的行为
-        prompt = f"""请翻译以下英文文章，并提取核心词汇：
-
-标题: {title}
-
-内容:
-{content[:2000]}  # 限制长度避免超出上下文
-
-请按以下格式输出：
-1. 中文翻译（简洁）
-2. 核心词汇表（最多30个，格式：word|中文释义）
-"""
-        
-        # 由于没有运行 llama-server，我们先使用简单翻译
-        # 实际使用时应该调用 llm.generate_content()
-        print("Note: llm.py requires llama-server running. Using placeholder translations.")
-        
+        print("Calling LLM for translation...")
+        raw = llm.generate_content(content)
+        if raw:
+            sections = llm.parse_content(raw)
+            vocab_text = sections.get('vocabulary', '')
+            if isinstance(vocab_text, list):
+                vocab_text = '\n'.join(vocab_text)
+            llm_vocab = parse_llm_vocab(vocab_text)
+            print(f"  LLM returned {len(llm_vocab)} vocabulary items")
+        else:
+            print("  LLM returned empty result, falling back to frequency extraction")
     except Exception as e:
-        print(f"LLM translation failed: {e}")
-        print("Using basic import without LLM translation...")
+        print(f"  LLM call failed: {e}")
+        print("  Falling back to frequency extraction...")
     
-    # 导入词汇（简化版：使用占位释义）
-    # TODO: 应调用 wc_add_source() 创建真正的 content_source_t 记录
-    source_id = 0  # 临时使用 0，表示无特定来源
+    # 如果没有 LLM 结果，回退到频率提取
+    if not llm_vocab:
+        word_freq = extract_words(content)
+        top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:30]
+        llm_vocab = [(w, f"[auto] freq={f}") for w, f in top_words]
     
     imported = 0
-    for word, freq in top_words[:30]:  # 最多30个词
+    for word, meaning in llm_vocab[:30]:  # 最多30个词
         # 检查是否已存在
         existing = db.find_vocab(word=word)
         if existing:
             print(f"  Skip existing: {word}")
             continue
         
-        # 添加词汇（占位释义，实际应调用 LLM）
         vid = db.add_vocab(
             word=word,
-            meaning=f"[待翻译] freq={freq}",  # 占位
+            meaning=meaning,
             phonetic="",
             pos="",
             example="",
             example_cn="",
-            difficulty=2 if freq > 5 else 3,
+            difficulty=2,
             source_id=source_id
         )
         if vid > 0:
             imported += 1
-            print(f"  Added: {word} (freq={freq})")
+            print(f"  Added: {word} -> {meaning[:40]}")
     
-    # 保存数据库
     db.save()
     print(f"\nImport complete: {imported} words added")
     print(f"Database saved to: {db_path}")
@@ -168,7 +184,6 @@ if __name__ == "__main__":
         for f in args.files:
             import_article(f, args.db)
     else:
-        # 默认导入 res/solar_system.txt（如果存在）
         test_file = "res/solar_system.txt"
         if os.path.exists(test_file):
             import_article(test_file, args.db)

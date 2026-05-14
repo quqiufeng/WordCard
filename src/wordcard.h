@@ -239,7 +239,14 @@ typedef struct {
     void *id_hash;                  /* vocab_id → vocab_index */
     void *source_hash;              /* source_id → source_index */
     void *user_hash;                /* dingtalk_uid → user_index */
+    void *user_id_hash;             /* user_id → user_index (O(1) 用户ID查找) */
     void *mastery_hash;             /* (user_id,vocab_id) → mastery_index */
+    void *stat_hash;                /* (user_id,date) → stat_index (O(1) 统计查找) */
+    
+    /* ====== 到期复习索引（惰性重建）====== */
+    uint32_t *mastery_due_sorted;   /* 按 next_review 排序的 mastery 索引数组 */
+    size_t mastery_due_sorted_count;/* 已排序记录数 */
+    int mastery_due_dirty;          /* 1 = 需要重建排序 */
     
     /* ====== 异步保存状态 ====== */
     int dirty;                      /* 数据是否被修改 */
@@ -334,6 +341,24 @@ user_t* wc_find_user(wordcard_db_t *db, const char *dingtalk_uid);
  * 根据内部ID查找用户
  */
 user_t* wc_find_user_by_id(wordcard_db_t *db, uint32_t user_id);
+
+/* -------- 载体/内容源操作 -------- */
+
+/**
+ * 添加内容载体
+ * @return 新载体ID，失败返回 0
+ */
+uint32_t wc_add_source(wordcard_db_t *db, const content_source_t *source);
+
+/**
+ * 根据ID查找载体
+ */
+content_source_t* wc_find_source_by_id(wordcard_db_t *db, uint32_t source_id);
+
+/**
+ * 根据名称查找载体
+ */
+content_source_t* wc_find_source_by_name(wordcard_db_t *db, const char *name);
 
 /* -------- 掌握度操作 -------- */
 
@@ -442,6 +467,11 @@ uint32_t wc_now(void);
  * 获取今日日期（YYYYMMDD）
  */
 uint32_t wc_today(void);
+
+/**
+ * 通知掌握度数据已变更，触发到期索引重建
+ */
+void wc_notify_mastery_changed(wordcard_db_t *db);
 
 /**
  * 返回版本号字符串

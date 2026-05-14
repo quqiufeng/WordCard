@@ -210,6 +210,99 @@ TEST(recommend_mode) {
     wc_db_free(wc_db_init());
 }
 
+/* -------- 测试 8: 载体操作 -------- */
+
+TEST(source_api) {
+    wordcard_db_t *db = wc_db_init();
+    
+    content_source_t s = {0};
+    strcpy(s.name, "CET-4");
+    s.type = SOURCE_WORDLIST;
+    
+    uint32_t sid = wc_add_source(db, &s);
+    ASSERT(sid > 0);
+    ASSERT(db->source_count == 1);
+    
+    content_source_t *found = wc_find_source_by_id(db, sid);
+    ASSERT(found != NULL);
+    ASSERT(strcmp(found->name, "CET-4") == 0);
+    
+    content_source_t *found2 = wc_find_source_by_name(db, "CET-4");
+    ASSERT(found2 == found);
+    
+    /* 重复添加应返回 0 */
+    uint32_t sid2 = wc_add_source(db, &s);
+    ASSERT(sid2 == 0);
+    
+    wc_db_free(db);
+}
+
+/* -------- 测试 9: O(1) 用户ID查找 -------- */
+
+TEST(user_id_hash) {
+    wordcard_db_t *db = wc_db_init();
+    
+    uint32_t uid = wc_create_user(db, "ding456", "HashTest");
+    ASSERT(uid > 0);
+    
+    /* wc_find_user_by_id 应使用哈希，O(1) */
+    user_t *u = wc_find_user_by_id(db, uid);
+    ASSERT(u != NULL);
+    ASSERT(strcmp(u->name, "HashTest") == 0);
+    
+    /* 不存在的用户 */
+    user_t *u2 = wc_find_user_by_id(db, 99999);
+    ASSERT(u2 == NULL);
+    
+    wc_db_free(db);
+}
+
+/* -------- 测试 10: 到期复习索引 -------- */
+
+TEST(due_words_index) {
+    wordcard_db_t *db = wc_db_init();
+    
+    /* 创建用户 */
+    uint32_t uid = wc_create_user(db, "due_test", "DueTest");
+    ASSERT(uid > 0);
+    
+    /* 添加单词 */
+    vocab_entry_t v = {0};
+    strcpy(v.word, "apple");
+    strcpy(v.meaning, "苹果");
+    uint32_t vid = wc_add_vocab(db, &v);
+    ASSERT(vid > 0);
+    
+    /* 创建掌握度记录并模拟学习 */
+    user_vocab_mastery_t *m = wc_get_or_create_mastery(db, uid, vid);
+    ASSERT(m != NULL);
+    
+    /* 第一次学习，rating=4 -> next_review 设为 1 天后 */
+    wc_sm2_update(m, 4);
+    wc_notify_mastery_changed(db);
+    
+    uint32_t now = wc_now();
+    uint32_t ids[10];
+    
+    /* 现在不应该到期 */
+    size_t count = wc_get_due_words(db, uid, now, ids, 10);
+    ASSERT(count == 0);
+    
+    /* 模拟 2 天后，应该到期 */
+    uint32_t future = now + 2 * 86400;
+    count = wc_get_due_words(db, uid, future, ids, 10);
+    ASSERT(count == 1);
+    ASSERT(ids[0] == vid);
+    
+    /* 复习后，再次不应到期 */
+    wc_sm2_update(m, 5);
+    wc_notify_mastery_changed(db);
+    count = wc_get_due_words(db, uid, future, ids, 10);
+    ASSERT(count == 0);
+    
+    wc_db_free(db);
+}
+
 /* ========================================================================
  * 主函数
  * ======================================================================== */
@@ -224,6 +317,9 @@ int main(void) {
     RUN(mastery_dimensions);
     RUN(db_save_load);
     RUN(recommend_mode);
+    RUN(source_api);
+    RUN(user_id_hash);
+    RUN(due_words_index);
     
     printf("\n===========================\n");
     printf("Passed: %d\n", tests_passed);
