@@ -214,3 +214,8 @@ data/
 src/*.o
 src/*.so
 src/test_sm2
+
+# Generated vocab exports (re-importable from source ebooks)
+output/*.json
+output/*.txt
+output/*.pdf

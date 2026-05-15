@@ -447,6 +447,14 @@ pip install fastapi uvicorn pydantic pillow fpdf requests
 
 # C 编译环境（gcc + make）
 sudo apt-get install build-essential cmake
+
+# C++ wrapper 编译依赖（libmobi + mupdf）
+sudo apt-get install -y \
+  autoconf automake libtool pkg-config \
+  libxml2-dev zlib1g-dev \
+  liblcms2-dev libjpeg-dev libopenjp2-7-dev \
+  libjbig2dec0-dev libpng-dev libfreetype6-dev \
+  libharfbuzz-dev libmujs-dev
 ```
 
 ### 2. 编译 llama.cpp（GPU 加速版，可选）
@@ -475,7 +483,97 @@ chmod +x build_llama_cpp.sh
 - 命令行工具：`llama-cli`
 - 多模态工具：`llama-llava-cli`
 
-### 3. 下载模型（可选）
+### 3. 编译电子书解析库（C++ Wrapper → .so）
+
+WordCard 集成了 **libmobi**（MOBI/AZW3）和 **MuPDF**（PDF/EPUB），通过 C++ Wrapper 编译为共享库，Python 通过 ctypes FFI 调用。
+
+**架构设计**：与 `voice/` 模块一致（SenseVoice/Piper wrapper 模式）
+
+```
+ebook file (.mobi/.azw3/.pdf/.epub)
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│  C++ Wrapper（importer/wrappers/）        │
+│  · mobi_wrapper.cpp → libmobiparse.so   │
+│  · pdf_wrapper.cpp  → libpdfparse.so    │
+│  extern "C" 暴露接口，供 Python ctypes 调用 │
+└────────────────────┬────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────┐
+│  Python FFI（importer/__init__.py）       │
+│  · MobiParser() / PdfParser()           │
+│  · parse_mobi() / parse_pdf()           │
+│  · 上下文管理器 with ... as parser      │
+└─────────────────────────────────────────┘
+```
+
+**源码位置**：
+- `libmobi` → `/opt/libmobi`（GitHub: `bfabiszewski/libmobi`）
+- `MuPDF` → `/opt/mupdf`（GitHub: `ArtifexSoftware/mupdf`）
+
+**编译步骤**：
+
+```bash
+# 1. 安装编译依赖（已在上方系统依赖中包含）
+# 2. 编译 libmobi（静态库）
+cd /opt/libmobi
+./autogen.sh && ./configure && make -j$(nproc)
+
+# 3. 编译 MuPDF（静态库，需 -fPIC 以链接到 .so）
+cd /opt/mupdf
+# 关键子模块：thirdparty/lcms2, thirdparty/openjpeg, thirdparty/mujs
+git submodule update --init thirdparty/lcms2 thirdparty/openjpeg thirdparty/mujs
+make XCFLAGS="-fPIC" -j$(nproc) libs
+
+# 4. 编译 Wrapper → .so
+cd /opt/WordCard/importer/wrappers
+make clean && make -j$(nproc)
+
+# 输出：
+#   importer/libs/libmobiparse.so  (MOBI/AZW3)
+#   importer/libs/libpdfparse.so   (PDF/EPUB)
+```
+
+**Python 调用**：
+
+```python
+from importer import parse_mobi, parse_pdf, parse_epub
+
+# MOBI / AZW3
+result = parse_mobi("book.azw3")
+print(result["title"], result["author"])
+print(result["text"][:500])
+
+# PDF
+result = parse_pdf("doc.pdf")
+print(f"Pages: {result['page_count']}")
+print(result["text"][:500])
+
+# EPUB（复用 MuPDF 解析能力）
+result = parse_epub("book.epub")
+print(f"Pages: {result['page_count']}")
+print(result["text"][:500])
+```
+
+**已验证支持的格式**：
+
+| 格式 | 扩展名 | 解析库 | 状态 |
+|------|--------|--------|------|
+| MOBI | `.mobi` | libmobi | ✅ |
+| AZW3 | `.azw3` | libmobi | ✅ |
+| PDF | `.pdf` | MuPDF | ✅ |
+| EPUB | `.epub` | MuPDF | ✅ |
+
+**迁移特性**：
+- `.db` 数据库文件是单一自包含二进制（结构体直写，无指针，无外部依赖）
+- `libmobiparse.so` 和 `libpdfparse.so` 已静态链接原生库，运行时无需源码
+- 复制 `data/wordcard.db` + `importer/libs/*.so` 到新服务器即可直接使用
+
+
+
+### 4. 下载模型（可选）
 
 ```bash
 # 下载 Qwen3-8B 模型（约 5.5GB）
