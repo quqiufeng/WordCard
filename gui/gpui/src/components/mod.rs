@@ -1,0 +1,1630 @@
+use gpui::{
+    div, px, rgb, AnyElement, App, FontWeight, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, StyleRefinement, Window,
+};
+use gpui::prelude::FluentBuilder as _;
+use gpui_component::{h_flex, v_flex};
+
+/// UI font stack for Chinese/Latin mixed text.
+pub fn ui_font() -> &'static str {
+    "Noto Sans CJK SC, Source Han Sans SC, WenQuanYi Micro Hei, \
+     PingFang SC, Microsoft YaHei, sans-serif"
+}
+
+pub fn mono_font() -> &'static str {
+    "Noto Sans Mono CJK SC, Source Han Mono SC, \
+     WenQuanYi Micro Hei Mono, monospace"
+}
+
+/* =========================================================================
+ * WordCard — 英语单词专用卡片（音标/词性/释义/例句完整展示）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct WordCard {
+    pub word: SharedString,
+    pub phonetic: SharedString,
+    pub part_of_speech: SharedString,
+    pub definition_cn: SharedString,
+    pub definition_en: SharedString,
+    pub example_sentence: SharedString,
+    pub example_cn: SharedString,
+    pub flipped: bool,
+    pub difficulty: u8,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl WordCard {
+    pub fn new(word: impl Into<SharedString>) -> Self {
+        Self {
+            word: word.into(),
+            phonetic: SharedString::default(),
+            part_of_speech: SharedString::default(),
+            definition_cn: SharedString::default(),
+            definition_en: SharedString::default(),
+            example_sentence: SharedString::default(),
+            example_cn: SharedString::default(),
+            flipped: false,
+            difficulty: 1,
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+    pub fn phonetic(mut self, s: impl Into<SharedString>) -> Self { self.phonetic = s.into(); self }
+    pub fn pos(mut self, s: impl Into<SharedString>) -> Self { self.part_of_speech = s.into(); self }
+    pub fn cn(mut self, s: impl Into<SharedString>) -> Self { self.definition_cn = s.into(); self }
+    pub fn en(mut self, s: impl Into<SharedString>) -> Self { self.definition_en = s.into(); self }
+    pub fn example(mut self, en: impl Into<SharedString>, cn: impl Into<SharedString>) -> Self {
+        self.example_sentence = en.into(); self.example_cn = cn.into(); self
+    }
+    pub fn flipped(mut self, v: bool) -> Self { self.flipped = v; self }
+    pub fn difficulty(mut self, d: u8) -> Self { self.difficulty = d; self }
+}
+
+impl RenderOnce for WordCard {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let accent = rgb(0x6c5ce7);
+        let text_main = rgb(0x2d3436);
+        let text_secondary = rgb(0xb2bec3);
+        let text_hint = rgb(0xdfe6e9);
+        let card_bg = rgb(0xffffff);
+        let border = rgb(0xe0e0e0);
+        let diff_color = match self.difficulty {
+            1 => rgb(0x00b894),
+            2 => rgb(0xfdcb6e),
+            3 => rgb(0xe17055),
+            _ => rgb(0xe17055),
+        };
+
+        let front = div()
+            .p_6()
+            .child(
+                // Word + phonetic
+                div()
+                    .child(
+                        div()
+                            .text_3xl()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(text_main)
+                            .font_family(ui_font())
+                            .child(self.word.clone()),
+                    )
+                    .child(
+                        div()
+                            .mt_2()
+                            .text_lg()
+                            .text_color(accent)
+                            .font_family(ui_font())
+                            .child(format!("/{}/", self.phonetic)),
+                    ),
+            )
+            .child(
+                // Part of speech + difficulty
+                div()
+                    .mt_4()
+                    .child(
+                        div()
+                    .px_2()
+                            .py(px(2.0))
+                            .rounded_sm()
+                            .bg(rgb(0xf0f0f3))
+                            .text_sm()
+                            .text_color(diff_color)
+                            .font_family(ui_font())
+                            .child(self.part_of_speech.clone()),
+                    )
+                    .child(
+                        div()
+                            .ml_2()
+                    .px_2()
+                            .py(px(2.0))
+                            .rounded_sm()
+                            .bg(rgb(0xf0f0f3))
+                            .text_sm()
+                            .text_color(text_hint)
+                            .font_family(ui_font())
+                            .child(format!("Level {}", self.difficulty)),
+                    ),
+            );
+
+        let back = div()
+            .p_6()
+            .child(
+                // Chinese definition
+                div()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(text_hint)
+                            .font_family(ui_font())
+                            .child("中文释义"),
+                    )
+                    .child(
+                        div()
+                            .mt_1()
+                            .text_xl()
+                            .text_color(text_main)
+                            .font_family(ui_font())
+                            .child(self.definition_cn.clone()),
+                    ),
+            )
+            .child(
+                // English definition
+                div()
+                    .mt_4()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(text_hint)
+                            .font_family(ui_font())
+                            .child("English Definition"),
+                    )
+                    .child(
+                        div()
+                            .mt_1()
+                            .text_base()
+                            .text_color(text_secondary)
+                            .font_family(ui_font())
+                            .child(self.definition_en.clone()),
+                    ),
+            )
+            .child(
+                // Example sentence
+                div()
+                    .mt_4()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(text_hint)
+                            .font_family(ui_font())
+                            .child("Example"),
+                    )
+                    .child(
+                        div()
+                            .mt_1()
+                            .text_base()
+                            .text_color(text_secondary)
+                            .font_family(ui_font())
+                            .child(self.example_sentence.clone()),
+                    )
+                    .child(
+                        div()
+                            .mt_1()
+                            .text_base()
+                            .text_color(text_hint)
+                            .font_family(ui_font())
+                            .child(self.example_cn.clone()),
+                    ),
+            );
+
+        div()
+            .w_full()
+            .rounded_xl()
+            .bg(card_bg)
+            .border_1()
+            .border_color(border)
+            .child(if self.flipped { back } else { front })
+    }
+}
+
+/* =========================================================================
+ * FlashCard — 通用卡片正/反面（简单版）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct FlashCard {
+    pub question: SharedString,
+    pub answer: SharedString,
+    pub flipped: bool,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl FlashCard {
+    pub fn new(question: impl Into<SharedString>, answer: impl Into<SharedString>) -> Self {
+        Self {
+            question: question.into(),
+            answer: answer.into(),
+            flipped: false,
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+    pub fn flipped(mut self, v: bool) -> Self { self.flipped = v; self }
+}
+
+impl RenderOnce for FlashCard {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let card_bg = rgb(0xffffff);
+        let text_main = rgb(0x2d3436);
+        let text_hint = rgb(0xb2bec3);
+        let border = rgb(0xe0e0e0);
+        div()
+            .w_full()
+            .p_6()
+            .rounded_xl()
+            .bg(card_bg)
+            .border_1()
+            .border_color(border)
+            .child(
+                div()
+                    .text_color(text_main)
+                    .text_2xl()
+                    .font_family(ui_font())
+                    .child(if self.flipped { self.answer.clone() } else { self.question.clone() }),
+            )
+            .child(
+                div()
+                    .mt_4()
+                    .text_color(text_hint)
+                    .text_sm()
+                    .font_family(ui_font())
+                    .child(if self.flipped { "Tap to flip back" } else { "Tap to reveal answer" }),
+            )
+    }
+}
+
+/* =========================================================================
+ * ChoiceQuiz — 选择题模式（四选一）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct ChoiceQuiz {
+    pub question: SharedString,
+    pub options: Vec<SharedString>,
+    pub selected: Option<usize>,
+    pub correct_index: usize,
+    pub revealed: bool,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl ChoiceQuiz {
+    pub fn new(question: impl Into<SharedString>) -> Self {
+        Self {
+            question: question.into(),
+            options: Vec::new(),
+            selected: None,
+            correct_index: 0,
+            revealed: false,
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+    pub fn option(mut self, s: impl Into<SharedString>) -> Self { self.options.push(s.into()); self }
+    pub fn correct(mut self, idx: usize) -> Self { self.correct_index = idx; self }
+    pub fn selected(mut self, idx: Option<usize>) -> Self { self.selected = idx; self }
+    pub fn revealed(mut self, v: bool) -> Self { self.revealed = v; self }
+}
+
+impl RenderOnce for ChoiceQuiz {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_4()
+            .child(
+                div()
+                    .text_base()
+                    .text_color(rgb(0x2d3436))
+                    .font_family(ui_font())
+                    .child(self.question.clone()),
+            )
+            .children(self.options.into_iter().enumerate().map(|(i, opt)| {
+                let is_correct = i == self.correct_index;
+                let is_selected = self.selected == Some(i);
+                let (bg, border_color, text_color) = if self.revealed && is_correct {
+                    (rgb(0xe8f8f5), rgb(0x00b894), rgb(0x55efc4))
+                } else if self.revealed && is_selected && !is_correct {
+                    (rgb(0xfde8e8), rgb(0xe17055), rgb(0xfab1a0))
+                } else if is_selected {
+                    (rgb(0xeef0ff), rgb(0x6c5ce7), rgb(0x80d0ff))
+                } else {
+                    (rgb(0xffffff), rgb(0xe0e0e0), rgb(0x636e72))
+                };
+                div()
+                    .mt_2()
+                    .px_4()
+                    .py_3()
+                    .rounded_md()
+                    .bg(bg)
+                    .border_1()
+                    .border_color(border_color)
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(text_color)
+                            .font_family(ui_font())
+                            .child(format!("{}. {}", (b'A' + i as u8) as char, opt)),
+                    )
+                    .into_any_element()
+            }))
+    }
+}
+
+/* =========================================================================
+ * FillBlank — 填空模式（句子中缺词）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct FillBlank {
+    pub sentence_before: SharedString,
+    pub blank_word: SharedString,
+    pub sentence_after: SharedString,
+    pub input_text: SharedString,
+    pub revealed: bool,
+    pub correct: bool,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl FillBlank {
+    pub fn new() -> Self {
+        Self {
+            sentence_before: SharedString::default(),
+            blank_word: SharedString::default(),
+            sentence_after: SharedString::default(),
+            input_text: SharedString::default(),
+            revealed: false,
+            correct: false,
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl RenderOnce for FillBlank {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let blank_color = if self.revealed {
+            if self.correct { rgb(0x55efc4) } else { rgb(0xfab1a0) }
+        } else {
+            rgb(0xfdcb6e)
+        };
+        div()
+            .p_4()
+            .child(
+                div()
+                    .text_base()
+                    .text_color(rgb(0x2d3436))
+                    .font_family(ui_font())
+                    .child(self.sentence_before.clone()),
+            )
+            .child(
+                div()
+                    .px_3()
+                    .py_1()
+                    .mx_1()
+                    .rounded_md()
+                    .bg(rgb(0xf0f0f3))
+                    .border_1()
+                    .border_color(blank_color)
+                    .text_base()
+                    .text_color(blank_color)
+                    .font_weight(FontWeight::BOLD)
+                    .font_family(ui_font())
+                    .child(if self.revealed { self.blank_word.clone() } else { SharedString::from("______") }),
+            )
+            .child(
+                div()
+                    .text_base()
+                    .text_color(rgb(0x2d3436))
+                    .font_family(ui_font())
+                    .child(self.sentence_after.clone()),
+            )
+            .child(
+                div()
+                    .mt_3()
+                    .text_sm()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .child(if self.revealed {
+                        if self.correct { SharedString::from("✓ Correct!") } else { SharedString::from(format!("✗ Answer: {}", self.blank_word)) }
+                    } else {
+                        SharedString::from("Type the missing word below")
+                    }),
+            )
+    }
+}
+
+/* =========================================================================
+ * MatchingGame — 配对模式（左右两列匹配）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct MatchingGame {
+    pub left_items: Vec<MatchingItem>,
+    pub right_items: Vec<MatchingItem>,
+    pub connections: Vec<(usize, usize)>,
+    pub selected_left: Option<usize>,
+    pub all_revealed: bool,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+pub struct MatchingItem {
+    pub id: usize,
+    pub text: SharedString,
+}
+
+impl MatchingGame {
+    pub fn new() -> Self {
+        Self {
+            left_items: Vec::new(),
+            right_items: Vec::new(),
+            connections: Vec::new(),
+            selected_left: None,
+            all_revealed: false,
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl RenderOnce for MatchingGame {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let max_rows = self.left_items.len().max(self.right_items.len());
+        div()
+            .p_4()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .mb_3()
+                    .child("Match each item on the left with its pair on the right"),
+            )
+            .children((0..max_rows).map(|i| {
+                let left = self.left_items.get(i);
+                let right = self.right_items.get(i);
+                let left_bg = if self.selected_left == left.map(|l| l.id) {
+                    rgb(0x1a3a3a)
+                } else {
+                    rgb(0xffffff)
+                };
+                let left_border = if self.selected_left == left.map(|l| l.id) {
+                    rgb(0x00b894)
+                } else {
+                    rgb(0xe0e0e0)
+                };
+                h_flex()
+                    .w_full()
+                    .mt_2()
+                    .child(
+                        div()
+                            .flex_1()
+                            .px_3()
+                            .py_2()
+                            .rounded_md()
+                            .bg(left_bg)
+                            .border_1()
+                            .border_color(left_border)
+                            .text_base()
+                            .text_color(rgb(0x2d3436))
+                            .font_family(ui_font())
+                            .child(left.map(|l| l.text.clone()).unwrap_or_default()),
+                    )
+                    .child(
+                        div()
+                            .px_3()
+                            .text_color(rgb(0xdfe6e9))
+                            .font_family(ui_font())
+                            .child("⟷"),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .px_3()
+                            .py_2()
+                            .rounded_md()
+                            .bg(rgb(0xffffff))
+                            .border_1()
+                            .border_color(rgb(0xe0e0e0))
+                            .text_base()
+                            .text_color(rgb(0x2d3436))
+                            .font_family(ui_font())
+                            .child(right.map(|r| r.text.clone()).unwrap_or_default()),
+                    )
+                    .into_any_element()
+            }))
+    }
+}
+
+/* =========================================================================
+ * SpellingPractice — 拼写练习（看释义/音标写单词）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct SpellingPractice {
+    pub definition_cn: SharedString,
+    pub phonetic: SharedString,
+    pub word_length: usize,
+    pub input: SharedString,
+    pub revealed: bool,
+    pub correct_word: SharedString,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl SpellingPractice {
+    pub fn new() -> Self {
+        Self {
+            definition_cn: SharedString::default(),
+            phonetic: SharedString::default(),
+            word_length: 0,
+            input: SharedString::default(),
+            revealed: false,
+            correct_word: SharedString::default(),
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl RenderOnce for SpellingPractice {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let word_hint = if self.word_length > 0 {
+            format!("({} letters)", self.word_length)
+        } else {
+            String::new()
+        };
+        div()
+            .p_4()
+            .child(
+                div()
+                    .text_xl()
+                    .text_color(rgb(0x2d3436))
+                    .font_family(ui_font())
+                    .child(self.definition_cn.clone()),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .text_lg()
+                    .text_color(rgb(0x6c5ce7))
+                    .font_family(ui_font())
+                    .child(format!("/{}/  {}", self.phonetic, word_hint)),
+            )
+            .child(
+                div()
+                    .mt_4()
+                    .px_4()
+                    .py_3()
+                    .bg(rgb(0xf8f9fa))
+                    .rounded_md()
+                    .border_1()
+                    .border_color(if self.revealed { rgb(0x00b894) } else { rgb(0xe0e0e0) })
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(if self.revealed { rgb(0x55efc4) } else { rgb(0xfdcb6e) })
+                            .font_family(mono_font())
+                            .child(if self.revealed { self.correct_word.clone() } else { self.input.clone() }),
+                    ),
+            )
+    }
+}
+
+/* =========================================================================
+ * Dictation — 听写模式（显示音频波形占位 + 输入框）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct DictationView {
+    pub word_hint: SharedString,
+    pub input: SharedString,
+    pub revealed: bool,
+    pub correct_word: SharedString,
+    pub has_audio: bool,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl DictationView {
+    pub fn new() -> Self {
+        Self {
+            word_hint: SharedString::default(),
+            input: SharedString::default(),
+            revealed: false,
+            correct_word: SharedString::default(),
+            has_audio: false,
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl RenderOnce for DictationView {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_4()
+            // Audio play button placeholder
+            .child(
+                div()
+                    .px_4()
+                    .py_3()
+                    .bg(rgb(0xf8f9fa))
+                    .rounded_lg()
+                    .border_1()
+                    .border_color(rgb(0xe0e0e0))
+                    .child(
+                        h_flex()
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_1()
+                                    .rounded_md()
+                                    .bg(rgb(0x6c5ce7))
+                                    .child(
+                                        div()
+                                            .text_base()
+                                            .text_color(rgb(0xffffff))
+                                            .font_family(ui_font())
+                                            .child("▶ Play Audio"),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .ml_3()
+                                    .text_base()
+                                    .text_color(rgb(0xb2bec3))
+                                    .font_family(ui_font())
+                                    .child(self.word_hint.clone()),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .mt_4()
+                    .px_4()
+                    .py_3()
+                    .bg(rgb(0xffffff))
+                    .rounded_md()
+                    .border_1()
+                    .border_color(if self.revealed { rgb(0x00b894) } else { rgb(0xe0e0e0) })
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(if self.revealed { rgb(0x55efc4) } else { rgb(0xfdcb6e) })
+                            .font_family(mono_font())
+                            .child(if self.revealed { self.correct_word.clone() } else { self.input.clone() }),
+                    ),
+            )
+    }
+}
+
+/* =========================================================================
+ * PronunciationGuide — 发音指导（音节拆分 + 重音标记）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct PronunciationGuide {
+    pub word: SharedString,
+    pub syllables: Vec<Syllable>,
+    pub phonetic_full: SharedString,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+pub struct Syllable {
+    pub text: SharedString,
+    pub stressed: bool,
+}
+
+impl PronunciationGuide {
+    pub fn new(word: impl Into<SharedString>) -> Self {
+        Self {
+            word: word.into(),
+            syllables: Vec::new(),
+            phonetic_full: SharedString::default(),
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl RenderOnce for PronunciationGuide {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_4()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .child("Pronunciation"),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .child(
+                        h_flex()
+                            .gap_0()
+                            .children(self.syllables.into_iter().map(|s| {
+                                div()
+                                    .text_2xl()
+                                    .font_weight(if s.stressed { FontWeight::BOLD } else { FontWeight::NORMAL })
+                                    .text_color(if s.stressed { rgb(0x6c5ce7) } else { rgb(0x2d3436) })
+                                    .font_family(ui_font())
+                                    .child(if s.stressed { format!("ˈ{}", s.text) } else { s.text.to_string() })
+                                    .into_any_element()
+                            })),
+                    ),
+            )
+            .child(
+                div()
+                    .mt_1()
+                    .text_base()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .child(format!("/{}/", self.phonetic_full)),
+            )
+    }
+}
+
+/* =========================================================================
+ * SentenceCard — 例句卡片（高亮目标词）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct SentenceCard {
+    pub sentence_en: SharedString,
+    pub sentence_cn: SharedString,
+    pub highlight_word: SharedString,
+    pub source: SharedString,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl SentenceCard {
+    pub fn new() -> Self {
+        Self {
+            sentence_en: SharedString::default(),
+            sentence_cn: SharedString::default(),
+            highlight_word: SharedString::default(),
+            source: SharedString::default(),
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl RenderOnce for SentenceCard {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_4()
+            .bg(rgb(0xf8f9fa))
+            .rounded_lg()
+            .border_1()
+            .border_color(rgb(0xe0e0e0))
+            .child(
+                div()
+                    .text_base()
+                    .text_color(rgb(0x2d3436))
+                    .font_family(ui_font())
+                    .child(self.sentence_en.clone()),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .text_base()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .child(self.sentence_cn.clone()),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .text_sm()
+                    .text_color(rgb(0xdfe6e9))
+                    .font_family(ui_font())
+                    .child(format!("— {}", self.source)),
+            )
+    }
+}
+
+/* =========================================================================
+ * WordListTable — 单词列表（可滚动，显示掌握度）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct WordListTable {
+    pub words: Vec<WordListItem>,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+pub struct WordListItem {
+    pub word: SharedString,
+    pub meaning: SharedString,
+    pub mastery: u8,
+    pub category: SharedString,
+}
+
+impl WordListTable {
+    pub fn new(words: Vec<WordListItem>) -> Self {
+        Self { words, style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for WordListTable {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .children(self.words.into_iter().map(|w| {
+                let mastery_color = if w.mastery >= 80 { rgb(0x00b894) }
+                    else if w.mastery >= 50 { rgb(0xfdcb6e) }
+                    else { rgb(0xff6600) };
+                h_flex()
+                    .w_full()
+                    .px_3()
+                    .py_2()
+                    .border_b_1()
+                    .border_color(rgb(0xf0f0f3))
+                    .child(
+                        div()
+                            .w(px(160.0))
+                            .text_base()
+                            .text_color(rgb(0x2d3436))
+                            .font_family(ui_font())
+                            .child(w.word.clone()),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .text_sm()
+                            .text_color(rgb(0xb2bec3))
+                            .font_family(ui_font())
+                            .child(w.meaning.clone()),
+                    )
+                    .child(
+                        div()
+                            .w(px(60.0))
+                            .text_sm()
+                            .text_color(mastery_color)
+                            .font_family(ui_font())
+                            .child(format!("{}%", w.mastery)),
+                    )
+                    .into_any_element()
+            }))
+    }
+}
+
+/* =========================================================================
+ * DailyGoal — 每日学习目标（环形进度）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct DailyGoal {
+    pub goal: usize,
+    pub done: usize,
+    pub streak: usize,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl DailyGoal {
+    pub fn new(goal: usize, done: usize) -> Self {
+        Self { goal, done, streak: 0, style: StyleRefinement::default(), children: Vec::new() }
+    }
+    pub fn streak(mut self, n: usize) -> Self { self.streak = n; self }
+}
+
+impl RenderOnce for DailyGoal {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let pct = if self.goal > 0 { (self.done as f64 / self.goal as f64 * 100.0) as u32 } else { 0 };
+        div()
+            .p_4()
+            .bg(rgb(0xf8f9fa))
+            .rounded_lg()
+            .child(
+                h_flex()
+                    .child(
+                        div()
+                            .text_3xl()
+                            .text_color(rgb(0x6c5ce7))
+                            .font_family(ui_font())
+                            .font_weight(FontWeight::BOLD)
+                            .child(format!("{}%", pct.min(100))),
+                    )
+                    .child(
+                        div()
+                            .ml_2()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0xb2bec3))
+                                    .font_family(ui_font())
+                                    .child("Daily Goal"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0x636e72))
+                                    .font_family(ui_font())
+                                    .child(format!("{} / {}", self.done, self.goal)),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .w_full()
+                    .h(px(6.0))
+                    .bg(rgb(0xf0f0f3))
+                    .rounded_full()
+                    .child(
+                        div()
+                            .h_full()
+                            .w(px((pct.min(100) as f32) * 2.5))
+                            .bg(rgb(0x6c5ce7))
+                            .rounded_full(),
+                    ),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .text_sm()
+                    .text_color(rgb(0x00b894))
+                    .font_family(ui_font())
+                    .child(format!("🔥 {} day streak", self.streak)),
+            )
+    }
+}
+
+/* =========================================================================
+ * HeatmapCalendar — 学习热力图（GitHub 风格）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct HeatmapCalendar {
+    pub daily_counts: Vec<(String, usize)>,  // (date_YYYYMMDD, count)
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl HeatmapCalendar {
+    pub fn new(daily_counts: Vec<(String, usize)>) -> Self {
+        Self { daily_counts, style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for HeatmapCalendar {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_3()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .mb_2()
+                    .child("Study Activity (last 30 days)"),
+            )
+            .child(
+                h_flex()
+                    .gap(px(3.0))
+                    .children(self.daily_counts.into_iter().map(|(_, count)| {
+                        let color = if count == 0 { rgb(0xf5f6fa) }
+                            else if count <= 3 { rgb(0x0e442e) }
+                            else if count <= 8 { rgb(0x006d32) }
+                            else if count <= 15 { rgb(0x26a641) }
+                            else { rgb(0x39d353) };
+                        div()
+                            .w(px(12.0))
+                            .h(px(12.0))
+                            .rounded_sm()
+                            .bg(color)
+                            .into_any_element()
+                    })),
+            )
+    }
+}
+
+/* =========================================================================
+ * CategoryBadge — 内容类别标签
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct CategoryBadge {
+    pub category: SharedString,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl CategoryBadge {
+    pub fn new(category: impl Into<SharedString>) -> Self {
+        Self { category: category.into(), style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for CategoryBadge {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let cat_str = self.category.to_string();
+        let (bg, color, label) = match cat_str.as_str() {
+            "english" | "ENGLISH_VOCAB" => (rgb(0xeef0ff), rgb(0x6c5ce7), "English".to_string()),
+            "legal" | "LEGAL_LAW" => (rgb(0xfde8e8), rgb(0xe17055), "Law".to_string()),
+            "ielts" | "IELTS_SPEAKING" | "IELTS_WRITING" => (rgb(0xf5eef8), rgb(0xa29bfe), "IELTS".to_string()),
+            "gre" | "GRE_VERBAL" | "GRE_QUANT" => (rgb(0xf8f5ee), rgb(0xfdcb6e), "GRE".to_string()),
+            "medical" | "MEDICAL_TERM" => (rgb(0xeef8f5), rgb(0x00b894), "Medical".to_string()),
+            "cpa" | "CPA" => (rgb(0xf8f5ee), rgb(0xe17055), "CPA".to_string()),
+            _ => (rgb(0xf0f0f3), rgb(0x636e72), cat_str),
+        };
+        div()
+            .px_2()
+            .py(px(2.0))
+            .rounded_sm()
+            .bg(bg)
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(color)
+                    .font_family(ui_font())
+                    .child(label),
+            )
+    }
+}
+
+/* =========================================================================
+ * TagGroup — 标签组
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct TagGroup {
+    pub tags: Vec<SharedString>,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl TagGroup {
+    pub fn new(tags: Vec<SharedString>) -> Self {
+        Self { tags, style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for TagGroup {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        h_flex()
+            .gap(px(4.0))
+            .children(self.tags.into_iter().map(|tag| {
+                div()
+                    .px_2()
+                    .py(px(1.0))
+                    .rounded_sm()
+                    .bg(rgb(0xf0f0f3))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(rgb(0xb2bec3))
+                            .font_family(ui_font())
+                            .child(tag),
+                    )
+                    .into_any_element()
+            }))
+    }
+}
+
+/* =========================================================================
+ * ModeSelector — 学习模式选择面板
+ * ========================================================================= */
+
+pub struct ModeButton {
+    pub id: u8,
+    pub label: &'static str,
+    pub icon: &'static str,
+    pub active: bool,
+}
+
+#[derive(IntoElement)]
+pub struct ModeSelector {
+    pub modes: Vec<ModeButton>,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl ModeSelector {
+    pub fn new(modes: Vec<ModeButton>) -> Self {
+        Self { modes, style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for ModeSelector {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_3()
+            .bg(rgb(0xf5f6fa))
+            .border_1()
+            .border_color(rgb(0xe0e0e0))
+            .rounded_lg()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .mb_2()
+                    .child("Study Mode"),
+            )
+            .children(self.modes.into_iter().map(|m| {
+                let is_active = m.active;
+                div()
+                    .px_3()
+                    .py_2()
+                    .mb_1()
+                    .rounded_md()
+                    .bg(if is_active { rgb(0x6c5ce7) } else { rgb(0xf0f0f3) })
+                    .cursor_pointer()
+                    .child(
+                        div()
+                            .text_color(if is_active { rgb(0xffffff) } else { rgb(0xb2bec3) })
+                            .text_base()
+                            .font_family(ui_font())
+                            .child(format!("{}  {}", m.icon, m.label)),
+                    )
+                    .into_any_element()
+            }))
+    }
+}
+
+/* =========================================================================
+ * ReviewQueue — 今日复习队列
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct ReviewQueue {
+    pub total: usize,
+    pub done: usize,
+    pub due: Vec<SharedString>,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl ReviewQueue {
+    pub fn new(due: Vec<SharedString>) -> Self {
+        Self { total: due.len(), done: 0, due, style: StyleRefinement::default(), children: Vec::new() }
+    }
+    pub fn done_count(mut self, n: usize) -> Self { self.done = n; self }
+}
+
+impl RenderOnce for ReviewQueue {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_3()
+            .bg(rgb(0xffffff))
+            .border_1()
+            .border_color(rgb(0xe0e0e0))
+            .rounded_lg()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .child(format!("Review Queue  ({}/{})", self.done, self.total)),
+            )
+            .children(self.due.into_iter().map(|item| {
+                div()
+                    .px_2()
+                    .py_1()
+                    .text_base()
+                    .text_color(rgb(0x2d3436))
+                    .font_family(ui_font())
+                    .child(item)
+                    .into_any_element()
+            }))
+    }
+}
+
+/* =========================================================================
+ * StatsWidget — 学习统计概览
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct StatsWidget {
+    pub mastered: usize,
+    pub learning: usize,
+    pub new_count: usize,
+    pub streak: usize,
+    pub today_reviewed: usize,
+    pub today_correct: usize,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl StatsWidget {
+    pub fn new() -> Self {
+        Self {
+            mastered: 0, learning: 0, new_count: 0, streak: 0,
+            today_reviewed: 0, today_correct: 0,
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+    pub fn mastered(mut self, v: usize) -> Self { self.mastered = v; self }
+    pub fn learning(mut self, v: usize) -> Self { self.learning = v; self }
+    pub fn new_count(mut self, v: usize) -> Self { self.new_count = v; self }
+    pub fn streak(mut self, v: usize) -> Self { self.streak = v; self }
+    pub fn today_reviewed(mut self, v: usize) -> Self { self.today_reviewed = v; self }
+    pub fn today_correct(mut self, v: usize) -> Self { self.today_correct = v; self }
+}
+
+impl RenderOnce for StatsWidget {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_3()
+            .bg(rgb(0xf8f9fa))
+            .rounded_lg()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .child("Today's Progress"),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(rgb(0x00b894))
+                            .font_family(ui_font())
+                            .child(format!("✓ {} correct", self.today_correct)),
+                    )
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(rgb(0x2d3436))
+                            .font_family(ui_font())
+                            .child(format!("📖 {} reviewed", self.today_reviewed)),
+                    ),
+            )
+            .child(
+                div()
+                    .mt_3()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(rgb(0xb2bec3))
+                            .font_family(ui_font())
+                            .child("All Time"),
+                    )
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(rgb(0x6c5ce7))
+                            .font_family(ui_font())
+                            .child(format!("✅ {} mastered", self.mastered)),
+                    )
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(rgb(0xfdcb6e))
+                            .font_family(ui_font())
+                            .child(format!("🔁 {} learning", self.learning)),
+                    )
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(rgb(0xff6600))
+                            .font_family(ui_font())
+                            .child(format!("🆕 {} new", self.new_count)),
+                    ),
+            )
+            .child(
+                div()
+                    .mt_3()
+                    .text_sm()
+                    .text_color(rgb(0x00b894))
+                    .font_family(ui_font())
+                    .child(format!("🔥 {} day streak", self.streak)),
+            )
+    }
+}
+
+/* =========================================================================
+ * AnswerInput — 答案输入框
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct AnswerInput {
+    pub placeholder: SharedString,
+    pub disabled: bool,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl AnswerInput {
+    pub fn new() -> Self {
+        Self {
+            placeholder: "Type your answer...".into(),
+            disabled: false,
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+    pub fn placeholder_text(mut self, s: impl Into<SharedString>) -> Self { self.placeholder = s.into(); self }
+}
+
+impl RenderOnce for AnswerInput {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .w_full()
+            .p_3()
+            .bg(rgb(0xffffff))
+            .border_1()
+            .border_color(rgb(0xe0e0e0))
+            .rounded_md()
+            .child(
+                div()
+                    .text_color(if self.disabled { rgb(0x555555) } else { rgb(0xb2bec3) })
+                    .text_base()
+                    .font_family(mono_font())
+                    .child(self.placeholder),
+            )
+    }
+}
+
+/* =========================================================================
+ * ProgressBar — 进度条
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct ProgressBar {
+    pub current: usize,
+    pub total: usize,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl ProgressBar {
+    pub fn new(current: usize, total: usize) -> Self {
+        Self { current, total, style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for ProgressBar {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let pct = if self.total > 0 {
+            (self.current as f64 / self.total as f64 * 100.0) as u32
+        } else { 0 };
+        div()
+            .w_full()
+            .h(px(8.0))
+            .bg(rgb(0xf0f0f3))
+            .rounded_full()
+            .child(
+                div()
+                    .h_full()
+                    .w(px((pct.min(100) as f32) * 2.5))
+                    .bg(rgb(0x6c5ce7))
+                    .rounded_full(),
+            )
+    }
+}
+
+/* =========================================================================
+ * ScoreBadge — 正确/错误反馈标签
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct ScoreBadge {
+    pub correct: bool,
+    pub label: SharedString,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl ScoreBadge {
+    pub fn correct(label: impl Into<SharedString>) -> Self {
+        Self { correct: true, label: label.into(), style: StyleRefinement::default(), children: Vec::new() }
+    }
+    pub fn wrong(label: impl Into<SharedString>) -> Self {
+        Self { correct: false, label: label.into(), style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for ScoreBadge {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .px_4()
+            .py_2()
+            .rounded_lg()
+            .bg(if self.correct { rgb(0xe8f8f5) } else { rgb(0xfde8e8) })
+            .border_1()
+            .border_color(if self.correct { rgb(0x00b894) } else { rgb(0xe17055) })
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(if self.correct { rgb(0x55efc4) } else { rgb(0xfab1a0) })
+                    .font_family(ui_font())
+                    .child(self.label),
+            )
+    }
+}
+
+/* =========================================================================
+ * SpeedReview — 速闪模式（快速判断已知/未知）
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct SpeedReview {
+    pub word: SharedString,
+    pub known: bool,
+    pub time_left_ms: u32,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl SpeedReview {
+    pub fn new(word: impl Into<SharedString>) -> Self {
+        Self { word: word.into(), known: false, time_left_ms: 3000, style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for SpeedReview {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_6()
+            .child(
+                div()
+                    .text_3xl()
+                    .text_color(rgb(0x2d3436))
+                    .font_family(ui_font())
+                    .font_weight(FontWeight::BOLD)
+                    .child(self.word.clone()),
+            )
+            .child(
+                div()
+                    .mt_6()
+                    .child(
+                        h_flex()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .px_6()
+                                    .py_3()
+                                    .rounded_lg()
+                                    .bg(rgb(0xe8f8f5))
+                                    .border_1()
+                                    .border_color(rgb(0x00b894))
+                                    .child(
+                                        div()
+                                            .text_lg()
+                                            .text_color(rgb(0x55efc4))
+                                            .font_family(ui_font())
+                                            .font_weight(FontWeight::BOLD)
+                                            .child("✓ Know It"),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .px_6()
+                                    .py_3()
+                                    .rounded_lg()
+                                    .bg(rgb(0xfde8e8))
+                                    .border_1()
+                                    .border_color(rgb(0xe17055))
+                                    .child(
+                                        div()
+                                            .text_lg()
+                                            .text_color(rgb(0xfab1a0))
+                                            .font_family(ui_font())
+                                            .font_weight(FontWeight::BOLD)
+                                            .child("✗ Don't Know"),
+                                    ),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .mt_4()
+                    .text_sm()
+                    .text_color(rgb(0xdfe6e9))
+                    .font_family(ui_font())
+                    .child(format!("⏱ {}s", self.time_left_ms / 1000)),
+            )
+    }
+}
+
+/* =========================================================================
+ * NamespaceTree — KV Cache 命名空间浏览器
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct NamespaceTree {
+    pub entries: Vec<NamespaceEntry>,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+pub struct NamespaceEntry {
+    pub path: SharedString,
+    pub value_preview: SharedString,
+    pub depth: usize,
+}
+
+impl NamespaceTree {
+    pub fn new(entries: Vec<NamespaceEntry>) -> Self {
+        Self { entries, style: StyleRefinement::default(), children: Vec::new() }
+    }
+}
+
+impl RenderOnce for NamespaceTree {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .p_3()
+            .font_family(mono_font())
+            .children(self.entries.into_iter().map(|e| {
+                div()
+                    .pl_3()
+                    .text_color(rgb(0x2d3436))
+                    .text_sm()
+                    .child(format!("{}{}", "  ".repeat(e.depth), e.path))
+                    .into_any_element()
+            }))
+    }
+}
+
+/* =========================================================================
+ * BookImportWidget — 电子书导入面板
+ * ========================================================================= */
+
+#[derive(IntoElement)]
+pub struct BookImportWidget {
+    pub supported_formats: &'static [&'static str],
+    pub import_path: SharedString,
+    style: StyleRefinement,
+    children: Vec<AnyElement>,
+}
+
+impl BookImportWidget {
+    pub fn new() -> Self {
+        Self {
+            supported_formats: &["EPUB", "MOBI", "AZW3", "PDF"],
+            import_path: SharedString::default(),
+            style: StyleRefinement::default(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl RenderOnce for BookImportWidget {
+    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let formats = self.supported_formats.join("  ");
+        div()
+            .p_4()
+            .bg(rgb(0xffffff))
+            .rounded_lg()
+            .border_1()
+            .border_color(rgb(0xe0e0e0))
+            .child(
+                div()
+                    .text_base()
+                    .text_color(rgb(0x2d3436))
+                    .font_family(ui_font())
+                    .child("Import E-book"),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .text_sm()
+                    .text_color(rgb(0xb2bec3))
+                    .font_family(ui_font())
+                    .child(format!("Supported: {}", formats)),
+            )
+            .child(
+                div()
+                    .mt_3()
+                    .px_4()
+                    .py_2()
+                    .bg(rgb(0x6c5ce7))
+                    .rounded_md()
+                    .child(
+                        div()
+                            .text_base()
+                            .text_color(rgb(0xffffff))
+                            .font_family(ui_font())
+                            .child("Select File..."),
+                    ),
+            )
+    }
+}

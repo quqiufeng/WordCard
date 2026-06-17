@@ -1164,3 +1164,5 @@ uint32_t wc_today(void) {
 const char* wc_version_string(void) {
     return "WordCard DB v3.0.0 (Universal)";
 }
+
+

@@ -219,3 +219,15 @@ src/test_sm2
 output/*.json
 output/*.txt
 output/*.pdf
+
+# C test binaries in src/
+src/test_cache_basic
+
+# Rust GUI build artifacts
+gui/gpui/target/
+gui/test_gui
+gui/*.o
+gui/*.so
+
+# Object files in subdirectories
+src/**/*.o
