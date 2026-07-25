@@ -213,7 +213,7 @@ def create_png(sections, output_path):
         if cur: lines.append(cur)
         return lines
     def line_h(fs):
-        return int(fs * 1.4)
+        return int(fs * 1.6)
     def write_para(text, fs, x, baseline, color, max_w):
         wlines = wrap_en(text, max_w, fs) if not _is_cjk(text[0:1]) else wrap_cn(text, max_w, fs)
         bl = baseline
