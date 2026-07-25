@@ -244,7 +244,7 @@ def create_png(sections, output_path):
             y += len(wl) * line_h(FS_BODY)
         return y + MARGIN
 
-    H = est_h()
+    H = int(est_h() * 1.3)
     c = txt2png.Canvas(W, H, BG)
     y = MARGIN
     bl = y + asc_wrapped(font_path, FS_LABEL)
