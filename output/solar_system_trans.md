@@ -1,6 +1,6 @@
 # Solar System
 
-> 生成时间: 2026-07-26 06:46:24
+> 2026-07-26 06:50:08
 
 ---
 
@@ -272,21 +272,20 @@ planet.
 
 了解我们的太阳系有助于我们欣赏家园的脆弱性和韧性。
 
-
 ---
 
 ## 词汇表
 
-| solar                        太阳的 | giant                        巨大的 |
-| system                         系统 | fusion                         融合 |
-| consists                  由...组成 | mass                           质量 |
-| orbit                          轨道 | light-years                    光年 |
-| planets                        行星 | inner                        内部的 |
-| dwarf                        矮小的 | outer                        外部的 |
-| asteroid                     小行星 | ring                             环 |
-| comet                          彗星 | ice                              冰 |
-| gravitational                引力的 | belt                             带 |
-| boundary                       边界 | Kuiper                       柯伊伯 |
+| solar  太阳的                     | giant  巨大的                     |
+| system  系统                     | fusion  融合                     |
+| consists  由...组成               | mass  质量                       |
+| orbit  轨道                      | light-years  光年                |
+| planets  行星                    | inner  内部的                     |
+| dwarf  矮小的                     | outer  外部的                     |
+| asteroid  小行星                  | ring  环                        |
+| comet  彗星                      | ice  冰                         |
+| gravitational  引力的             | belt  带                        |
+| boundary  边界                   | Kuiper  柯伊伯                    |
 
 ---
 
