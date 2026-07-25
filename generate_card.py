@@ -226,25 +226,33 @@ def create_png(sections, output_path):
     probe = txt2png.Canvas(100, 100, BG)
 
     def est_h():
-        y = MARGIN + FS_LABEL + 10 + FS_TITLE + 10 + FS_SECTION + 10
-        for line in wrap_en(sections.get('original', ''), TEXT_W, FS_BODY):
-            y += line_h(FS_BODY)
-        y += 20 + FS_SECTION + 10
+        fs = FS_BODY
+        a = asc_wrapped(font_path, fs)
+        y = MARGIN
+        y += line_h(FS_LABEL) + 10
+        y += line_h(FS_TITLE) + 20
+        y += line_h(FS_SECTION) + 5
+        y += a
+        for line in wrap_en(sections.get('original', ''), TEXT_W, fs):
+            y += line_h(fs)
+        y += 20 + line_h(FS_SECTION) + 5
         for line in sections.get('en_ch', '').split('\n'):
-            if not line.strip(): continue
-            wl = wrap_en(line, TEXT_W, FS_BODY) if not _is_cjk(line[0:1]) else wrap_cn(line, TEXT_W, FS_BODY)
-            y += len(wl) * line_h(FS_BODY)
-        y += 20 + FS_SECTION + 10
+            if not line.strip(): y += line_h(fs) // 2; continue
+            y += a
+            wl = wrap_en(line, TEXT_W, fs) if not _is_cjk(line[0:1]) else wrap_cn(line, TEXT_W, fs)
+            y += len(wl) * line_h(fs)
+        y += 20 + line_h(FS_SECTION) + 5
         vl = [l for l in sections.get('vocabulary', []) if l.strip()]
         y += ((len(vl) + 1) // 2) * line_h(FS_VOCAB)
-        y += 20 + FS_SECTION + 10
+        y += 20 + line_h(FS_SECTION) + 5
         for line in sections.get('sentences', '').split('\n'):
-            if not line.strip(): continue
-            wl = wrap_en(line, TEXT_W, FS_BODY) if not _is_cjk(line[0:1]) else wrap_cn(line, TEXT_W, FS_BODY)
-            y += len(wl) * line_h(FS_BODY)
+            if not line.strip(): y += line_h(fs) // 2; continue
+            y += a
+            wl = wrap_en(line, TEXT_W, fs) if not _is_cjk(line[0:1]) else wrap_cn(line, TEXT_W, fs)
+            y += len(wl) * line_h(fs)
         return y + MARGIN
 
-    H = int(est_h() * 1.3)
+    H = int(est_h() * 1.2)
     c = txt2png.Canvas(W, H, BG)
     y = MARGIN
     bl = y + asc_wrapped(font_path, FS_LABEL)
