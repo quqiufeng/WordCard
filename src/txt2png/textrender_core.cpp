@@ -632,4 +632,156 @@ void txt2png_bridge_free(unsigned char *data) {
     free(data);
 }
 
+// ── 画布 API ──────────────────────────────────────────────────
+
+struct CanvasData {
+    cairo_surface_t *surface;
+    cairo_t *cr;
+    FT_Library ft_lib;
+    int width;
+    int height;
+};
+
+txt2png_canvas_t txt2png_canvas_create(int width, int height, uint32_t bg_color) {
+    auto *c = new CanvasData();
+    c->width = width;
+    c->height = height;
+
+    if (FT_Init_FreeType(&c->ft_lib)) { delete c; return nullptr; }
+
+    c->surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, width, height);
+    c->cr = cairo_create(c->surface);
+
+    unsigned char br = (bg_color >> 16) & 0xFF;
+    unsigned char bg = (bg_color >> 8) & 0xFF;
+    unsigned char bb = bg_color & 0xFF;
+    cairo_set_source_rgb(c->cr, br / 255.0, bg / 255.0, bb / 255.0);
+    cairo_paint(c->cr);
+
+    return c;
+}
+
+void txt2png_canvas_destroy(txt2png_canvas_t canvas) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    if (!c) return;
+    cairo_destroy(c->cr);
+    cairo_surface_destroy(c->surface);
+    FT_Done_FreeType(c->ft_lib);
+    delete c;
+}
+
+int txt2png_canvas_draw_text(txt2png_canvas_t canvas, const char *font_path,
+                              double font_size, const char *text,
+                              int x, int baseline_y, uint32_t color) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    if (!c || !font_path || !text) return 0;
+
+    FT_Face ft_face;
+    if (FT_New_Face(c->ft_lib, font_path, 0, &ft_face)) return 0;
+    if (FT_Set_Char_Size(ft_face, 0, static_cast<FT_F26Dot6>(font_size * 64), 72, 72)) {
+        FT_Done_Face(ft_face); return 0;
+    }
+
+    hb_font_t *hb_font = hb_ft_font_create(ft_face, nullptr);
+    cairo_font_face_t *cf = cairo_ft_font_face_create_for_ft_face(ft_face, FT_LOAD_DEFAULT);
+
+    // Shape text with HarfBuzz
+    hb_buffer_t *buf = hb_buffer_create();
+    hb_buffer_add_utf8(buf, text, -1, 0, -1);
+    hb_buffer_guess_segment_properties(buf);
+    hb_shape(hb_font, buf, nullptr, 0);
+
+    unsigned int ng = 0;
+    hb_glyph_info_t *info = hb_buffer_get_glyph_infos(buf, &ng);
+    hb_glyph_position_t *gpos = hb_buffer_get_glyph_positions(buf, &ng);
+
+    // Build Cairo glyph array
+    std::vector<cairo_glyph_t> glyphs(ng);
+    double pen_x = x, pen_y = baseline_y;
+    for (unsigned int i = 0; i < ng; ++i) {
+        glyphs[i].index = info[i].codepoint;
+        glyphs[i].x = pen_x + gpos[i].x_offset / 64.0;
+        glyphs[i].y = pen_y - gpos[i].y_offset / 64.0;
+        pen_x += gpos[i].x_advance / 64.0;
+        pen_y -= gpos[i].y_advance / 64.0;
+    }
+
+    // Set color and render
+    unsigned char r = (color >> 16) & 0xFF;
+    unsigned char g = (color >> 8) & 0xFF;
+    unsigned char b = color & 0xFF;
+    cairo_set_font_face(c->cr, cf);
+    cairo_set_font_size(c->cr, font_size);
+    cairo_set_source_rgb(c->cr, r / 255.0, g / 255.0, b / 255.0);
+
+    if (!glyphs.empty())
+        cairo_show_glyphs(c->cr, glyphs.data(), static_cast<int>(glyphs.size()));
+
+    int advance = static_cast<int>(pen_x - x);
+
+    hb_buffer_destroy(buf);
+    cairo_font_face_destroy(cf);
+    hb_font_destroy(hb_font);
+    FT_Done_Face(ft_face);
+
+    return advance;
+}
+
+int txt2png_canvas_measure(txt2png_canvas_t canvas, const char *font_path,
+                            double font_size, const char *text) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    if (!c || !font_path || !text) return 0;
+
+    FT_Face ft_face;
+    if (FT_New_Face(c->ft_lib, font_path, 0, &ft_face)) return 0;
+    if (FT_Set_Char_Size(ft_face, 0, static_cast<FT_F26Dot6>(font_size * 64), 72, 72)) {
+        FT_Done_Face(ft_face); return 0;
+    }
+
+    hb_font_t *hb_font = hb_ft_font_create(ft_face, nullptr);
+
+    hb_buffer_t *buf = hb_buffer_create();
+    hb_buffer_add_utf8(buf, text, -1, 0, -1);
+    hb_buffer_guess_segment_properties(buf);
+    hb_shape(hb_font, buf, nullptr, 0);
+
+    double total = 0;
+    unsigned int np = 0;
+    hb_glyph_position_t *gpos = hb_buffer_get_glyph_positions(buf, &np);
+    for (unsigned int i = 0; i < np; ++i)
+        total += gpos[i].x_advance / 64.0;
+
+    hb_buffer_destroy(buf);
+    hb_font_destroy(hb_font);
+    FT_Done_Face(ft_face);
+
+    return static_cast<int>(total);
+}
+
+int txt2png_canvas_save(txt2png_canvas_t canvas, const char *output_path) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    if (!c || !output_path) return -1;
+    return cairo_surface_write_to_png(c->surface, output_path) == CAIRO_STATUS_SUCCESS ? 0 : -1;
+}
+
+int txt2png_canvas_height(txt2png_canvas_t canvas) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    return c ? c->height : 0;
+}
+
+int txt2png_canvas_ascent(txt2png_canvas_t canvas, const char *font_path,
+                           double font_size) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    if (!c || !font_path) return 0;
+
+    FT_Face ft_face;
+    if (FT_New_Face(c->ft_lib, font_path, 0, &ft_face)) return 0;
+    if (FT_Set_Char_Size(ft_face, 0, static_cast<FT_F26Dot6>(font_size * 64), 72, 72)) {
+        FT_Done_Face(ft_face); return 0;
+    }
+    int ascent = ft_face->size->metrics.ascender / 64;
+    FT_Done_Face(ft_face);
+    return ascent;
+}
+
 } // extern "C"

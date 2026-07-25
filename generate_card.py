@@ -171,39 +171,132 @@ def create_png(sections, output_path):
     if not os.path.exists(font_path):
         font_path = os.path.join(os.path.dirname(__file__) or '.', FONT)
 
-    lines = []
-    lines.append(sections.get('title', ''))
-    lines.append('')
-    lines.append('\u539f\u6587')
-    lines.append('-')
-    lines.append(sections.get('original', ''))
-    lines.append('')
-    lines.append('\u4e2d\u82f1\u53cc\u8bed')
-    lines.append('-')
-    for l in sections.get('en_ch', '').split('\n'):
-        lines.append(l)
-    lines.append('')
-    lines.append('\u8bcd\u6c47\u8868')
-    lines.append('-')
+    MARGIN = 40
+    W = 780
+    COL_GAP = 20
+    GREEN = 0x27AE60
+    DARK = 0x34495E
+    GRAY = 0x7F8C8D
+    RED = 0xE74C3C
+    BG = 0xF5F5F5
+    FS_TITLE = 26
+    FS_SECTION = 20
+    FS_BODY = 18
+    FS_VOCAB = 16
+    FS_LABEL = 20
+
+    def measure_wrapped(fp, fs, text):
+        return probe.measure(fp, fs, text)
+    def asc_wrapped(fp, fs):
+        return probe.ascent(fp, fs)
+    def wrap_en(text, max_w, fs):
+        if not text: return []
+        words = text.split()
+        lines = []; cur = ''
+        for w in words:
+            test = (cur + ' ' + w).strip()
+            if measure_wrapped(font_path, fs, test) <= max_w: cur = test
+            else:
+                if cur: lines.append(cur)
+                cur = w
+        if cur: lines.append(cur)
+        return lines
+    def wrap_cn(text, max_w, fs):
+        if not text: return []
+        lines = []; cur = ''
+        for ch in text:
+            test = cur + ch
+            if measure_wrapped(font_path, fs, test) <= max_w: cur = test
+            else:
+                if cur: lines.append(cur)
+                cur = ch
+        if cur: lines.append(cur)
+        return lines
+    def line_h(fs):
+        return int(fs * 1.4)
+    def write_para(text, fs, x, baseline, color, max_w):
+        wlines = wrap_en(text, max_w, fs) if not _is_cjk(text[0:1]) else wrap_cn(text, max_w, fs)
+        bl = baseline
+        for line in wlines:
+            c.draw_text(font_path, fs, line, x, bl, color)
+            bl += line_h(fs)
+        return bl
+
+    TEXT_W = W - 2 * MARGIN
+    probe = txt2png.Canvas(100, 100, BG)
+
+    def est_h():
+        y = MARGIN + FS_LABEL + 10 + FS_TITLE + 10 + FS_SECTION + 10
+        for line in wrap_en(sections.get('original', ''), TEXT_W, FS_BODY):
+            y += line_h(FS_BODY)
+        y += 20 + FS_SECTION + 10
+        for line in sections.get('en_ch', '').split('\n'):
+            if not line.strip(): continue
+            wl = wrap_en(line, TEXT_W, FS_BODY) if not _is_cjk(line[0:1]) else wrap_cn(line, TEXT_W, FS_BODY)
+            y += len(wl) * line_h(FS_BODY)
+        y += 20 + FS_SECTION + 10
+        vl = [l for l in sections.get('vocabulary', []) if l.strip()]
+        y += ((len(vl) + 1) // 2) * line_h(FS_VOCAB)
+        y += 20 + FS_SECTION + 10
+        for line in sections.get('sentences', '').split('\n'):
+            if not line.strip(): continue
+            wl = wrap_en(line, TEXT_W, FS_BODY) if not _is_cjk(line[0:1]) else wrap_cn(line, TEXT_W, FS_BODY)
+            y += len(wl) * line_h(FS_BODY)
+        return y + MARGIN
+
+    H = est_h()
+    c = txt2png.Canvas(W, H, BG)
+    y = MARGIN
+    bl = y + asc_wrapped(font_path, FS_LABEL)
+    c.draw_text(font_path, FS_LABEL, 'WordCard', MARGIN, bl, GREEN)
+    y += line_h(FS_LABEL) + 10
+    bl = y + asc_wrapped(font_path, FS_TITLE)
+    c.draw_text(font_path, FS_TITLE, sections.get('title', ''), MARGIN, bl, DARK)
+    y += line_h(FS_TITLE) + 20
+
+    bl = y + asc_wrapped(font_path, FS_SECTION)
+    c.draw_text(font_path, FS_SECTION, '\u539f\u6587', MARGIN, bl, GREEN)
+    y += line_h(FS_SECTION) + 5
+    bl = y + asc_wrapped(font_path, FS_BODY)
+    y = write_para(sections.get('original', ''), FS_BODY, MARGIN, bl, DARK, TEXT_W)
+    y += 20
+
+    bl = y + asc_wrapped(font_path, FS_SECTION)
+    c.draw_text(font_path, FS_SECTION, '\u4e2d\u82f1\u53cc\u8bed', MARGIN, bl, GREEN)
+    y += line_h(FS_SECTION) + 5
+    for line in sections.get('en_ch', '').split('\n'):
+        if not line.strip(): y += line_h(FS_BODY) // 2; continue
+        bl = y + asc_wrapped(font_path, FS_BODY)
+        color = GRAY if _is_cjk(line[0:1]) else DARK
+        y = write_para(line, FS_BODY, MARGIN, bl, color, TEXT_W)
+    y += 20
+
+    bl = y + asc_wrapped(font_path, FS_SECTION)
+    c.draw_text(font_path, FS_SECTION, '\u8bcd\u6c47\u8868', MARGIN, bl, GREEN)
+    y += line_h(FS_SECTION) + 5
     vl = [l for l in sections.get('vocabulary', []) if l.strip()]
-    for i in range(0, len(vl), 2):
-        v = vl[i]
-        if i+1 < len(vl):
-            v += '    ' + vl[i+1]
-        lines.append('  ' + v)
-    lines.append('')
-    lines.append('\u7cbe\u5f69\u53e5\u5b50')
-    lines.append('-')
-    for l in sections.get('sentences', '').split('\n'):
-        lines.append(l)
+    mid = len(vl) // 2
+    col_w = (TEXT_W - COL_GAP) // 2
+    for i in range(max(len(vl[:mid]), len(vl[mid:]))):
+        bl2 = y + asc_wrapped(font_path, FS_VOCAB)
+        left = vl[i] if i < len(vl[:mid]) else ''
+        right = vl[mid+i] if mid+i < len(vl) else ''
+        if left: c.draw_text(font_path, FS_VOCAB, left, MARGIN, bl2, RED)
+        if right: c.draw_text(font_path, FS_VOCAB, right, MARGIN + col_w + COL_GAP, bl2, RED)
+        y += line_h(FS_VOCAB)
+    y += 20
 
-    text = '\n'.join(lines)
-    style = txt2png.make_style(font_size=18, width=760, margin=28, leading=1.5)
-    txt2png.render_file(text, font_path, style, output_path)
+    bl = y + asc_wrapped(font_path, FS_SECTION)
+    c.draw_text(font_path, FS_SECTION, '\u7cbe\u5f69\u53e5\u5b50', MARGIN, bl, GREEN)
+    y += line_h(FS_SECTION) + 5
+    for line in sections.get('sentences', '').split('\n'):
+        if not line.strip(): y += line_h(FS_BODY) // 2; continue
+        bl = y + asc_wrapped(font_path, FS_BODY)
+        color = GRAY if _is_cjk(line[0:1]) else DARK
+        y = write_para(line, FS_BODY, MARGIN, bl, color, TEXT_W)
+
+    c.save(output_path)
     print('  PNG:', output_path)
-
-# ---------- PDF ----------
-
 def create_pdf(sections, output_path):
     try:
         from fpdf import FPDF
