@@ -8,7 +8,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(__file__) or '.')
 import txt2png
 
-FONT = 'LXGWWenKai-Regular.ttf'
+FONT = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
 
 # ---------- text parser ----------
 
@@ -287,10 +287,14 @@ def create_png(sections, output_path):
     col_w = (TEXT_W - COL_GAP) // 2
     for i in range(max(len(vl[:mid]), len(vl[mid:]))):
         bl2 = y + asc_wrapped(font_path, FS_VOCAB)
-        left = vl[i] if i < len(vl[:mid]) else ''
-        right = vl[mid+i] if mid+i < len(vl) else ''
-        if left: c.draw_text(font_path, FS_VOCAB, left, MARGIN, bl2, RED)
-        if right: c.draw_text(font_path, FS_VOCAB, right, MARGIN + col_w + COL_GAP, bl2, RED)
+        left_raw = vl[i] if i < len(vl[:mid]) else ''
+        right_raw = vl[mid+i] if mid+i < len(vl) else ''
+        if left_raw:
+            en, cn = _pv(left_raw)
+            c.draw_text(font_path, FS_VOCAB, f'{en}  {cn}', MARGIN, bl2, RED)
+        if right_raw:
+            en, cn = _pv(right_raw)
+            c.draw_text(font_path, FS_VOCAB, f'{en}  {cn}', MARGIN + col_w + COL_GAP, bl2, RED)
         y += line_h(FS_VOCAB)
     y += 20
 
