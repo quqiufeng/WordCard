@@ -1,19 +1,19 @@
 # WordCard 设计方案
 
-> 纯 C 间隔重复学习引擎 + KV Cache 知识缓存 + 电子书语义搜索
-> 文档版本: v4.0 — 2026-06-17
+> C 核心引擎 + Python 业务层 + HarfBuzz/Cairo 文本渲染
+> 文档版本: v4.0 — 2026-07-26
 
 ---
 
 ## 一、设计哲学
 
-**纯 C，零依赖，零 Python。**
+**C 核心引擎 + Python 胶水层，零 GUI 依赖。**
 
-- **C 共享库**：`libwordcard.so` 包含 SM-2 间隔重复引擎 + KV Cache 记忆系统 + 电子书解析能力，全部 C 实现
-- **mmap 零拷贝持久化**：结构体直写磁盘 + 内存池分配，启动即加载
-- **KV Cache 知识库**：层级命名空间 + 多维搜索 + 向量嵌入，专为 AI Agent 记忆设计
-- **电子书语义搜索**：EPUB/MOBI/AZW3/PDF → 分章 → 向量化 → HNSW 近似搜索
-- **无外部依赖**：仅需标准 C 库 + pthread + OpenMP（可选加速），零配置部署
+- **C 共享库**：`libwordcard.so` SM-2 间隔重复引擎 + 哈希索引 + 结构体直写磁盘
+- **Python 业务层**：`engine.py` ctypes 绑定 + `cli.py` 终端复习 + `api.py` REST 接口
+- **电子书导入**：PDF/MOBI/AZW3/MD → C++ 解析 → 词汇提取 → SM-2 数据库
+- **高质量文本渲染**：HarfBuzz shaping + Knuth-Plass 断行 + Cairo → PNG 卡片
+- **零外部数据库**：SQLite/Redis 零依赖，C 结构体直写 mmap 文件
 
 ---
 
