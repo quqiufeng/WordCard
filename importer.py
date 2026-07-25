@@ -69,28 +69,37 @@ def extract_mobi(path):
 
 def extract_pdf(path):
     lib = _find_lib('libpdfparse.so')
-    if not lib:
-        raise RuntimeError('libpdfparse.so not built; run: cd importer/wrappers && make')
-    ctypes = __import__('ctypes')
-    cdll = ctypes.CDLL(lib)
-    cdll.pdf_open.argtypes = [ctypes.c_char_p]
-    cdll.pdf_open.restype = ctypes.c_void_p
-    cdll.pdf_extract_text.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_char_p), ctypes.POINTER(ctypes.c_size_t)]
-    cdll.pdf_extract_text.restype = ctypes.c_int
-    cdll.pdf_close.argtypes = [ctypes.c_void_p]
-    cdll.pdf_close.restype = None
+    if lib:
+        ctypes = __import__('ctypes')
+        cdll = ctypes.CDLL(lib)
+        cdll.pdf_open.argtypes = [ctypes.c_char_p]
+        cdll.pdf_open.restype = ctypes.c_void_p
+        cdll.pdf_extract_text.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_char_p), ctypes.POINTER(ctypes.c_size_t)]
+        cdll.pdf_extract_text.restype = ctypes.c_int
+        cdll.pdf_close.argtypes = [ctypes.c_void_p]
+        cdll.pdf_close.restype = None
+        h = cdll.pdf_open(path.encode('utf-8'))
+        if h:
+            try:
+                text_p = ctypes.c_char_p()
+                text_len = ctypes.c_size_t()
+                cdll.pdf_extract_text(h, ctypes.byref(text_p), ctypes.byref(text_len))
+                text = text_p.value.decode('utf-8', errors='replace') if text_p.value else ''
+                if len(text.strip()) > 50:
+                    return {'title': Path(path).stem, 'author': '', 'text': text}
+            finally:
+                cdll.pdf_close(h)
 
-    h = cdll.pdf_open(path.encode('utf-8'))
-    if not h:
-        raise RuntimeError(f'Cannot open PDF: {path}')
+    # Fallback: OCR via Tesseract (for scanned PDFs)
     try:
-        text_p = ctypes.c_char_p()
-        text_len = ctypes.c_size_t()
-        cdll.pdf_extract_text(h, ctypes.byref(text_p), ctypes.byref(text_len))
-        text = text_p.value.decode('utf-8', errors='replace') if text_p.value else ''
-        return {'title': Path(path).stem, 'author': '', 'text': text}
-    finally:
-        cdll.pdf_close(h)
+        from ocr import pdf as ocr_pdf
+        text = ocr_pdf(path)
+        if text.strip():
+            return {'title': Path(path).stem, 'author': '', 'text': text}
+    except Exception as e:
+        pass
+
+    raise RuntimeError(f'Cannot extract text from PDF: {path}')
 
 def extract_md(path):
     with open(path, 'r', encoding='utf-8') as f:
