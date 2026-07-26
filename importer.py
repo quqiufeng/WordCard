@@ -90,37 +90,28 @@ def extract_pdf(path):
             finally:
                 cdll.pdf_close(h)
 
-    # Fallback: OCR via /opt/my-agent/wechat-ocr PP-OCRv4
-    import ctypes, json, tempfile, os as _os
+    # Fallback: OCR via /opt/my-agent/wechat-ocr PP-OCRv4 (subprocess)
+    import subprocess, json, tempfile, os as _os
     import fitz
-    _lib = ctypes.CDLL('/opt/my-agent/wechat-ocr/lib/libwechat_ocr_core.so', mode=ctypes.RTLD_GLOBAL)
-    _lib.ocr_create.restype = ctypes.c_void_p
-    _lib.ocr_capture_file.restype = ctypes.c_char_p
-    _lib.ocr_free_string.argtypes = [ctypes.c_char_p]
-    _lib.ocr_destroy.argtypes = [ctypes.c_void_p]
-    _mdl = '/opt/my-agent/wechat-ocr/models'
-    _eng = _lib.ocr_create(
-        f'{_mdl}/ch_PP-OCRv4_det_infer.onnx'.encode(),
-        f'{_mdl}/ch_PP-OCRv4_rec_infer.onnx'.encode(),
-        '/opt/my-agent/wechat-ocr/ppocr_keys_v1.txt'.encode())
-    if _eng:
+    _helper = '/opt/WordCard/voice/libs/ocr_helper'
+    if _os.path.exists(_helper):
         doc = fitz.open(path)
         mat = fitz.Matrix(300/72, 300/72)
         texts = []
         for i, page in enumerate(doc):
             png = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
             page.get_pixmap(matrix=mat).save(png.name)
-            result = _lib.ocr_capture_file(_eng, png.name.encode(), 0, 0)
+            r = subprocess.run([_helper, png.name], capture_output=True, text=True, timeout=60)
             _os.unlink(png.name)
-            if result:
-                data = json.loads(result.decode('utf-8'))
-                boxes = data.get('boxes', [])
-                page_text = '\n'.join(b.get('text', '') for b in boxes)
-                if page_text.strip():
-                    texts.append(f'--- Page {i+1} ---\n{page_text}')
-                _lib.ocr_free_string(result)
+            if r.returncode == 0 and r.stdout.strip():
+                try:
+                    boxes = json.loads(r.stdout)
+                    page_text = '\n'.join(b.get('text','') for b in boxes)
+                    if page_text.strip():
+                        texts.append(f'--- Page {i+1} ---\n{page_text}')
+                except json.JSONDecodeError:
+                    pass
         doc.close()
-        _lib.ocr_destroy(_eng)
         full = '\n\n'.join(texts)
         if full.strip():
             return {'title': Path(path).stem, 'author': '', 'text': full}
