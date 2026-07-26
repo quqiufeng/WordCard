@@ -22,21 +22,30 @@ WordCard 是一个**电子书驱动**的间隔重复学习系统：
 用户
  ├── CLI (cli.py) ──────── 终端交互复习
  ├── API (api.py) ──────── FastAPI REST (port 8000)
- └── 卡片图片 ───────────── txt2png Canvas → PNG
+ ├── 卡片图片 ───────────── txt2png Canvas → PNG
+ └── 语音 ──────────────── ASR (Qwen3-ASR / SenseVoice) + TTS
 
 Python 层
- ├── engine.py  ────────── SM-2 ctypes 绑定 → libwordcard.so
- ├── importer.py ───────── 电子书解析 → 词汇提取 → DB
- ├── txt2png.py ────────── 画布 API → libtxt2png.so
- └── generate_card.py ──── 多格式输出 (MD/PNG/PDF)
+ ├── engine.py    ────────── SM-2 ctypes 绑定 → libwordcard.so
+ ├── importer.py  ────────── 电子书解析 → 词汇提取 → DB
+ ├── txt2png.py   ────────── 画布 API → libtxt2png.so
+ ├── voice.py     ────────── ASR/TTS 接口
+ ├── sound.py     ────────── 音频录制/播放/转换
+ └── generate_card.py ────── 多格式输出 (MD/PNG/PDF)
 
 C/C++ 层
- ├── libwordcard.so ────── SM-2 学习引擎 (wordcard.c + modes.c)
- ├── libcache.so ───────── KV Cache (14 个模块)
- ├── libtxt2png.so ─────── HarfBuzz + Knuth-Plass + Cairo
- └── importer/libs/
-      ├── libmobiparse.so ─ MOBI/AZW3 解析 (libmobi)
-      └── libpdfparse.so ── PDF/EPUB 解析 (MuPDF)
+ ├── libwordcard.so     ───── SM-2 学习引擎 (wordcard.c + modes.c)
+ ├── libcache.so        ───── KV Cache (14 个模块)
+ ├── libtxt2png.so      ───── HarfBuzz + Knuth-Plass + Cairo
+ ├── libqwen3_asr.so    ───── Qwen3-ASR (ONNX + llama.cpp)
+ │                         来源: /opt/friday/agent/qwen3_asr_engine.cpp
+ ├── importer/libs/
+ │   ├── libmobiparse.so ──── MOBI/AZW3 解析 (libmobi)
+ │   └── libpdfparse.so ──── PDF/EPUB 解析 (MuPDF)
+ └── voice/wrappers/
+     ├── piper_wrapper.cpp ─── TTS (需编译)
+     ├── sensevoice_wrapper.cpp ─ ASR 备选
+     └── qwen3_asr_bridge.*  ─── Qwen3-ASR C ABI
 ```
 
 ---
@@ -116,6 +125,8 @@ WordCard/
 ├── cli.py                       # CLI 交互复习
 ├── api.py                       # FastAPI REST
 ├── txt2png.py                   # 画布 API (Canvas)
+├── voice.py                     # ASR/TTS (Qwen3-ASR / SenseVoice / Piper)
+├── sound.py                     # 音频录制/播放/转换
 ├── generate_card.py             # 多格式卡片输出
 │
 ├── importer/
@@ -126,6 +137,14 @@ WordCard/
 │   └── libs/                    # 编译产物
 │       ├── libmobiparse.so
 │       └── libpdfparse.so
+│
+├── voice/                       # 语音引擎
+│   ├── libs/libqwen3_asr.so     # Qwen3-ASR (来自 /opt/friday)
+│   ├── wrappers/
+│   │   ├── qwen3_asr_bridge.h/cpp  # C ABI 桥
+│   │   ├── sensevoice_wrapper.cpp  # SenseVoice 封装
+│   │   └── piper_wrapper.cpp       # Piper TTS 封装
+│   └── Makefile
 │
 ├── data/                        # 数据库目录
 │   └── wordcard.db
@@ -168,15 +187,17 @@ WordCard/
 
 ## 技术栈
 
-| 层 | 技术 | 产物 |
-|-----|------|------|
-| **学习引擎** | C (C11) | `libwordcard.so` |
-| **KV Cache** | C (C11) | `libcache.so` |
-| **文本渲染** | C++17 + HarfBuzz + Cairo | `libtxt2png.so` |
-| **电子书解析** | C++17 + libmobi/MuPDF | `libmobiparse.so` / `libpdfparse.so` |
-| **业务逻辑** | Python (ctypes) | `engine.py` |
-| **CLI** | Python | `cli.py` |
-| **REST API** | Python (FastAPI) | `api.py` |
+| 层 | 技术 | 来源 | 产物 |
+|-----|------|------|------|
+| **学习引擎** | C (C11) | 本项目 | `libwordcard.so` |
+| **KV Cache** | C (C11) | `/opt/my_db` | `libcache.so` |
+| **文本渲染** | C++17 + HarfBuzz + Cairo | `/opt/txt2png` | `libtxt2png.so` |
+| **ASR 引擎** | C++17 + ONNX + llama.cpp | `/opt/friday/agent/` | `libqwen3_asr.so` |
+| **ASR 备选** | subprocess | `/opt/friday/shell/` | SenseVoice |
+| **TTS** | C++ Piper | `voice/wrappers/` | 需编译 |
+| **电子书解析** | C++17 + libmobi/MuPDF | `importer/wrappers/` | `libmobiparse.so` / `libpdfparse.so` |
+| **业务逻辑** | Python ctypes | 本项目 | `engine.py` |
+| **CLI / API** | Python | 本项目 | `cli.py` / `api.py` |
 
 ---
 

@@ -87,9 +87,18 @@
 | 阶段 7: 测试优化 | 3 | 3 | 0 | 0 |
 | 阶段 8: txt2png 集成 | 5 | 5 | 0 | 0 |
 | 阶段 9: CLI + API | 4 | 4 | 0 | 0 |
-| **总计** | **30** | **30** | **0** | **0** |
+| 阶段 10: /opt/friday 语音集成 | 4 | 4 | 0 | 0 |
+| **总计** | **34** | **34** | **0** | **0** |
 
 **当前完成度: 100%**
+
+---
+
+### ✅ 阶段 10: 集成 /opt/friday 语音能力 (P1)
+- [x] 10.1 `voice/libs/libqwen3_asr.so` — Qwen3-ASR C++ 引擎 C ABI 桥接
+- [x] 10.2 `voice.py` — ASR (Qwen3-ASR 主 + SenseVoice 备) + TTS (Piper)
+- [x] 10.3 `sound.py` — 音频录制/播放/转换
+- [x] 10.4 `voice/wrappers/qwen3_asr_bridge.*` — 桥接源码 + Makefile
 
 ---
 
