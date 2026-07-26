@@ -90,13 +90,38 @@ def extract_pdf(path):
             finally:
                 cdll.pdf_close(h)
 
-    # Fallback: OCR via Tesseract (for scanned PDFs)
+    # Fallback: OCR via /opt/Unlimited-OCR (Baidu SGLang, for scanned PDFs)
     try:
-        from ocr import pdf as ocr_pdf
-        text = ocr_pdf(path)
-        if text.strip():
-            return {'title': Path(path).stem, 'author': '', 'text': text}
-    except Exception as e:
+        import requests, base64, tempfile
+        import fitz
+        OCR_URL = "http://127.0.0.1:10000"
+        r = requests.get(f"{OCR_URL}/health", timeout=3)
+        if r.status_code == 200:
+            doc = fitz.open(path)
+            mat = fitz.Matrix(300 / 72, 300 / 72)
+            texts = []
+            for i, page in enumerate(doc):
+                tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+                page.get_pixmap(matrix=mat).save(tmp.name)
+                with open(tmp.name, 'rb') as f:
+                    b64 = base64.b64encode(f.read()).decode()
+                import os; os.unlink(tmp.name)
+                payload = {
+                    "model": "Unlimited-OCR",
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": "document parsing."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}
+                    ]}],
+                    "temperature": 0,
+                }
+                resp = requests.post(f"{OCR_URL}/v1/chat/completions", json=payload, timeout=300)
+                text = resp.json()["choices"][0]["message"]["content"]
+                texts.append(f"--- Page {i+1} ---\n{text}")
+            doc.close()
+            full = "\n\n".join(texts)
+            if full.strip():
+                return {'title': Path(path).stem, 'author': '', 'text': full}
+    except Exception:
         pass
 
     raise RuntimeError(f'Cannot extract text from PDF: {path}')
