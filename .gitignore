@@ -235,3 +235,9 @@ src/**/*.o
 # WordCard runtime data
 data/*
 *.db
+
+# Old stb txt2png (replaced by C++ bridge)
+src/stb_*.h
+src/txt2png.c
+src/txt2png.h
+src/test_txt2png.c
