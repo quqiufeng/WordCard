@@ -90,26 +90,40 @@ def extract_pdf(path):
             finally:
                 cdll.pdf_close(h)
 
-    # Fallback: OCR via tesseract（扫描版 PDF）
-    try:
-        import fitz, pytesseract, tempfile, os as _os
-        from PIL import Image
+    # Fallback: OCR via /opt/my-agent/wechat-ocr PP-OCRv4
+    import ctypes, json, tempfile, os as _os
+    import fitz
+    _lib = ctypes.CDLL('/opt/my-agent/wechat-ocr/lib/libwechat_ocr_core.so', mode=ctypes.RTLD_GLOBAL)
+    _lib.ocr_create.restype = ctypes.c_void_p
+    _lib.ocr_capture_file.restype = ctypes.c_char_p
+    _lib.ocr_free_string.argtypes = [ctypes.c_char_p]
+    _lib.ocr_destroy.argtypes = [ctypes.c_void_p]
+    _mdl = '/opt/my-agent/wechat-ocr/models'
+    _eng = _lib.ocr_create(
+        f'{_mdl}/ch_PP-OCRv4_det_infer.onnx'.encode(),
+        f'{_mdl}/ch_PP-OCRv4_rec_infer.onnx'.encode(),
+        '/opt/my-agent/wechat-ocr/ppocr_keys_v1.txt'.encode())
+    if _eng:
         doc = fitz.open(path)
         mat = fitz.Matrix(300/72, 300/72)
         texts = []
         for i, page in enumerate(doc):
-            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            page.get_pixmap(matrix=mat).save(tmp.name)
-            text = pytesseract.image_to_string(Image.open(tmp.name), lang='eng+chi_sim')
-            _os.unlink(tmp.name)
-            if text.strip():
-                texts.append(f'--- Page {i+1} ---\n{text}')
+            png = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            page.get_pixmap(matrix=mat).save(png.name)
+            result = _lib.ocr_capture_file(_eng, png.name.encode(), 0, 0)
+            _os.unlink(png.name)
+            if result:
+                data = json.loads(result.decode('utf-8'))
+                boxes = data.get('boxes', [])
+                page_text = '\n'.join(b.get('text', '') for b in boxes)
+                if page_text.strip():
+                    texts.append(f'--- Page {i+1} ---\n{page_text}')
+                _lib.ocr_free_string(result)
         doc.close()
+        _lib.ocr_destroy(_eng)
         full = '\n\n'.join(texts)
         if full.strip():
             return {'title': Path(path).stem, 'author': '', 'text': full}
-    except Exception:
-        pass
 
     raise RuntimeError(f'Cannot extract text from PDF: {path}')
 
