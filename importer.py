@@ -90,31 +90,40 @@ def extract_pdf(path):
             finally:
                 cdll.pdf_close(h)
 
-    # Fallback: OCR via /opt/my-agent/wechat-ocr PP-OCRv4 (subprocess)
-    import subprocess, json, tempfile, os as _os
+    # Fallback: OCR via /opt/Unlimited-OCR (Baidu SGLang)
+    import requests, base64, tempfile, os as _os
     import fitz
-    _helper = '/opt/WordCard/voice/libs/ocr_helper'
-    if _os.path.exists(_helper):
-        doc = fitz.open(path)
-        mat = fitz.Matrix(300/72, 300/72)
-        texts = []
-        for i, page in enumerate(doc):
-            png = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            page.get_pixmap(matrix=mat).save(png.name)
-            r = subprocess.run([_helper, png.name], capture_output=True, text=True, timeout=60)
-            _os.unlink(png.name)
-            if r.returncode == 0 and r.stdout.strip():
-                try:
-                    boxes = json.loads(r.stdout)
-                    page_text = '\n'.join(b.get('text','') for b in boxes)
-                    if page_text.strip():
-                        texts.append(f'--- Page {i+1} ---\n{page_text}')
-                except json.JSONDecodeError:
-                    pass
-        doc.close()
-        full = '\n\n'.join(texts)
-        if full.strip():
-            return {'title': Path(path).stem, 'author': '', 'text': full}
+    try:
+        _sr = requests.get('http://127.0.0.1:10000/health', timeout=2)
+        if _sr.status_code == 200:
+            doc = fitz.open(path)
+            mat = fitz.Matrix(300/72, 300/72)
+            texts = []
+            for i, page in enumerate(doc):
+                png = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+                page.get_pixmap(matrix=mat).save(png.name)
+                with open(png.name, 'rb') as f:
+                    b64 = base64.b64encode(f.read()).decode()
+                _os.unlink(png.name)
+                payload = {
+                    'model': 'Unlimited-OCR',
+                    'messages': [{'role': 'user', 'content': [
+                        {'type': 'text', 'text': 'document parsing.'},
+                        {'type': 'image_url', 'image_url': {'url': f'data:image/png;base64,{b64}'}}
+                    ]}],
+                    'temperature': 0,
+                }
+                r = requests.post('http://127.0.0.1:10000/v1/chat/completions',
+                                  json=payload, timeout=300)
+                text = r.json()['choices'][0]['message']['content']
+                if text.strip():
+                    texts.append(f'--- Page {i+1} ---\n{text}')
+            doc.close()
+            full = '\n\n'.join(texts)
+            if full.strip():
+                return {'title': Path(path).stem, 'author': '', 'text': full}
+    except Exception:
+        pass
 
     raise RuntimeError(f'Cannot extract text from PDF: {path}')
 
