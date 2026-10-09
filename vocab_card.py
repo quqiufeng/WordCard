@@ -183,10 +183,10 @@ def _wrap(canvas, text, fs, max_w):
         out.append(cur)
     return out
 
-def render_png(card, out_path, width=1000, min_height=0, title='', bg=None):
+def render_png(card, out_path, width=1000, min_height=0, title='', bg=None, margin_ratio=0.052):
     import datetime
     s = width / 1000.0
-    MARGIN = int(52 * s)
+    MARGIN = int(width * margin_ratio)
     TEXT_W = width - 2 * MARGIN
     FS, FS_T, FS_SEC, FS_SM = int(27*s), int(54*s), int(24*s), int(21*s)
     LH = lambda fs: int(fs * 1.62)
@@ -369,7 +369,8 @@ def main():
             pw, ph = 1920, 2560
         for c in cards:
             p = os.path.join(a.out, f"card_{c['word']}.png")
-            render_png(c, p, width=pw, min_height=ph, title=title, bg=a.bg)
+            render_png(c, p, width=pw, min_height=ph, title=title, bg=a.bg,
+                       margin_ratio=(0.115 if a.bg else 0.052))
         print(f'PNG: {len(cards)} 张 ({pw}x{ph}) → {a.out}/card_*.png')
 
 if __name__ == '__main__':
