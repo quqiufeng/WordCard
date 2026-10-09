@@ -124,23 +124,28 @@ class WordCardDB:
         db = cls.__new__(cls)
         db._lib = lib
         db._handle = h
+        db._path = path
         db._dirty = True
         return db
 
     def open_new(self, path):
-        # Already called wc_db_init via cls()
-        self._lib.wc_load_db.restype = c_void_p
-        h = self._lib.wc_load_db(path.encode('utf-8'))
-        if h:
+        # 新建数据库：wc_db_init 创建空库，后续 save(path) 落盘
+        self._lib.wc_db_init.restype = c_void_p
+        h = self._lib.wc_db_init()
+        if not h:
+            raise RuntimeError('wc_db_init failed')
+        if self._handle:
             self._lib.wc_db_free(self._handle)
-            self._handle = h
+        self._handle = h
+        self._path = path
         return self
 
     def save(self, path=None):
         self._lib.wc_save_db.argtypes = [c_void_p, c_char_p]
         self._lib.wc_save_db.restype = c_int
+        target = path or getattr(self, '_path', None)
         return self._lib.wc_save_db(self._handle,
-                                     path.encode('utf-8') if path else None)
+                                     target.encode('utf-8') if target else None)
 
     def close(self):
         if self._handle:

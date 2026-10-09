@@ -9,6 +9,14 @@ import engine
 # ── 英文停用词 ──────────────────────────────────────────────
 
 _STOPWORDS = set("""
+themselves himself herself itself ourselves yourself myself
+old first four end side moment seemed always though another went good
+came go going gone get got take took give gave make made know knew
+said say says see saw look looked think thought want wanted well also
+still yet ever much many little own thing things man men way ways upon
+shall unto thee thou thy hath did does done being having having
+""".split())
+_STOPWORDS |= set("""
 a an the and or but in on at to for of with by from as is are was were
 be been being have has had do does did will would shall should may might
 can could must need dare ought used about after against among between
@@ -17,6 +25,12 @@ further then once here there where why how all each every both few more
 most other some such no nor not only own same so than too very just
 because until while i you he she it we they me him his her its our your
 them their this that these those what which who whom am
+when now one two three time back into never round came day any even said
+work get got go going gone come came take took give gave make made know
+knew see saw look looked think thought say says said want wanted could
+would should who whose like well also just still yet ever every much many
+little long own thing things man men way ways make made must upon shall
+unto thee thou thy hath did does done being having having
 """.split())
 
 # ── 导入路径 ────────────────────────────────────────────────
@@ -183,6 +197,47 @@ def extract(path):
 
 # ── 提取词汇 ────────────────────────────────────────────────
 
+# 版权页/元数据/URL 常见噪声词
+_NOISE_WORDS = set("""
+isbn cip www http https com cn org net html xml utf eisbn
+bic cipdata xzxcn bfwy cip code isbn978 rights reserved
+publishing press group limited corporation inc ltd llc
+www bfwy com cn net http https email tel fax
+""".split())
+
+_ROMAN_RE = re.compile(r'^[IVXLCDM]{2,}$')
+
+def _is_noise_token(w):
+    """判断 token 是否为噪声（缩写/罗马数字/URL/编号）"""
+    wl = w.lower()
+    if wl in _NOISE_WORDS:
+        return True
+    # 全大写且长度>=2（缩写/编号，如 ISBN / XZXCN / VIII）
+    if len(w) >= 2 and w.isupper():
+        return True
+    # 罗马数字
+    if _ROMAN_RE.match(w):
+        return True
+    # 无元音且长度>3（多为编码，如 bfwy）
+    if len(wl) > 3 and not any(c in wl for c in 'aeiouy'):
+        return True
+    # 连续相同字符（如 aaaa）
+    if len(wl) >= 3 and len(set(wl)) == 1:
+        return True
+    return False
+
+def _is_prose(sent):
+    """粗判句子是否自然语言（过滤版权页/表格/目录等）"""
+    if len(sent) > 400:
+        return False
+    alpha = sum(c.isalpha() or c.isspace() for c in sent)
+    if len(sent) and alpha / len(sent) < 0.6:
+        return False
+    digits = sum(c.isdigit() for c in sent)
+    if digits > len(sent) * 0.15:
+        return False
+    return True
+
 def _clean_text(text):
     """Remove markdown syntax and normalize"""
     text = re.sub(r'#{1,6}\s*', '', text)
@@ -193,29 +248,42 @@ def _clean_text(text):
     return text
 
 def extract_words(text, max_words=200):
-    """提取文本中的英文词汇，返回 [(word, context_sentence), ...]"""
-    text = _clean_text(text)
+    """提取文本中的英文词汇，返回 [(word, context_sentence), ...]
+
+    过滤版权页/URL/缩写等噪声，按词频从高到低排序（高频＝更常用）。
+    """
+    import html as _html
+    text = _clean_text(_html.unescape(text))
     sentences = re.split(r'(?<=[.!?])\s+', text)
-    word_set = {}
+    freq = {}
+    ctx = {}
+    lower_seen = set()    # 出现过小写形式的词
     for sent in sentences:
         sent = sent.strip()
-        if not sent:
+        if not sent or not _is_prose(sent):
             continue
+        # 去掉 URL 片段
+        sent = re.sub(r'\b(?:https?://|www\.)\S+', '', sent)
         words = re.findall(r"[a-zA-Z]+(?:'[a-zA-Z]+)?", sent)
         for w in words:
             wl = w.lower()
             if len(wl) < 3 or len(wl) > 20:
                 continue
-            if wl in _STOPWORDS:
+            if wl in _STOPWORDS or _is_noise_token(w):
                 continue
-            if wl not in word_set and len(word_set) < max_words:
-                context = sent.strip()
-                if len(context) > 200:
-                    context = context[:200] + '...'
-                word_set[wl] = (w, context)
-    result = list(word_set.values())
-    result.sort(key=lambda x: len(x[0]), reverse=True)
-    return result
+            if w == wl:            # 该词曾以小写出现
+                lower_seen.add(wl)
+            freq[wl] = freq.get(wl, 0) + 1
+            if wl not in ctx:
+                c = re.sub(r'\s+', ' ', sent).strip()
+                if len(c) > 200:
+                    c = c[:200] + '...'
+                ctx[wl] = c
+    # 专有名词过滤：只以大写形式出现的词（人名/地名/品牌）
+    ranked = [w for w in freq if w in lower_seen]
+    # 按词频降序，频次相同按字母序
+    ranked.sort(key=lambda w: (-freq[w], w))
+    return [(wl, ctx[wl]) for wl in ranked[:max_words]]
 
 # ── 导入流程 ────────────────────────────────────────────────
 
