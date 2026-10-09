@@ -311,8 +311,8 @@ int wp_select_ex(void* handle, const char* text, const wp_config_t* cfg,
         if (total == 0 || (float)alpha / total < 0.65f) return;
         int marks = 0;
         for (char c : sentence)
-            if (c==':'||c=='{'||c=='}'||c=='<'||c=='>'||c=='='||c=='/'||c=='@'||c==';') ++marks;
-        if (marks > 2) return;
+            if (c=='{'||c=='}'||c=='<'||c=='>'||c=='='||c=='@') ++marks;
+        if (marks > 0) return;   // HTML 标签特征
 
         int chunk = text_len ? (int)((off_end * 8) / text_len) : 0;
         if (chunk > 7) chunk = 7;
@@ -324,12 +324,19 @@ int wp_select_ex(void* handle, const char* text, const wp_config_t* cfg,
             size_t j = i;
             while (j < n && (is_alpha(sentence[j]) || (sentence[j]=='\'' && j+1<n && is_alpha(sentence[j+1])))) ++j;
             std::string raw = sentence.substr(i, j - i);
+            bool prev_hyphen = (i > 0 && sentence[i - 1] == '-');
+            bool next_css   = (j < n && (sentence[j] == ':' || sentence[j] == ';' || sentence[j] == '-'));
+            int  start = (int)i;
             i = j;
             if (raw.empty()) continue;
             std::string low = lower_ascii(raw);
             bool is_cap = (raw[0] >= 'A' && raw[0] <= 'Z');
             bool s_init = first;
             first = false;
+
+            // 跳过 CSS 属性 token：前后带 '-' / 后接 ':' ';'
+            if (prev_hyphen || next_css) continue;
+            (void)start;
 
             if (is_noise(raw, low)) continue;
             std::string lemma = to_lemma(low);
