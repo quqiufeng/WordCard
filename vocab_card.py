@@ -24,7 +24,15 @@ FONT_PRESETS = {
     'kai':   '/usr/share/fonts/truetype/arphic/ukai.ttc',
     'hei':   '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
     'zenhei':'/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+    'maple':       os.path.expanduser('~/.local/share/fonts/MapleMono/MapleMono-NF-CN-Regular.ttf'),
+    'maple-medium':os.path.expanduser('~/.local/share/fonts/MapleMono/MapleMono-NF-CN-Medium.ttf'),
+    'maple-semibold':os.path.expanduser('~/.local/share/fonts/MapleMono/MapleMono-NF-CN-SemiBold.ttf'),
+    'maple-bold':  os.path.expanduser('~/.local/share/fonts/MapleMono/MapleMono-NF-CN-Bold.ttf'),
 }
+
+# 含中文的等宽/全字库字体 → 中英统一
+_MULTI_FONTS = {'maple', 'maple-medium', 'maple-semibold', 'maple-bold',
+                'zenhei', 'hei'}
 FONT_CN = FONT_PRESETS['kai']      # 中文：楷体
 FONT_EN = FONT_PRESETS['serif']    # 西文：宋体
 for _p in FONT_PRESETS.values():
@@ -251,6 +259,7 @@ def main():
     ap.add_argument('--out', default='output')
     ap.add_argument('--size', default='xhs',
                     help='xhs/小红薯=1920x2560(3:4), sq/朋友圈=2048x2048, 或 WxH')
+    ap.add_argument('--font-cn', default=None, help='覆盖中文字体')
     ap.add_argument('--font', default='serif',
                     help='sans/serif/kai/hei/zenhei 或字体文件路径')
     ap.add_argument('--no-png', action='store_true')
@@ -258,9 +267,14 @@ def main():
 
     global FONT_CN, FONT_EN
     if a.font in FONT_PRESETS:
-        FONT_EN = FONT_PRESETS[a.font]
+        if a.font in _MULTI_FONTS:
+            FONT_CN = FONT_EN = FONT_PRESETS[a.font]
+        else:
+            FONT_EN = FONT_PRESETS[a.font]
     elif os.path.exists(a.font):
         FONT_EN = a.font
+    if a.font_cn:
+        FONT_CN = a.font_cn
     print(f'字体: 中文={os.path.basename(FONT_CN)}  西文={os.path.basename(FONT_EN)}')
 
     os.makedirs(a.out, exist_ok=True)
