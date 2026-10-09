@@ -39,6 +39,8 @@ def _load():
     _lib.voice_tts_load.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p,
                                      ctypes.c_int, ctypes.c_int]
     _lib.voice_tts_load.restype = ctypes.c_int
+    _lib.voice_tts_set_sid.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    _lib.voice_tts_set_sid.restype = None
     _lib.voice_tts_synthesize.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p]
     _lib.voice_tts_synthesize.restype = ctypes.POINTER(ctypes.c_char)
     _lib.voice_tts_free_text.argtypes = [ctypes.POINTER(ctypes.c_char)]
@@ -90,7 +92,7 @@ def tts_available():
     lib = _load()
     return lib is not None and os.path.exists('/opt/sherpa-onnx/bin/sherpa-onnx-offline-tts')
 
-def synthesize(text, output_path=None):
+def synthesize(text, output_path=None, sid=None):
     lib = _load()
     if not lib:
         raise RuntimeError('libvoice_engine.so not loaded')
@@ -99,6 +101,8 @@ def synthesize(text, output_path=None):
         raise RuntimeError('TTS engine creation failed')
     try:
         lib.voice_tts_load(engine, None, None, 4, 0)
+        if sid is not None:
+            lib.voice_tts_set_sid(engine, int(sid))
         out = output_path.encode() if output_path else None
         text_p = lib.voice_tts_synthesize(engine, text.encode(), out)
         result = ctypes.cast(text_p, ctypes.c_char_p).value.decode('utf-8') if text_p else ''

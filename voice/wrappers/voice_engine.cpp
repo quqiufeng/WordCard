@@ -120,7 +120,7 @@ void* voice_tts_create(const char* model_dir) {
     if (model_dir) eng->model_dir = model_dir;
     eng->tts_bin = "/opt/sherpa-onnx/bin/sherpa-onnx-offline-tts";
     eng->kokoro_dir = "/data/models/kokoro-multi-lang-v1_0";
-    eng->sid = 47;
+    { const char* s = getenv("WC_TTS_SID"); eng->sid = s ? atoi(s) : 47; }
     eng->threads = 4;
     return eng;
 }
@@ -159,6 +159,11 @@ char* voice_tts_synthesize(void* engine, const char* text, const char* output_pa
     if (!result) return nullptr;
     memcpy(result, out.c_str(), out.size() + 1);
     return result;
+}
+
+void voice_tts_set_sid(void* engine, int sid) {
+    auto* eng = static_cast<VoiceTtsEngine*>(engine);
+    if (eng && sid >= 0) eng->sid = sid;
 }
 
 void voice_tts_free_text(char* text) {

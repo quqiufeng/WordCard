@@ -22,6 +22,7 @@ void* voice_tts_create(const char* model_dir);
 int   voice_tts_load(void* engine, const char* model_path, const char* config_path,
                      int n_threads, int use_gpu);
 char*  voice_tts_synthesize(void* engine, const char* text, const char* output_path);
+void   voice_tts_set_sid(void* engine, int sid);
 void   voice_tts_free_text(char* text);
 void   voice_tts_destroy(void* engine);
 
