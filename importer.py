@@ -208,7 +208,16 @@ def extract_epub(path):
     finally:
         cdll.epub_close(h)
 
-def extract(path):
+def extract(path, save_text=None):
+    """解析电子书。save_text 非空时把完整正文写入该文件。"""
+    info = _extract(path)
+    if save_text:
+        os.makedirs(os.path.dirname(save_text) or '.', exist_ok=True)
+        with open(save_text, 'w', encoding='utf-8') as f:
+            f.write(f"TITLE: {info['title']}\nAUTHOR: {info['author']}\n\n{info['text']}")
+    return info
+
+def _extract(path):
     ext = Path(path).suffix.lower()
     if ext in ('.mobi', '.azw3', '.prc'):
         return extract_mobi(path)

@@ -462,9 +462,12 @@ def main():
 
     os.makedirs(a.out, exist_ok=True)
     print('解析电子书...')
-    info = importer.extract(a.book)
+    base = os.path.splitext(os.path.basename(a.book))[0]
+    txt_out = os.path.join(a.out, base + '.txt')
+    info = importer.extract(a.book, save_text=txt_out)
     text = html.unescape(info['text'])
-    title = info['title'] or os.path.basename(a.book)
+    title = info['title'] or base
+    print(f'正文已保存: {txt_out}  ({len(info["text"])} 字符)')
 
     if a.words:
         words = [(w.strip().lower(), 0.0, 0, 0) for w in a.words.split(',') if w.strip()]

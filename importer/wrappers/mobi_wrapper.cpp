@@ -149,9 +149,13 @@ API int mobi_get_metadata(void* handle,
     if (author && author_len > 0) {
         // libmobi 的 EXTH 记录中，EXTH_AUTHOR 是作者
         const MOBIExthHeader* exth = mobi_get_exthrecord_by_tag(h->m, EXTH_AUTHOR);
-        if (exth && exth->data) {
-            strncpy(author, (const char*)exth->data, author_len - 1);
-            author[author_len - 1] = '\0';
+        if (exth && exth->data && exth->size > 0) {
+            size_t n = exth->size;
+            if (n > author_len - 1) n = author_len - 1;
+            memcpy(author, exth->data, n);
+            author[n] = '\0';
+            while (n > 0 && (author[n-1] == '\0' || author[n-1] == ' '))
+                author[--n] = '\0';
         } else {
             author[0] = '\0';
         }
