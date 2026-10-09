@@ -784,4 +784,44 @@ int txt2png_canvas_ascent(txt2png_canvas_t canvas, const char *font_path,
     return ascent;
 }
 
+// ── 线 / 矩形 ──────────────────────────────────────────────
+
+void txt2png_canvas_line(txt2png_canvas_t canvas, double x1, double y1,
+                          double x2, double y2, uint32_t color, double width) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    if (!c) return;
+    unsigned char r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
+    cairo_set_source_rgb(c->cr, r / 255.0, g / 255.0, b / 255.0);
+    cairo_set_line_width(c->cr, width > 0 ? width : 1.0);
+    cairo_move_to(c->cr, x1, y1);
+    cairo_line_to(c->cr, x2, y2);
+    cairo_stroke(c->cr);
+}
+
+void txt2png_canvas_rect(txt2png_canvas_t canvas, double x, double y,
+                          double w, double h, uint32_t color, int filled, double radius) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    if (!c) return;
+    unsigned char r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
+    cairo_set_source_rgb(c->cr, r / 255.0, g / 255.0, b / 255.0);
+    const double PI = 3.14159265358979323846;
+    if (radius > 0) {
+        double x0 = x, y0 = y, x1 = x + w, y1 = y + h, rad = radius;
+        cairo_new_sub_path(c->cr);
+        cairo_arc(c->cr, x1 - rad, y0 + rad, rad, -PI / 2, 0);
+        cairo_arc(c->cr, x1 - rad, y1 - rad, rad, 0, PI / 2);
+        cairo_arc(c->cr, x0 + rad, y1 - rad, rad, PI / 2, PI);
+        cairo_arc(c->cr, x0 + rad, y0 + rad, rad, PI, 3 * PI / 2);
+        cairo_close_path(c->cr);
+    } else {
+        cairo_rectangle(c->cr, x, y, w, h);
+    }
+    if (filled) {
+        cairo_fill(c->cr);
+    } else {
+        cairo_set_line_width(c->cr, 1.5);
+        cairo_stroke(c->cr);
+    }
+}
+
 } // extern "C"

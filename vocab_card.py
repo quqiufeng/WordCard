@@ -54,6 +54,8 @@ RED    = 0xD92121   # 朱砂红
 MUTED  = 0x5B6B4F
 ACCENT = 0x2A3C5C   # 黛蓝
 BORDER = 0xC4D6A6
+CARD   = 0xF3F8E8   # 嫩菊绿（头部卡片）
+ZH_BG  = 0xEDF4DD   # 译文浅底
 
 W = 1000
 MARGIN = 50
@@ -181,69 +183,115 @@ def _wrap(canvas, text, fs, max_w):
         out.append(cur)
     return out
 
-def render_png(card, out_path, width=1000, min_height=0):
-    scale = width / 1000.0
-    MARGIN = int(50 * scale)
+def render_png(card, out_path, width=1000, min_height=0, title=''):
+    import datetime
+    s = width / 1000.0
+    MARGIN = int(52 * s)
     TEXT_W = width - 2 * MARGIN
-    FS = int(27 * scale)
-    FS_T = int(52 * scale)
-    FS_SEC = int(25 * scale)
-    FS_SM = int(21 * scale)
-    LH = lambda fs: int(fs * 1.6)
-
+    FS, FS_T, FS_SEC, FS_SM = int(27*s), int(54*s), int(24*s), int(21*s)
+    LH = lambda fs: int(fs * 1.62)
+    GAP = int(30 * s)
+    PAD = int(24 * s)
     W = width
+
     probe = txt2png.Canvas(W, 100, BG)
+    def wrap(t, fs, mw): return _wrap(probe, t, fs, mw)
+    def nlines(t, fs, mw): return len(wrap(t, fs, mw))
+    def lines_h(t, fs, mw): return nlines(t, fs, mw) * LH(fs)
 
-    def para_h(text, fs):
-        return len(_wrap(probe, text, fs, TEXT_W)) * LH(fs)
-
-    h = MARGIN
-    h += LH(FS_SM) + int(8 * scale)
-    h += LH(FS_T) + int(24 * scale)
-    h += para_h(card['zh_def'], FS) + para_h(card['en_def'], FS_SM) + int(24 * scale)
+    header_h = PAD + LH(FS_SM) + int(8*s) + LH(FS_T) + PAD
+    # 预估内容高度
+    h = MARGIN + header_h + GAP
+    h += lines_h(card['zh_def'], FS, TEXT_W) + int(4*s) + lines_h(card['en_def'], FS_SM, TEXT_W) + GAP
     if card['para_en']:
-        h += LH(FS_SEC) + int(6 * scale) + para_h(card['para_en'], FS) + para_h(card['para_zh'], FS) + int(20 * scale)
+        h += LH(FS_SEC) + int(12*s) + lines_h(card['para_en'], FS, TEXT_W)
+        h += int(8*s) + PAD + lines_h(card['para_zh'], FS, TEXT_W) + PAD + GAP
     if card['sents']:
-        h += LH(FS_SEC) + int(6 * scale)
+        h += LH(FS_SEC) + int(12*s)
         for en, zh in card['sents']:
-            h += para_h(en, FS) + para_h(zh, FS_SM) + int(14 * scale)
-    h += MARGIN
+            h += lines_h(en, FS, TEXT_W - int(40*s)) + int(4*s) + lines_h(zh, FS_SM, TEXT_W - int(40*s)) + int(22*s)
+        h += GAP
+    h += PAD + MARGIN
     if min_height:
         h = max(h, min_height)
 
     c = txt2png.Canvas(W, h, BG)
+    c.rect(0, 0, W, int(7*s), GREEN, True, 0)          # 顶部色条
+
     y = MARGIN
-    c.draw_text(FONT_EN, FS_SM, 'WordCard', MARGIN, y + c.ascent(FONT, FS_SM), GREEN)
-    c.draw_text(FONT_EN, FS_SM, card['level'], MARGIN + int(120 * scale), y + c.ascent(FONT, FS_SM), MUTED)
-    y += LH(FS_SM) + int(8 * scale)
-    c.draw_text(FONT_EN, FS_T, card['word'], MARGIN, y + c.ascent(FONT, FS_T), RED)
+    # ── 头部卡片 ──
+    c.rect(MARGIN, y, TEXT_W, header_h, CARD, True, int(16*s))
+    ix = MARGIN + PAD
+    yy = y + PAD
+    c.draw_text(FONT_EN, FS_SM, 'WordCard', ix, yy + c.ascent(FONT_EN, FS_SM), GREEN)
+    if card['level']:
+        lv = card['level']
+        bw = int(70*s); bh = LH(FS_SM)
+        c.rect(MARGIN + TEXT_W - PAD - bw, yy, bw, bh, GREEN, True, int(6*s))
+        tx = MARGIN + TEXT_W - PAD - bw + (bw - c.measure(FONT_EN, FS_SM, lv))//2
+        c.draw_text(FONT_EN, FS_SM, lv, tx, yy + c.ascent(FONT_EN, FS_SM), 0xFFFFFF)
+    yy += LH(FS_SM) + int(8*s)
+    c.draw_text(FONT_EN, FS_T, card['word'], ix, yy + c.ascent(FONT_EN, FS_T), RED)
     if card['pos']:
         xw = c.measure(FONT_EN, FS_T, card['word'])
-        c.draw_text(FONT_EN, FS_SM, card['pos'], MARGIN + xw + int(14 * scale), y + c.ascent(FONT, FS_T), MUTED)
-    y += LH(FS_T) + int(24 * scale)
-    for line in _wrap(c, card['zh_def'], FS, TEXT_W):
+        c.draw_text(FONT_EN, FS_SM, card['pos'], ix + xw + int(16*s), yy + c.ascent(FONT_EN, FS_T), MUTED)
+    y += header_h + GAP
+
+    # ── 释义 ──
+    for line in wrap(card['zh_def'], FS, TEXT_W):
         c.draw_text(FONT_CN, FS, line, MARGIN, y + c.ascent(FONT_CN, FS), INK); y += LH(FS)
-    for line in _wrap(c, card['en_def'], FS_SM, TEXT_W):
+    y += int(4*s)
+    for line in wrap(card['en_def'], FS_SM, TEXT_W):
         c.draw_text(FONT_EN, FS_SM, line, MARGIN, y + c.ascent(FONT_EN, FS_SM), MUTED); y += LH(FS_SM)
-    y += int(24 * scale)
+    y += GAP
+
+    def section(label):
+        nonlocal y
+        bx = MARGIN
+        c.rect(bx, y + int(3*s), int(6*s), LH(FS_SEC) - int(8*s), GREEN, True, int(3*s))
+        c.draw_text(FONT_CN, FS_SEC, label, bx + int(18*s), y + c.ascent(FONT_CN, FS_SEC), GREEN)
+        c.line(MARGIN, y + LH(FS_SEC) + int(4*s), MARGIN + TEXT_W, y + LH(FS_SEC) + int(4*s), BORDER, 1.2)
+        y += LH(FS_SEC) + int(12*s)
+
+    # ── 段落 ──
     if card['para_en']:
-        c.draw_text(FONT_CN, FS_SEC, '段落', MARGIN, y + c.ascent(FONT, FS_SEC), GREEN)
-        y += LH(FS_SEC) + int(6 * scale)
-        for line in _wrap(c, card['para_en'], FS, TEXT_W):
+        section('段落')
+        for line in wrap(card['para_en'], FS, TEXT_W):
             c.draw_text(FONT_EN, FS, line, MARGIN, y + c.ascent(FONT_EN, FS), INK); y += LH(FS)
-        for line in _wrap(c, card['para_zh'], FS, TEXT_W):
-            c.draw_text(FONT_CN, FS, line, MARGIN, y + c.ascent(FONT_CN, FS), ACCENT); y += LH(FS)
-        y += int(20 * scale)
+        y += int(8*s)
+        c.rect(MARGIN, y, TEXT_W, PAD + lines_h(card['para_zh'], FS, TEXT_W - int(20*s)) + PAD, ZH_BG, True, int(10*s))
+        c.rect(MARGIN, y, int(5*s), PAD + lines_h(card['para_zh'], FS, TEXT_W - int(20*s)) + PAD, ACCENT, True, int(2*s))
+        ty = y + PAD
+        for line in wrap(card['para_zh'], FS, TEXT_W - int(20*s)):
+            c.draw_text(FONT_CN, FS, line, MARGIN + int(20*s), ty + c.ascent(FONT_CN, FS), ACCENT); ty += LH(FS)
+        y = ty + PAD + GAP
+
+    # ── 例句 ──
     if card['sents']:
-        c.draw_text(FONT_CN, FS_SEC, '例句', MARGIN, y + c.ascent(FONT, FS_SEC), GREEN)
-        y += LH(FS_SEC) + int(6 * scale)
+        section('例句')
         for idx, (en, zh) in enumerate(card['sents'], 1):
-            c.draw_text(FONT_EN, FS_SM, f'{idx}.', MARGIN, y + c.ascent(FONT_EN, FS_SM), RED)
-            for line in _wrap(c, en, FS, TEXT_W - int(24 * scale)):
-                c.draw_text(FONT_EN, FS, line, MARGIN + int(24 * scale), y + c.ascent(FONT_EN, FS), INK); y += LH(FS)
-            for line in _wrap(c, zh, FS_SM, TEXT_W - int(24 * scale)):
-                c.draw_text(FONT_CN, FS_SM, line, MARGIN + int(24 * scale), y + c.ascent(FONT_CN, FS_SM), ACCENT); y += LH(FS_SM)
-            y += int(14 * scale)
+            xoff = MARGIN + int(40*s)
+            c.rect(MARGIN, y, int(30*s), int(30*s), RED, True, int(15*s))
+            num = str(idx)
+            nw = c.measure(FONT_EN, FS_SM, num)
+            c.draw_text(FONT_EN, FS_SM, num, MARGIN + (int(30*s)-nw)//2, y + c.ascent(FONT_EN, FS_SM) - int(2*s), 0xFFFFFF)
+            for line in wrap(en, FS, TEXT_W - int(40*s)):
+                c.draw_text(FONT_EN, FS, line, xoff, y + c.ascent(FONT_EN, FS), INK); y += LH(FS)
+            y += int(4*s)
+            c.line(xoff, y, xoff, y + lines_h(zh, FS_SM, TEXT_W-int(40*s)), ACCENT, 2.0)
+            for line in wrap(zh, FS_SM, TEXT_W - int(40*s)):
+                c.draw_text(FONT_CN, FS_SM, line, xoff + int(14*s), y + c.ascent(FONT_CN, FS_SM), ACCENT); y += LH(FS_SM)
+            y += int(22*s)
+        y += int(8*s)
+
+    # ── 页脚 ──
+    fy = h - MARGIN
+    c.line(MARGIN, fy - PAD, MARGIN + TEXT_W, fy - PAD, BORDER, 1.2)
+    c.draw_text(FONT_CN, FS_SM, (title or 'WordCard')[:40], MARGIN, fy + c.ascent(FONT_CN, FS_SM) - int(10*s), MUTED)
+    ds = datetime.datetime.now().strftime('%Y-%m-%d')
+    dw = c.measure(FONT_EN, FS_SM, ds)
+    c.draw_text(FONT_EN, FS_SM, ds, MARGIN + TEXT_W - dw, fy + c.ascent(FONT_EN, FS_SM) - int(10*s), MUTED)
+
     c.save(out_path)
     return out_path
 
@@ -317,7 +365,7 @@ def main():
             pw, ph = 1920, 2560
         for c in cards:
             p = os.path.join(a.out, f"card_{c['word']}.png")
-            render_png(c, p, width=pw, min_height=ph)
+            render_png(c, p, width=pw, min_height=ph, title=title)
         print(f'PNG: {len(cards)} 张 ({pw}x{ph}) → {a.out}/card_*.png')
 
 if __name__ == '__main__':
