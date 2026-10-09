@@ -129,34 +129,36 @@ def build_card(word, level_name, text, max_sent=3):
 
 # ── 音频（英文朗读）─────────────────────────────────────
 
-def render_audio(card, out_path, sid=3):
-    """英文朗读：单词 → 段落 → 每个例句，段落间合理停顿"""
+def render_audio_all(cards, out_path, sid=3, card_gap=1.5):
+    """所有单词合成一个 WAV：单词→段落→例句，段间静音，单词间更长静音"""
     import wave, tempfile, voice
-    # (文本, 其后停顿秒数)
-    items = [(card['word'], 0.8)]
-    if card['para_en']:
-        items.append((card['para_en'], 1.0))
-    for en, _zh in card['sents']:
-        if en and en.strip():
-            items.append((en, 0.7))
     frames, params = [], None
     rate = ch = sw = None
-    for text, gap in items:
-        tmp = tempfile.mktemp(suffix='.wav')
-        voice.synthesize(text, tmp, sid=sid)
-        with wave.open(tmp, 'rb') as w:
-            if params is None:
-                params = w.getparams()
-                rate, ch, sw = w.getframerate(), w.getnchannels(), w.getsampwidth()
-            frames.append((w.readframes(w.getnframes()), gap))
-        os.unlink(tmp)
+    for card in cards:
+        items = [(card['word'], 1.0)]
+        if card['para_en']:
+            items.append((card['para_en'], 1.2))
+        for en, _zh in card['sents']:
+            if en and en.strip():
+                items.append((en, 0.8))
+        for text, gap in items:
+            tmp = tempfile.mktemp(suffix='.wav')
+            voice.synthesize(text, tmp, sid=sid)
+            with wave.open(tmp, 'rb') as w:
+                if params is None:
+                    params = w.getparams()
+                    rate, ch, sw = w.getframerate(), w.getnchannels(), w.getsampwidth()
+                frames.append((w.readframes(w.getnframes()), gap))
+            os.unlink(tmp)
+        frames.append((b'', card_gap))   # 单词之间静音
     if not frames:
         return None
     sil = lambda sec: b'\x00' * int(rate * sec) * ch * sw
     with wave.open(out_path, 'wb') as w:
         w.setparams(params)
         for i, (fr, gap) in enumerate(frames):
-            w.writeframes(fr)
+            if fr:
+                w.writeframes(fr)
             if i < len(frames) - 1:
                 w.writeframes(sil(gap))
     return out_path
@@ -398,10 +400,9 @@ def main():
     print('MD:', md)
 
     if a.audio:
-        for c_ in cards:
-            ap_ = os.path.join(a.out, f"audio_{c_['word']}.wav")
-            render_audio(c_, ap_, sid=a.sid)
-        print(f'AUDIO: {len(cards)} 个 → {a.out}/audio_*.wav')
+        ap_ = os.path.join(a.out, 'vocab_audio.wav')
+        render_audio_all(cards, ap_, sid=a.sid)
+        print(f'AUDIO: {len(cards)} 词 → {ap_}')
 
     if not a.no_png:
         # 尺寸预设
