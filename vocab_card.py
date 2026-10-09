@@ -186,12 +186,15 @@ def _wrap(canvas, text, fs, max_w):
 def render_png(card, out_path, width=1000, min_height=0, title='', bg=None, margin_ratio=0.052):
     import datetime
     s = width / 1000.0
-    MARGIN = int(width * margin_ratio)
-    TEXT_W = width - 2 * MARGIN
-    FS, FS_T, FS_SEC, FS_SM = int(27*s), int(54*s), int(24*s), int(21*s)
+    OUT_M = int(width * margin_ratio)      # 画布外边距
+    PAD = int(46 * s)                       # 面板内边距
+    PANEL_X = OUT_M
+    PANEL_W = width - 2 * OUT_M
+    TXT_X = PANEL_X + PAD
+    TEXT_W = PANEL_W - 2 * PAD
+    FS, FS_T, FS_SEC, FS_SM = int(27*s), int(52*s), int(24*s), int(21*s)
     LH = lambda fs: int(fs * 1.62)
-    GAP = int(30 * s)
-    PAD = int(24 * s)
+    GAP = int(32 * s)
     W = width
 
     probe = txt2png.Canvas(W, 100, BG)
@@ -199,41 +202,50 @@ def render_png(card, out_path, width=1000, min_height=0, title='', bg=None, marg
     def nlines(t, fs, mw): return len(wrap(t, fs, mw))
     def lines_h(t, fs, mw): return nlines(t, fs, mw) * LH(fs)
 
-    header_h = PAD + LH(FS_SM) + int(8*s) + LH(FS_T) + PAD
-    # 预估内容高度
-    h = MARGIN + header_h + GAP
-    h += lines_h(card['zh_def'], FS, TEXT_W) + int(4*s) + lines_h(card['en_def'], FS_SM, TEXT_W) + GAP
+    header_h = PAD + LH(FS_SM) + int(6*s) + LH(FS_T) + int(10*s)
+    # 面板内容高度（相对面板顶部）
+    ch = PAD
+    ch += header_h + GAP
+    ch += lines_h(card['zh_def'], FS, TEXT_W) + int(6*s) + lines_h(card['en_def'], FS_SM, TEXT_W) + GAP
     if card['para_en']:
-        h += LH(FS_SEC) + int(12*s) + lines_h(card['para_en'], FS, TEXT_W)
-        h += int(8*s) + PAD + lines_h(card['para_zh'], FS, TEXT_W) + PAD + GAP
+        ch += LH(FS_SEC) + int(14*s) + lines_h(card['para_en'], FS, TEXT_W)
+        ch += int(10*s) + PAD + lines_h(card['para_zh'], FS, TEXT_W) + PAD + GAP
     if card['sents']:
-        h += LH(FS_SEC) + int(12*s)
+        ch += LH(FS_SEC) + int(14*s)
         for en, zh in card['sents']:
-            h += lines_h(en, FS, TEXT_W - int(40*s)) + int(4*s) + lines_h(zh, FS_SM, TEXT_W - int(40*s)) + int(22*s)
-        h += GAP
-    h += PAD + MARGIN
+            ch += lines_h(en, FS, TEXT_W - int(40*s)) + int(4*s) + lines_h(zh, FS_SM, TEXT_W - int(40*s)) + int(24*s)
+        ch += int(10*s)
+    FOOTER_H = LH(FS_SM) + int(24*s)
+    ch += FOOTER_H
+    ch += PAD
+
+    h = ch + 2 * OUT_M
     if min_height:
         h = max(h, min_height)
+    panel_y = (h - ch) // 2                # 垂直居中
 
     c = txt2png.Canvas(W, h, BG)
     if bg:
-        c.image(bg, 0, 0, W, h)                        # 背景图
+        c.image(bg, 0, 0, W, h)
+        # 居中半透明面板
+        c.rect(PANEL_X, panel_y, PANEL_W, ch, 0xFDFBF2, True, int(22*s), 0.94)
+        c.rect(PANEL_X, panel_y, PANEL_W, ch, BORDER, False, int(22*s), 1.0)
     else:
-        c.rect(0, 0, W, int(7*s), GREEN, True, 0)      # 顶部色条
+        c.rect(0, 0, W, int(7*s), GREEN, True, 0)
 
-    y = MARGIN
+    y = panel_y + PAD
     # ── 头部卡片 ──
-    c.rect(MARGIN, y, TEXT_W, header_h, CARD, True, int(16*s))
-    ix = MARGIN + PAD
-    yy = y + PAD
+    c.rect(TXT_X, y, TEXT_W, header_h, CARD, True, int(16*s))
+    ix = TXT_X + int(24*s)
+    yy = y + int(16*s)
     c.draw_text(FONT_EN, FS_SM, 'WordCard', ix, yy + c.ascent(FONT_EN, FS_SM), GREEN)
     if card['level']:
         lv = card['level']
-        bw = int(70*s); bh = LH(FS_SM)
-        c.rect(MARGIN + TEXT_W - PAD - bw, yy, bw, bh, GREEN, True, int(6*s))
-        tx = MARGIN + TEXT_W - PAD - bw + (bw - c.measure(FONT_EN, FS_SM, lv))//2
-        c.draw_text(FONT_EN, FS_SM, lv, tx, yy + c.ascent(FONT_EN, FS_SM), 0xFFFFFF)
-    yy += LH(FS_SM) + int(8*s)
+        bw = int(72*s); bh = LH(FS_SM)
+        bx = TXT_X + TEXT_W - int(24*s) - bw
+        c.rect(bx, yy, bw, bh, GREEN, True, int(6*s))
+        c.draw_text(FONT_EN, FS_SM, lv, bx + (bw - c.measure(FONT_EN, FS_SM, lv))//2, yy + c.ascent(FONT_EN, FS_SM), 0xFFFFFF)
+    yy += LH(FS_SM) + int(6*s)
     c.draw_text(FONT_EN, FS_T, card['word'], ix, yy + c.ascent(FONT_EN, FS_T), RED)
     if card['pos']:
         xw = c.measure(FONT_EN, FS_T, card['word'])
@@ -242,58 +254,53 @@ def render_png(card, out_path, width=1000, min_height=0, title='', bg=None, marg
 
     # ── 释义 ──
     for line in wrap(card['zh_def'], FS, TEXT_W):
-        c.draw_text(FONT_CN, FS, line, MARGIN, y + c.ascent(FONT_CN, FS), INK); y += LH(FS)
-    y += int(4*s)
+        c.draw_text(FONT_CN, FS, line, TXT_X, y + c.ascent(FONT_CN, FS), INK); y += LH(FS)
+    y += int(6*s)
     for line in wrap(card['en_def'], FS_SM, TEXT_W):
-        c.draw_text(FONT_EN, FS_SM, line, MARGIN, y + c.ascent(FONT_EN, FS_SM), MUTED); y += LH(FS_SM)
+        c.draw_text(FONT_EN, FS_SM, line, TXT_X, y + c.ascent(FONT_EN, FS_SM), MUTED); y += LH(FS_SM)
     y += GAP
 
     def section(label):
         nonlocal y
-        bx = MARGIN
-        c.rect(bx, y + int(3*s), int(6*s), LH(FS_SEC) - int(8*s), GREEN, True, int(3*s))
-        c.draw_text(FONT_CN, FS_SEC, label, bx + int(18*s), y + c.ascent(FONT_CN, FS_SEC), GREEN)
-        c.line(MARGIN, y + LH(FS_SEC) + int(4*s), MARGIN + TEXT_W, y + LH(FS_SEC) + int(4*s), BORDER, 1.2)
-        y += LH(FS_SEC) + int(12*s)
+        c.rect(TXT_X, y + int(3*s), int(6*s), LH(FS_SEC) - int(8*s), GREEN, True, int(3*s))
+        c.draw_text(FONT_CN, FS_SEC, label, TXT_X + int(18*s), y + c.ascent(FONT_CN, FS_SEC), GREEN)
+        c.line(TXT_X, y + LH(FS_SEC) + int(6*s), TXT_X + TEXT_W, y + LH(FS_SEC) + int(6*s), BORDER, 1.2)
+        y += LH(FS_SEC) + int(14*s)
 
-    # ── 段落 ──
     if card['para_en']:
         section('段落')
         for line in wrap(card['para_en'], FS, TEXT_W):
-            c.draw_text(FONT_EN, FS, line, MARGIN, y + c.ascent(FONT_EN, FS), INK); y += LH(FS)
-        y += int(8*s)
-        c.rect(MARGIN, y, TEXT_W, PAD + lines_h(card['para_zh'], FS, TEXT_W - int(20*s)) + PAD, ZH_BG, True, int(10*s))
-        c.rect(MARGIN, y, int(5*s), PAD + lines_h(card['para_zh'], FS, TEXT_W - int(20*s)) + PAD, ACCENT, True, int(2*s))
+            c.draw_text(FONT_EN, FS, line, TXT_X, y + c.ascent(FONT_EN, FS), INK); y += LH(FS)
+        y += int(10*s)
+        bh = PAD + lines_h(card['para_zh'], FS, TEXT_W - int(20*s)) + PAD
+        c.rect(TXT_X, y, TEXT_W, bh, ZH_BG, True, int(10*s))
+        c.rect(TXT_X, y, int(5*s), bh, ACCENT, True, int(2*s))
         ty = y + PAD
         for line in wrap(card['para_zh'], FS, TEXT_W - int(20*s)):
-            c.draw_text(FONT_CN, FS, line, MARGIN + int(20*s), ty + c.ascent(FONT_CN, FS), ACCENT); ty += LH(FS)
+            c.draw_text(FONT_CN, FS, line, TXT_X + int(20*s), ty + c.ascent(FONT_CN, FS), ACCENT); ty += LH(FS)
         y = ty + PAD + GAP
 
-    # ── 例句 ──
     if card['sents']:
         section('例句')
         for idx, (en, zh) in enumerate(card['sents'], 1):
-            xoff = MARGIN + int(40*s)
-            c.rect(MARGIN, y, int(30*s), int(30*s), RED, True, int(15*s))
-            num = str(idx)
-            nw = c.measure(FONT_EN, FS_SM, num)
-            c.draw_text(FONT_EN, FS_SM, num, MARGIN + (int(30*s)-nw)//2, y + c.ascent(FONT_EN, FS_SM) - int(2*s), 0xFFFFFF)
+            xoff = TXT_X + int(40*s)
+            c.rect(TXT_X, y, int(30*s), int(30*s), RED, True, int(15*s))
+            num = str(idx); nw = c.measure(FONT_EN, FS_SM, num)
+            c.draw_text(FONT_EN, FS_SM, num, TXT_X + (int(30*s)-nw)//2, y + c.ascent(FONT_EN, FS_SM) - int(2*s), 0xFFFFFF)
             for line in wrap(en, FS, TEXT_W - int(40*s)):
                 c.draw_text(FONT_EN, FS, line, xoff, y + c.ascent(FONT_EN, FS), INK); y += LH(FS)
             y += int(4*s)
             c.line(xoff, y, xoff, y + lines_h(zh, FS_SM, TEXT_W-int(40*s)), ACCENT, 2.0)
             for line in wrap(zh, FS_SM, TEXT_W - int(40*s)):
                 c.draw_text(FONT_CN, FS_SM, line, xoff + int(14*s), y + c.ascent(FONT_CN, FS_SM), ACCENT); y += LH(FS_SM)
-            y += int(22*s)
-        y += int(8*s)
+            y += int(24*s)
 
-    # ── 页脚 ──
-    fy = h - MARGIN
-    c.line(MARGIN, fy - PAD, MARGIN + TEXT_W, fy - PAD, BORDER, 1.2)
-    c.draw_text(FONT_CN, FS_SM, (title or 'WordCard')[:40], MARGIN, fy + c.ascent(FONT_CN, FS_SM) - int(10*s), MUTED)
+    # ── 页脚（面板底部预留区）──
+    fy = panel_y + ch - PAD - FOOTER_H
+    c.line(TXT_X, fy, TXT_X + TEXT_W, fy, BORDER, 1.2)
+    c.draw_text(FONT_CN, FS_SM, (title or 'WordCard')[:40], TXT_X, fy + int(12*s) + c.ascent(FONT_CN, FS_SM), MUTED)
     ds = datetime.datetime.now().strftime('%Y-%m-%d')
-    dw = c.measure(FONT_EN, FS_SM, ds)
-    c.draw_text(FONT_EN, FS_SM, ds, MARGIN + TEXT_W - dw, fy + c.ascent(FONT_EN, FS_SM) - int(10*s), MUTED)
+    c.draw_text(FONT_EN, FS_SM, ds, TXT_X + TEXT_W - c.measure(FONT_EN, FS_SM, ds), fy + int(12*s) + c.ascent(FONT_EN, FS_SM), MUTED)
 
     c.save(out_path)
     return out_path

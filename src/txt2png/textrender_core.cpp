@@ -799,11 +799,11 @@ void txt2png_canvas_line(txt2png_canvas_t canvas, double x1, double y1,
 }
 
 void txt2png_canvas_rect(txt2png_canvas_t canvas, double x, double y,
-                          double w, double h, uint32_t color, int filled, double radius) {
+                          double w, double h, uint32_t color, int filled, double radius, double alpha) {
     auto *c = static_cast<CanvasData*>(canvas);
     if (!c) return;
     unsigned char r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
-    cairo_set_source_rgb(c->cr, r / 255.0, g / 255.0, b / 255.0);
+    cairo_set_source_rgba(c->cr, r / 255.0, g / 255.0, b / 255.0, alpha);
     const double PI = 3.14159265358979323846;
     if (radius > 0) {
         double x0 = x, y0 = y, x1 = x + w, y1 = y + h, rad = radius;

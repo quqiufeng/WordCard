@@ -65,7 +65,7 @@ int txt2png_canvas_ascent(txt2png_canvas_t canvas, const char *font_path,
 void txt2png_canvas_line(txt2png_canvas_t canvas, double x1, double y1,
                           double x2, double y2, uint32_t color, double width);
 void txt2png_canvas_rect(txt2png_canvas_t canvas, double x, double y,
-                          double w, double h, uint32_t color, int filled, double radius);
+                          double w, double h, uint32_t color, int filled, double radius, double alpha);
 
 void txt2png_canvas_image(txt2png_canvas_t canvas, const char* path,
                            double x, double y, double w, double h);

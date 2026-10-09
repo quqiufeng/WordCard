@@ -60,7 +60,7 @@ class Canvas:
             ('txt2png_canvas_height', [c_void_p], c_int),
             ('txt2png_canvas_ascent', [c_void_p, c_char_p, c_double], c_int),
             ('txt2png_canvas_line', [c_void_p, c_double, c_double, c_double, c_double, c_uint32, c_double], None),
-            ('txt2png_canvas_rect', [c_void_p, c_double, c_double, c_double, c_double, c_uint32, c_int, c_double], None),
+            ('txt2png_canvas_rect', [c_void_p, c_double, c_double, c_double, c_double, c_uint32, c_int, c_double, c_double], None),
             ('txt2png_canvas_image', [c_void_p, c_char_p, c_double, c_double, c_double, c_double], None),
         ]:
             f = getattr(lib, name)
@@ -92,8 +92,8 @@ class Canvas:
     def line(self, x1, y1, x2, y2, color=0x000000, width=1.0):
         self._lib.txt2png_canvas_line(self._handle, x1, y1, x2, y2, color, width)
 
-    def rect(self, x, y, w, h, color=0x000000, filled=True, radius=0.0):
-        self._lib.txt2png_canvas_rect(self._handle, x, y, w, h, color, int(filled), radius)
+    def rect(self, x, y, w, h, color=0x000000, filled=True, radius=0.0, alpha=1.0):
+        self._lib.txt2png_canvas_rect(self._handle, x, y, w, h, color, int(filled), radius, alpha)
 
     def image(self, path, x, y, w, h):
         self._lib.txt2png_canvas_image(self._handle, path.encode('utf-8'), x, y, w, h)
