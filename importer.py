@@ -275,13 +275,15 @@ def _clean_text(text):
     text = re.sub(r'^[-=]{3,}$', '', text, flags=re.MULTILINE)
     return text
 
-def extract_words(text, max_words=200, min_len=5, sort='difficulty', target_zipf=3.8):
+def extract_words(text, max_words=200, min_len=5, sort='difficulty',
+                  target_zipf=3.8, mode=0, level=0):
     """提取文本中的英文词汇，返回 [(word, context_sentence), ...]
 
     优先使用 C++ wordpick（基于通用词频 zipf 的学习价值评分）；
     不可用时回退到纯 Python 启发式。
     sort='difficulty'（默认）：按学习价值降序；
     sort='frequency'：按词频降序，选高频词。
+    mode=1 用覆盖率模式；level=1..6 指定 CEFR (A1..C2)。
     """
     # ── C++ wordpick 路径 ──
     try:
@@ -289,8 +291,9 @@ def extract_words(text, max_words=200, min_len=5, sort='difficulty', target_zipf
         if _wp.available() and sort != 'frequency':
             import html as _html
             picked = _wp.select(_html.unescape(text), max_words=max_words,
-                                target_zipf=target_zipf, min_len=min_len)
-            return [(w, ctx) for (w, ctx, _s, _z, _n) in picked]
+                                target_zipf=target_zipf, min_len=min_len,
+                                mode=mode, level=level)
+            return [(w, ctx) for (w, ctx, _s, _z, _n, _lv) in picked]
     except Exception:
         pass
 

@@ -187,6 +187,37 @@ WordCard/
 
 ---
 
+## 智能词汇选择（wordpick）
+
+从电子书正文挑选「最值得学习」的单词，用于 SM-2 卡片：
+
+```
+score = U(zipf) · (0.35 + 0.65·rel) · spread · prod · lenpen
+  U      : 偏态难度曲线（简单侧陡衰减，生僻侧长尾）
+  rel    : 书内词频 log 归一
+  spread : 书内散布度（跨 chunk）
+  prod   : 构词能产性分级（高/低后缀）
+  lenpen : 过长词惩罚
+```
+
+| 特性 | 说明 |
+|------|------|
+| 难度轴 | 通用词频 Zipf（内置 6 万词表），CEFR A1–C2 预设 |
+| 词形还原 | 内置 1.6 万条 lemma 表 + 规则回退 |
+| 过滤 | 噪声 / CapRatio 专有名词 / 停用词 / 基础词 |
+| 模式 | 0=学习价值，1=覆盖率 |
+| 评估 | `eval_wordpick.py`：Precision@K / NDCG@K / 覆盖率曲线 |
+
+```python
+import importer
+# 学习价值模式（默认），可选 CEFR 等级
+words = importer.extract_words(text, max_words=50, level=4)   # B2
+# 覆盖率模式
+words = importer.extract_words(text, max_words=50, mode=1)
+```
+
+---
+
 ## 技术栈
 
 | 层 | 技术 | 来源 | 产物 |
