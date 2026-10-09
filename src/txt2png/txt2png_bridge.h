@@ -67,9 +67,6 @@ void txt2png_canvas_line(txt2png_canvas_t canvas, double x1, double y1,
 void txt2png_canvas_rect(txt2png_canvas_t canvas, double x, double y,
                           double w, double h, uint32_t color, int filled, double radius, double alpha);
 
-void txt2png_canvas_image(txt2png_canvas_t canvas, const char* path,
-                           double x, double y, double w, double h);
-
 #ifdef __cplusplus
 }
 #endif

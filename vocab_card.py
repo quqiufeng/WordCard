@@ -183,10 +183,10 @@ def _wrap(canvas, text, fs, max_w):
         out.append(cur)
     return out
 
-def render_png(card, out_path, width=1000, min_height=0, title='', bg=None, margin_ratio=0.052):
+def render_png(card, out_path, width=1000, min_height=0, title=''):
     import datetime
     s = width / 1000.0
-    OUT_M = int(width * margin_ratio)      # 画布外边距
+    OUT_M = int(width * 0.052)              # 画布外边距
     PAD = int(46 * s)                       # 面板内边距
     PANEL_X = OUT_M
     PANEL_W = width - 2 * OUT_M
@@ -225,13 +225,7 @@ def render_png(card, out_path, width=1000, min_height=0, title='', bg=None, marg
     panel_y = (h - ch) // 2                # 垂直居中
 
     c = txt2png.Canvas(W, h, BG)
-    if bg:
-        c.image(bg, 0, 0, W, h)
-        # 居中半透明面板
-        c.rect(PANEL_X, panel_y, PANEL_W, ch, 0xFDFBF2, True, int(22*s), 0.94)
-        c.rect(PANEL_X, panel_y, PANEL_W, ch, BORDER, False, int(22*s), 1.0)
-    else:
-        c.rect(0, 0, W, int(7*s), GREEN, True, 0)
+    c.rect(0, 0, W, int(7*s), GREEN, True, 0)      # 顶部色条
 
     y = panel_y + PAD
     # ── 头部卡片 ──
@@ -320,7 +314,6 @@ def main():
     ap.add_argument('--font-cn', default=None, help='覆盖中文字体')
     ap.add_argument('--font', default='serif',
                     help='sans/serif/kai/hei/zenhei 或字体文件路径')
-    ap.add_argument('--bg', default=None, help='背景图 PNG（由 gen_bg.sh 生成）')
     ap.add_argument('--no-png', action='store_true')
     a = ap.parse_args()
 
@@ -376,8 +369,7 @@ def main():
             pw, ph = 1920, 2560
         for c in cards:
             p = os.path.join(a.out, f"card_{c['word']}.png")
-            render_png(c, p, width=pw, min_height=ph, title=title, bg=a.bg,
-                       margin_ratio=(0.115 if a.bg else 0.052))
+            render_png(c, p, width=pw, min_height=ph, title=title)
         print(f'PNG: {len(cards)} 张 ({pw}x{ph}) → {a.out}/card_*.png')
 
 if __name__ == '__main__':
