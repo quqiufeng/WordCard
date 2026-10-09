@@ -24,7 +24,8 @@ typedef struct {
     int   min_len;        // 最小词长 (0=默认 5)
     int   mode;           // 0=学习价值(默认), 1=覆盖率
     int   level;          // CEFR 预设 1..6 (覆盖 target_zipf)
-    float known_zipf;     // 覆盖率模式：已知词阈值 (0=默认 5.0)
+    float known_zipf;     // 学习者已知词阈值 (0=默认 5.0)，高于此视为已会，剔除
+    float coverage_weight;// 覆盖率权重 α∈[0,1]：0=纯学习价值, 1=纯覆盖率, <0=按 mode
 } wp_config_t;
 
 void* wp_create(const char* freq_path);

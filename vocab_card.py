@@ -109,6 +109,50 @@ def find_context(text, word, max_sent=3):
             break
     return para_hit, sents
 
+def _zipf(w):
+    global _ZIPF
+    try:
+        _ZIPF
+    except NameError:
+        _ZIPF = {}
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src', 'wordpick', 'en_freq.tsv')
+        if os.path.exists(p):
+            with open(p, encoding='utf-8') as f:
+                for line in f:
+                    parts = line.rstrip('\n').split('\t')
+                    if len(parts) == 2:
+                        _ZIPF[parts[0]] = float(parts[1])
+    if w in _ZIPF:
+        return _ZIPF[w]
+    for suf in ('s', 'es', 'ed', 'ing', 'ly'):
+        if w.endswith(suf) and len(w) > len(suf) + 2 and w[:-len(suf)] in _ZIPF:
+            return _ZIPF[w[:-len(suf)]]
+    return 2.0
+
+def coverage_report(text, known_zipf=5.0, checkpoints=(10, 20, 50, 100, 200, 500)):
+    """报告：学 N 个词后，未知词 token 覆盖率"""
+    import re as _re
+    from collections import Counter
+    cnt = Counter(_re.findall(r"[a-zA-Z]+(?:'[a-zA-Z]+)?", text.lower()))
+    total = sum(cnt.values())
+    unknown = {w: c for w, c in cnt.items() if _zipf(w) <= known_zipf and len(w) >= 4}
+    unknown_total = sum(unknown.values())
+    print(f'\n=== 覆盖率报告（已知阈值 zipf>{known_zipf} 视为已会）===')
+    print(f'全书 token: {total}   未知 token: {unknown_total} ({unknown_total/max(total,1)*100:.1f}%)')
+    maxk = max(checkpoints)
+    ranked = wordpick.select(text, max_words=maxk, known_zipf=known_zipf, coverage_weight=1.0)
+    cum = 0
+    idx = {n: None for n in checkpoints}
+    for i, (_w, _c, _s, _z, n, _lv) in enumerate(ranked, 1):
+        cum += n
+        if i in idx:
+            idx[i] = cum
+    print(f'{"学习词数":>8}  {"未知词覆盖":>8}')
+    for k in checkpoints:
+        if idx[k] is not None:
+            print(f'{k:>8}  {idx[k]/max(unknown_total,1)*100:>7.1f}%')
+    print()
+
 def _truncate(s, n=320):
     return s if len(s) <= n else s[:n].rstrip() + '...'
 
@@ -387,6 +431,9 @@ def main():
     ap.add_argument('book')
     ap.add_argument('--max', type=int, default=20)
     ap.add_argument('--level', type=int, default=4)
+    ap.add_argument('--known-zipf', type=float, default=5.0, help='已知词阈值(越大越简单, 默认5.0)')
+    ap.add_argument('--coverage-weight', type=float, default=0.5, help='覆盖率权重 α∈[0,1] (默认0.5)')
+    ap.add_argument('--report', action='store_true', help='打印覆盖率报告')
     ap.add_argument('--sent', type=int, default=3)
     ap.add_argument('--words', default=None, help='逗号分隔，覆盖自动选词')
     ap.add_argument('--out', default='output')
@@ -424,7 +471,11 @@ def main():
     else:
         print(f'选择词汇 (level={a.level})...')
         words = [(w, s, z, n, lv) for (w, _c, s, z, n, lv) in
-                 wordpick.select(text, max_words=a.max, level=a.level)]
+                 wordpick.select(text, max_words=a.max, level=a.level,
+                                 known_zipf=a.known_zipf,
+                                 coverage_weight=a.coverage_weight)]
+        if a.report:
+            coverage_report(text, a.known_zipf)
 
     if not translate.available():
         print('错误: 本地 LLM 翻译服务不可用', file=sys.stderr)

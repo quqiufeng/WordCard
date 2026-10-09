@@ -33,6 +33,7 @@ class WPConfig(Structure):
         ('mode', c_int),
         ('level', c_int),
         ('known_zipf', c_float),
+        ('coverage_weight', c_float),
     ]
 
 def _load():
@@ -62,12 +63,13 @@ def available():
 CEFR_NAMES = {1: 'A1', 2: 'A2', 3: 'B1', 4: 'B2', 5: 'C1', 6: 'C2'}
 
 def select(text, max_words=50, target_zipf=3.8, min_len=5,
-           mode=0, level=0, known_zipf=5.0):
+           mode=0, level=0, known_zipf=5.0, coverage_weight=0.5):
     """返回 [(word, context, score, zipf, count, level), ...]
 
-    mode: 0=学习价值, 1=覆盖率
+    mode: 用 coverage_weight 控制（兼容保留）
     level: CEFR 1..6 (A1..C2)，非 0 时覆盖 target_zipf
-    known_zipf: 覆盖率模式下的已知词阈值
+    known_zipf: 学习者已知词阈值（高于此视为已会，剔除）
+    coverage_weight: α∈[0,1] 覆盖率权重（0=学习价值, 1=覆盖率, 默认0.5）
     """
     lib = _load()
     if not lib:
@@ -76,7 +78,8 @@ def select(text, max_words=50, target_zipf=3.8, min_len=5,
     if not handle:
         raise RuntimeError(f'cannot load frequency table: {_FREQ}')
     try:
-        cfg = WPConfig(max_words, float(target_zipf), min_len, mode, level, float(known_zipf))
+        cfg = WPConfig(max_words, float(target_zipf), min_len, mode, level,
+                       float(known_zipf), float(coverage_weight))
         out = (WPWord * max_words)()
         n = lib.wp_select_ex(handle, text.encode('utf-8'), ctypes.byref(cfg), out, max_words)
         return [(out[i].word.decode('utf-8'), out[i].context.decode('utf-8'),

@@ -292,8 +292,10 @@ int wp_select_ex(void* handle, const char* text, const wp_config_t* cfg,
     int   min_len    = cfg->min_len   > 0 ? cfg->min_len   : 5;
     float target     = cfg->target_zipf > 0 ? cfg->target_zipf : 3.8f;
     if (cfg->level >= 1 && cfg->level <= 6) target = kCefrZipf[cfg->level - 1];
-    int   mode       = cfg->mode;
     float known_zipf = cfg->known_zipf > 0 ? cfg->known_zipf : 5.0f;
+    float alpha = cfg->coverage_weight;
+    if (alpha < 0.0f) alpha = (cfg->mode == 1) ? 1.0f : 0.0f;
+    if (alpha > 1.0f) alpha = 1.0f;
 
     const size_t text_len = strlen(text);
     std::unordered_map<std::string, WordStat> stats;
@@ -389,27 +391,25 @@ int wp_select_ex(void* handle, const char* text, const wp_config_t* cfg,
         if (cit != g_cefr.end()) { level = cit->second; zipf = kCefrZipf[level - 1]; }
         if (zipf > 6.3f || zipf < 1.8f) continue;
 
-        int pop = 0; for (int b = 0; b < 8; ++b) if (st.chunks & (1u << b)) ++pop;
-        float spread = pop / 8.0f;
-        float spread_f = 0.8f + 0.2f * spread;
+        // 已认识（高于学习者水平）的词剔除——推荐它没意义
+        if (zipf > known_zipf) continue;
 
-        float score;
-        if (mode == 1) {
-            // F) 覆盖率模式：只取未知词，边际覆盖 = 词频
-            if (zipf > known_zipf) continue;
-            float d = zipf - target;
-            float s = (d > 0) ? sigma_easy : sigma_hard;
-            float U = expf(-(d * d) / (2.0f * s * s));
-            score = U * (float)st.count;
-        } else {
-            float d = zipf - target;
-            float s = (d > 0) ? sigma_easy : sigma_hard;   // A) 偏态
-            float U = expf(-(d * d) / (2.0f * s * s));
-            float rel = logf(1.0f + st.count) / logf(1.0f + max_count);
-            float prod = productivity(w);                   // C) 分级
-            float lenpen = (w.size() > 13) ? 0.88f : 1.0f;
-            score = U * (0.35f + 0.65f * rel) * spread_f * prod * lenpen;  // D) spread
-        }
+        int pop = 0; for (int b = 0; b < 8; ++b) if (st.chunks & (1u << b)) ++pop;
+        float spread_f = 0.8f + 0.2f * (pop / 8.0f);        // D) 跨章节散布
+
+        float d = zipf - target;
+        float s = (d > 0) ? sigma_easy : sigma_hard;         // A) 偏态难度
+        float U = expf(-(d * d) / (2.0f * s * s));
+        float rel = logf(1.0f + st.count) / logf(1.0f + max_count);
+        float value_term = U * (0.35f + 0.65f * rel);        // 学习价值
+        float cov = (float)st.count / max_count;             // 覆盖增益（归一）
+
+        float prod = productivity(w);                        // C) 构词能产性
+        float lenpen = (w.size() > 13) ? 0.88f : 1.0f;
+        // α 平衡：α=0 纯学习价值，α=1 纯覆盖率
+        float score = powf(cov, alpha) * powf(value_term, 1.0f - alpha)
+                      * spread_f * prod * lenpen;
+
         if (level == 0) level = zipf_to_cefr(zipf);
         cands.push_back({w, st.context, score, zipf, st.count, level});
     }

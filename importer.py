@@ -276,7 +276,7 @@ def _clean_text(text):
     return text
 
 def extract_words(text, max_words=200, min_len=5, sort='difficulty',
-                  target_zipf=3.8, mode=0, level=0):
+                  target_zipf=3.8, mode=0, level=0, known_zipf=5.0, coverage_weight=0.5):
     """提取文本中的英文词汇，返回 [(word, context_sentence), ...]
 
     优先使用 C++ wordpick（基于通用词频 zipf 的学习价值评分）；
@@ -292,7 +292,8 @@ def extract_words(text, max_words=200, min_len=5, sort='difficulty',
             import html as _html
             picked = _wp.select(_html.unescape(text), max_words=max_words,
                                 target_zipf=target_zipf, min_len=min_len,
-                                mode=mode, level=level)
+                                mode=mode, level=level, known_zipf=known_zipf,
+                                coverage_weight=coverage_weight)
             return [(w, ctx) for (w, ctx, _s, _z, _n, _lv) in picked]
     except Exception:
         pass
