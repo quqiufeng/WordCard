@@ -1,109 +1,150 @@
-"""ASR / TTS — 从 /opt/friday 集成的语音能力
+"""ASR / TTS — C++ voice engine via libvoice_engine.so
 
 ASR (Speech-to-Text):
-  Qwen3-ASR  — /opt/friday/agent/qwen3_asr_engine.cpp — ONNX + llama.cpp 本地引擎
-  SenseVoice — /opt/friday/shell/shell.cpp subprocess 模式 — ggml 轻量引擎
+  SenseVoice — /opt/SenseVoice.cpp subprocess (via C++ engine)
 
 TTS (Text-to-Speech):
-  Piper       — WordCard/voice/wrappers/piper_wrapper.cpp — 需自行编译
-  Edge TTS   — 在线 fallback（pip install edge-tts）
+  Piper — /opt/piper/build/piper subprocess (via C++ engine)
+
+Audio Capture:
+  ALSA + VAD — C++ capture thread with callback
 """
 
-import ctypes, os, subprocess, tempfile
+import ctypes, os, tempfile
 
-_LIB = None
-_LIB_PATH = os.path.join(os.path.dirname(__file__), 'voice', 'libs', 'libqwen3_asr.so')
-_LLAMA_PATH = '/opt/llama.cpp/build/bin'
-_ONNX_PATH = '/data/venv/onnxruntime-linux-x64-gpu-1.26.0/lib'
-_QWEN_MODEL_DIR = '/data/models'
+_LIB_PATH = os.path.join(os.path.dirname(__file__), 'voice', 'libs', 'libvoice_engine.so')
 
-# ── ASR: Qwen3-ASR (本地 C++ 引擎，最准) ────────────────────────────
+_lib = None
 
-def _load_qwen3():
-    global _LIB
-    if _LIB is not None:
-        return _LIB
+def _load():
+    global _lib
+    if _lib is not None:
+        return _lib
     if not os.path.exists(_LIB_PATH):
         return None
-    # Set library path so it finds libllama.so.0 + libonnxruntime.so.1
-    env = os.environ.copy()
-    lp = env.get('LD_LIBRARY_PATH', '')
-    for p in [_ONNX_PATH, _LLAMA_PATH]:
-        if p not in lp:
-            lp = f'{p}:{lp}' if lp else p
-    env['LD_LIBRARY_PATH'] = lp
-    # Can't change LD_LIBRARY_PATH after process start; use RTLD_GLOBAL
-    old_cwd = os.getcwd()
-    try:
-        _LIB = ctypes.CDLL(_LIB_PATH, mode=ctypes.RTLD_GLOBAL)
-    except OSError:
-        return None
-    _LIB.qwen3_asr_create.argtypes = [ctypes.c_char_p]
-    _LIB.qwen3_asr_create.restype = ctypes.c_void_p
-    _LIB.qwen3_asr_destroy.argtypes = [ctypes.c_void_p]
-    _LIB.qwen3_asr_destroy.restype = None
-    _LIB.qwen3_asr_transcribe_file.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p]
-    _LIB.qwen3_asr_transcribe_file.restype = ctypes.c_char_p
-    _LIB.qwen3_asr_free_text.argtypes = [ctypes.c_char_p]
-    _LIB.qwen3_asr_free_text.restype = None
-    return _LIB
+    _lib = ctypes.CDLL(_LIB_PATH)
+    _lib.voice_asr_create.argtypes = [ctypes.c_char_p]
+    _lib.voice_asr_create.restype = ctypes.c_void_p
+    _lib.voice_asr_load.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p,
+                                     ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+    _lib.voice_asr_load.restype = ctypes.c_int
+    _lib.voice_asr_transcribe_file.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p]
+    _lib.voice_asr_transcribe_file.restype = ctypes.POINTER(ctypes.c_char)
+    _lib.voice_asr_free_text.argtypes = [ctypes.POINTER(ctypes.c_char)]
+    _lib.voice_asr_free_text.restype = None
+    _lib.voice_asr_destroy.argtypes = [ctypes.c_void_p]
+    _lib.voice_asr_destroy.restype = None
+    _lib.voice_tts_create.argtypes = [ctypes.c_char_p]
+    _lib.voice_tts_create.restype = ctypes.c_void_p
+    _lib.voice_tts_load.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p,
+                                     ctypes.c_int, ctypes.c_int]
+    _lib.voice_tts_load.restype = ctypes.c_int
+    _lib.voice_tts_synthesize.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p]
+    _lib.voice_tts_synthesize.restype = ctypes.POINTER(ctypes.c_char)
+    _lib.voice_tts_free_text.argtypes = [ctypes.POINTER(ctypes.c_char)]
+    _lib.voice_tts_free_text.restype = None
+    _lib.voice_tts_destroy.argtypes = [ctypes.c_void_p]
+    _lib.voice_tts_destroy.restype = None
+    _lib.voice_capture_create.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int,
+                                           ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                           ctypes.c_void_p, ctypes.c_void_p]
+    _lib.voice_capture_create.restype = ctypes.c_void_p
+    _lib.voice_capture_start.argtypes = [ctypes.c_void_p]
+    _lib.voice_capture_start.restype = ctypes.c_int
+    _lib.voice_capture_stop.argtypes = [ctypes.c_void_p]
+    _lib.voice_capture_stop.restype = None
+    _lib.voice_capture_destroy.argtypes = [ctypes.c_void_p]
+    _lib.voice_capture_destroy.restype = None
+    _lib.voice_play_wav.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    _lib.voice_play_wav.restype = ctypes.c_int
+    _lib.voice_convert_to_wav.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
+    _lib.voice_convert_to_wav.restype = ctypes.c_int
+    return _lib
 
-def qwen3_asr_available():
-    """Qwen3-ASR 引擎是否可用（需要 ONNX Runtime + llama.cpp 库）"""
-    return _load_qwen3() is not None
+# ── ASR ───────────────────────────────────────────────────────────
 
-def qwen3_asr_transcribe(wav_path, lang=''):
-    """使用 Qwen3-ASR 转写音频文件，返回文字"""
-    lib = _load_qwen3()
+def asr_available():
+    lib = _load()
+    return lib is not None and os.path.exists('/opt/SenseVoice.cpp/build/bin/sense-voice-main')
+
+def transcribe(wav_path, lang='auto', n_threads=4):
+    lib = _load()
     if not lib:
-        raise RuntimeError('libqwen3_asr.so not loaded; try: cd voice && make')
-    engine = lib.qwen3_asr_create(_QWEN_MODEL_DIR.encode())
+        raise RuntimeError('libvoice_engine.so not loaded')
+    engine = lib.voice_asr_create(None)
     if not engine:
-        raise RuntimeError('Qwen3-ASR engine creation failed')
+        raise RuntimeError('ASR engine creation failed')
     try:
-        text_p = lib.qwen3_asr_transcribe_file(engine, wav_path.encode(), lang.encode() if lang else None)
-        result = text_p.decode('utf-8') if text_p else ''
+        lib.voice_asr_load(engine, None, None, None, n_threads, 0)
+        text_p = lib.voice_asr_transcribe_file(engine, wav_path.encode(), lang.encode())
+        result = ctypes.cast(text_p, ctypes.c_char_p).value.decode('utf-8') if text_p else ''
         if text_p:
-            lib.qwen3_asr_free_text(text_p)
+            lib.voice_asr_free_text(text_p)
         return result
     finally:
-        lib.qwen3_asr_destroy(engine)
+        lib.voice_asr_destroy(engine)
 
-# ── ASR: SenseVoice (subprocess，轻量) ──────────────────────────────
+# ── TTS ───────────────────────────────────────────────────────────
 
-_SENSE_BIN = '/opt/SenseVoice.cpp/build/bin/sense-voice-main'
-_SENSE_MODEL = '/data/models/sense-voice-small-q4_k.gguf'
-
-def sensevoice_available():
-    return os.path.exists(_SENSE_BIN) and os.path.exists(_SENSE_MODEL)
-
-def transcribe(wav_path, lang='auto', n_threads=8):
-    """SenseVoice 转写（备用，Qwen3-ASR 不可用时用这个）"""
-    if not sensevoice_available():
-        raise RuntimeError('SenseVoice not available')
-    cmd = [_SENSE_BIN, '-m', _SENSE_MODEL, wav_path, '-t', str(n_threads), '--use-itn']
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    if r.returncode != 0:
-        raise RuntimeError(f'SenseVoice failed: {r.stderr[:200]}')
-    return r.stdout.strip()
-
-# ── TTS: Piper（WordCard voice/wrappers/piper_wrapper.cpp，需编译）───
-
-_PIPER_BIN = '/opt/piper/build/piper' if os.path.exists('/opt/piper/build/piper') else None
-_PIPER_MODEL = '/data/models/zh_CN-huayan-medium.onnx'
-_PIPER_CONFIG = '/data/models/zh_CN-huayan-medium.onnx.json'
-
-def piper_available():
-    return _PIPER_BIN and os.path.exists(_PIPER_BIN) and os.path.exists(_PIPER_MODEL)
+def tts_available():
+    lib = _load()
+    return lib is not None and os.path.exists('/opt/sherpa-onnx/bin/sherpa-onnx-offline-tts')
 
 def synthesize(text, output_path=None):
-    """Piper TTS 文字转语音（需先编译 piper_wrapper.cpp）"""
-    if not piper_available():
-        raise RuntimeError('Piper TTS not available; need to build piper_wrapper.cpp')
+    lib = _load()
+    if not lib:
+        raise RuntimeError('libvoice_engine.so not loaded')
+    engine = lib.voice_tts_create(None)
+    if not engine:
+        raise RuntimeError('TTS engine creation failed')
+    try:
+        lib.voice_tts_load(engine, None, None, 4, 0)
+        out = output_path.encode() if output_path else None
+        text_p = lib.voice_tts_synthesize(engine, text.encode(), out)
+        result = ctypes.cast(text_p, ctypes.c_char_p).value.decode('utf-8') if text_p else ''
+        if text_p:
+            lib.voice_tts_free_text(text_p)
+        return result
+    finally:
+        lib.voice_tts_destroy(engine)
+
+# ── Audio Capture ─────────────────────────────────────────────────
+
+def capture_start(device='default', sample_rate=16000, frame_ms=100,
+                  silence_ms=1200, min_speech_ms=300, max_seg_ms=6000,
+                  callback=None):
+    lib = _load()
+    if not lib:
+        raise RuntimeError('libvoice_engine.so not loaded')
+    cb = ctypes.CFUNCTYPE(None, ctypes.POINTER(ctypes.c_int16), ctypes.c_int, ctypes.c_void_p)(callback) if callback else None
+    handle = lib.voice_capture_create(device.encode(), sample_rate, frame_ms,
+                                       silence_ms, min_speech_ms, max_seg_ms, cb, None)
+    if not handle:
+        raise RuntimeError('Capture creation failed')
+    lib.voice_capture_start(handle)
+    return handle
+
+def capture_stop(handle):
+    lib = _load()
+    if lib and handle:
+        lib.voice_capture_stop(handle)
+        lib.voice_capture_destroy(handle)
+
+# ── Playback ──────────────────────────────────────────────────────
+
+def play_wav(path, device=None):
+    lib = _load()
+    if not lib:
+        raise RuntimeError('libvoice_engine.so not loaded')
+    return lib.voice_play_wav(path.encode(), device.encode() if device else None)
+
+# ── Utility ───────────────────────────────────────────────────────
+
+def convert_to_wav(input_path, output_path=None, sample_rate=16000):
+    lib = _load()
+    if not lib:
+        raise RuntimeError('libvoice_engine.so not loaded')
     if output_path is None:
-        output_path = tempfile.mktemp(suffix='.wav')
-    cmd = [_PIPER_BIN, '--model', _PIPER_MODEL, '--output-file', output_path]
-    if os.path.exists(_PIPER_CONFIG):
-        cmd += ['--config', _PIPER_CONFIG]
-    subprocess.run(cmd, input=text, capture_output=True, text=True, timeout=60, check=True)
+        output_path = os.path.splitext(input_path)[0] + '.wav'
+    lib.voice_convert_to_wav(input_path.encode(), output_path.encode(), sample_rate)
     return output_path

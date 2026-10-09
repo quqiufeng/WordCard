@@ -6,9 +6,9 @@ OUTPUT_DIR = ../libs
 LIBMOBI_SRC = /opt/libmobi
 MUPDF_SRC = /opt/mupdf
 
-.PHONY: all mobi pdf clean
+.PHONY: all mobi pdf epub clean
 
-all: mobi pdf
+all: mobi pdf epub
 
 # === libmobi wrapper ===
 mobi:
@@ -36,7 +36,15 @@ pdf:
 	  -o $(OUTPUT_DIR)/libpdfparse.so
 	@echo "完成: $(OUTPUT_DIR)/libpdfparse.so"
 
+# === epub wrapper ===
+epub:
+	@echo "编译 EPUB wrapper..."
+	mkdir -p $(OUTPUT_DIR)
+	g++ -shared -fPIC -std=c++17 	  -I/usr/include/libxml2 	  epub_wrapper.cpp 	  -lzip -lxml2 	  -o $(OUTPUT_DIR)/libepubparse.so 	  -lpthread -ldl
+	@echo "完成: $(OUTPUT_DIR)/libepubparse.so"
+
 clean:
 	rm -f $(OUTPUT_DIR)/libmobiparse.so
 	rm -f $(OUTPUT_DIR)/libpdfparse.so
+	rm -f $(OUTPUT_DIR)/libepubparse.so
 	@echo "已清理"

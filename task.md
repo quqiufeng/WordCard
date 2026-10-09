@@ -50,8 +50,9 @@
 
 ### ✅ 阶段 6: 数据导入工具 (P1) - 基础完成
 - [x] 6.1 `import_article.py` - 读取 res/*.txt，提取高频词汇，写入 C DB
-- [x] 6.2 电子书导入（importer.py：PDF/MOBI/MD → 提取词汇 → SM-2 DB）
+- [x] 6.2 电子书导入（importer.py：PDF/MOBI/EPUB/MD → 提取词汇 → SM-2 DB）
 - [x] 6.3 词表导入（CET-4/6/IELTS）
+- [x] 6.4 EPUB 解析（epub_wrapper.cpp：libzip + libxml2，支持 NCX/nav 目录）
 
 ### ✅ 阶段 8: txt2png 集成 (P1)
 - [x] 8.1 C++ 桥接（linebreak.h/cpp + HarfBuzz + Cairo + ICU）

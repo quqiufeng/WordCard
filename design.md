@@ -251,7 +251,7 @@ LRU 淘汰: access_time 排序 → 淘汰最旧非永久条目 → 直到内存 
 
 | 格式 | 扩展名 | 解析库 | C++ Wrapper 位置 |
 |------|--------|--------|-----------------|
-| EPUB | `.epub` | MuPDF | `importer/wrappers/pdf_wrapper.cpp` |
+| EPUB | `.epub` | libzip + libxml2 | `importer/wrappers/epub_wrapper.cpp` |
 | MOBI | `.mobi` | libmobi | `importer/wrappers/mobi_wrapper.cpp` |
 | AZW3 | `.azw3` | libmobi | `importer/wrappers/mobi_wrapper.cpp` |
 | PDF | `.pdf` | MuPDF | `importer/wrappers/pdf_wrapper.cpp` |

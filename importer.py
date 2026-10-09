@@ -132,10 +132,46 @@ def extract_md(path):
         text = f.read()
     return {'title': Path(path).stem, 'author': '', 'text': text}
 
+def extract_epub(path):
+    lib = _find_lib('libepubparse.so')
+    if not lib:
+        raise RuntimeError('libepubparse.so not built; run: cd importer/wrappers && make')
+    ctypes = __import__('ctypes')
+    cdll = ctypes.CDLL(lib)
+    cdll.epub_open.argtypes = [ctypes.c_char_p]
+    cdll.epub_open.restype = ctypes.c_void_p
+    cdll.epub_extract_text.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_char_p), ctypes.POINTER(ctypes.c_size_t)]
+    cdll.epub_extract_text.restype = ctypes.c_int
+    cdll.epub_get_metadata.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
+    cdll.epub_get_metadata.restype = ctypes.c_int
+    cdll.epub_close.argtypes = [ctypes.c_void_p]
+    cdll.epub_close.restype = None
+
+    h = cdll.epub_open(path.encode('utf-8'))
+    if not h:
+        raise RuntimeError(f'Cannot open EPUB: {path}')
+    try:
+        title = ctypes.create_string_buffer(256)
+        author = ctypes.create_string_buffer(256)
+        cdll.epub_get_metadata(h, title, 256, author, 256)
+        text_p = ctypes.c_char_p()
+        text_len = ctypes.c_size_t()
+        cdll.epub_extract_text(h, ctypes.byref(text_p), ctypes.byref(text_len))
+        text = text_p.value.decode('utf-8', errors='replace') if text_p.value else ''
+        return {
+            'title': title.value.decode('utf-8', errors='replace') if title.value else Path(path).stem,
+            'author': author.value.decode('utf-8', errors='replace') if author.value else '',
+            'text': text,
+        }
+    finally:
+        cdll.epub_close(h)
+
 def extract(path):
     ext = Path(path).suffix.lower()
     if ext in ('.mobi', '.azw3', '.prc'):
         return extract_mobi(path)
+    elif ext == '.epub':
+        return extract_epub(path)
     elif ext == '.pdf':
         return extract_pdf(path)
     elif ext == '.md':

@@ -174,11 +174,25 @@ def create_png(sections, output_path):
     MARGIN = 40
     W = 780
     COL_GAP = 20
-    GREEN = 0x27AE60
-    DARK = 0x34495E
-    GRAY = 0x7F8C8D
-    RED = 0xE74C3C
-    BG = 0xF5F5F5
+    # 中国传统配色（参考 /opt/my-agent dotui.h）
+    import ctypes
+    _dotui = ctypes.CDLL(os.path.join(os.path.dirname(__file__), 'src', 'libdotui.so'))
+    _dotui.dotui_bg.restype = ctypes.c_uint32
+    _dotui.dotui_card_top.restype = ctypes.c_uint32
+    _dotui.dotui_card_bot.restype = ctypes.c_uint32
+    _dotui.dotui_border.restype = ctypes.c_uint32
+    _dotui.dotui_ink.restype = ctypes.c_uint32
+    _dotui.dotui_muted.restype = ctypes.c_uint32
+    _dotui.dotui_dim.restype = ctypes.c_uint32
+    _dotui.dotui_accent.restype = ctypes.c_uint32
+    _dotui.dotui_warn.restype = ctypes.c_uint32
+    _dotui.dotui_crit.restype = ctypes.c_uint32
+    _dotui.dotui_ok.restype = ctypes.c_uint32
+    GREEN = _dotui.dotui_ok()        # 青绿 #2E8B57
+    DARK = _dotui.dotui_ink()        # 墨色 #1D1B1C
+    GRAY = _dotui.dotui_muted()      # #5B6B4F
+    RED = _dotui.dotui_crit()        # 朱砂红 #D92121
+    BG = _dotui.dotui_bg()           # 霜地 #E2F0CB
     FS_TITLE = 26
     FS_SECTION = 20
     FS_BODY = 18
