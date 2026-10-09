@@ -55,6 +55,7 @@ MUTED  = 0x5B6B4F
 ACCENT = 0x2A3C5C   # 黛蓝
 BORDER = 0xC4D6A6
 CARD   = 0xF3F8E8   # 嫩菊绿（头部卡片）
+GOLD   = 0xC9A227   # 金色（边框）
 ZH_BG  = 0xEDF4DD   # 译文浅底
 
 W = 1000
@@ -225,7 +226,12 @@ def render_png(card, out_path, width=1000, min_height=0, title=''):
     panel_y = (h - ch) // 2                # 垂直居中
 
     c = txt2png.Canvas(W, h, BG)
-    c.rect(0, 0, W, int(7*s), GREEN, True, 0)      # 顶部色条
+    # 四边金色边框
+    bw = max(2, int(round(2 * s)))
+    c.line(0, bw/2, W, bw/2, GOLD, bw)
+    c.line(0, h - bw/2, W, h - bw/2, GOLD, bw)
+    c.line(bw/2, 0, bw/2, h, GOLD, bw)
+    c.line(W - bw/2, 0, W - bw/2, h, GOLD, bw)
 
     y = panel_y + PAD
     # ── 头部卡片 ──
