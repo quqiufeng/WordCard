@@ -463,11 +463,14 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     print('解析电子书...')
     base = os.path.splitext(os.path.basename(a.book))[0]
-    txt_out = os.path.join(a.out, base + '.txt')
-    info = importer.extract(a.book, save_text=txt_out)
+    info = importer.extract(a.book)
     text = html.unescape(info['text'])
     title = info['title'] or base
-    print(f'正文已保存: {txt_out}  ({len(info["text"])} 字符)')
+    book_dir = os.path.join(a.out, importer._safe_name(title))
+    meta = importer.save_book(a.book, book_dir, info=info)
+    a.out = book_dir
+    os.makedirs(os.path.join(book_dir, 'cards'), exist_ok=True)
+    print(f'已按章节保存: {book_dir}/chapters/  ({meta["chapters"]} 章, {meta["chars"]} 字符)')
 
     if a.words:
         words = [(w.strip().lower(), 0.0, 0, 0) for w in a.words.split(',') if w.strip()]
@@ -515,9 +518,9 @@ def main():
         else:
             pw, ph = 1920, 2560
         for c in cards:
-            p = os.path.join(a.out, f"card_{c['word']}.png")
+            p = os.path.join(a.out, 'cards', f"card_{c['word']}.png")
             render_png(c, p, width=pw, min_height=ph, title=title)
-        print(f'PNG: {len(cards)} 张 ({pw}x{ph}) → {a.out}/card_*.png')
+        print(f'PNG: {len(cards)} 张 ({pw}x{ph}) → {a.out}/cards/card_*.png')
 
 if __name__ == '__main__':
     main()

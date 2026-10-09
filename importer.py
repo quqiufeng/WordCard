@@ -232,6 +232,78 @@ def _extract(path):
     else:
         raise ValueError(f'Unsupported format: {ext}')
 
+# ── 章节切分 + 保存 ────────────────────────────────────────
+
+_EN_CH = re.compile(r'^\s*(chapter|part|book)\s+([0-9]+|[ivxlcdm]+)\b', re.I)
+_CN_CH = re.compile(r'^\s*第\s*[0-9一二三四五六七八九十百千零两]+\s*[章回节卷篇部]')
+_MD_CH = re.compile(r'^#{1,3}\s+\S')
+
+def _safe_name(s, maxlen=60):
+    s = re.sub(r'[/\\:*?"<>|\r\n\t]', '_', s.strip())
+    s = re.sub(r'\s+', '_', s)
+    return s[:maxlen] or 'untitled'
+
+def _is_chapter_head(line):
+    s = line.strip()
+    if not s or len(s) > 80:
+        return None
+    if _MD_CH.match(s):
+        return re.sub(r'^#+\s*', '', s)
+    if _EN_CH.match(s) or _CN_CH.match(s):
+        return s
+    return None
+
+def split_chapters(text, fallback_chars=6000):
+    """把正文按章节标题切分；无标题则按长度 fallback。返回 [(title, body)]"""
+    lines = text.split('\n')
+    chapters, title, buf = [], 'FrontMatter', []
+    for line in lines:
+        h = _is_chapter_head(line)
+        if h:
+            body = '\n'.join(buf).strip()
+            if body:
+                chapters.append((title, body))
+            title, buf = h, []
+        else:
+            buf.append(line)
+    body = '\n'.join(buf).strip()
+    if body:
+        chapters.append((title, body))
+
+    # fallback：仅 1 段且很长 → 按长度切块
+    if len(chapters) <= 1 and len(text) > fallback_chars * 1.5:
+        paras = re.split(r'\n\s*\n', text)
+        chunks, cur, n = [], [], 0
+        for p in paras:
+            cur.append(p); n += len(p)
+            if n >= fallback_chars:
+                chunks.append('\n\n'.join(cur)); cur, n = [], 0
+        if cur:
+            chunks.append('\n\n'.join(cur))
+        chapters = [(f'Part_{i+1:02d}', c) for i, c in enumerate(chunks)]
+    return chapters
+
+def save_book(book_path, out_dir, info=None):
+    """解析电子书 → out_dir/ 下保存 meta.json + book.txt + chapters/*.md"""
+    import json, html as _html
+    if info is None:
+        info = extract(book_path)
+    text = _html.unescape(info['text'])
+    chapters = split_chapters(text)
+    os.makedirs(os.path.join(out_dir, 'chapters'), exist_ok=True)
+    with open(os.path.join(out_dir, 'book.txt'), 'w', encoding='utf-8') as f:
+        f.write(f"TITLE: {info['title']}\nAUTHOR: {info['author']}\n\n{text}")
+    for i, (t, body) in enumerate(chapters, 1):
+        fn = f'{i:03d}-{_safe_name(t)}.md'
+        with open(os.path.join(out_dir, 'chapters', fn), 'w', encoding='utf-8') as f:
+            f.write(f'# {t}\n\n{body}\n')
+    meta = {'title': info['title'], 'author': info['author'],
+            'chars': len(text), 'chapters': len(chapters),
+            'chapter_titles': [t for t, _ in chapters]}
+    with open(os.path.join(out_dir, 'meta.json'), 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    return meta
+
 # ── 提取词汇 ────────────────────────────────────────────────
 
 # 版权页/元数据/URL 常见噪声词
