@@ -187,6 +187,23 @@ WordCard/
 
 ---
 
+## 词汇卡生成（vocab_card）
+
+为选出的单词生成学习卡片（PNG + MD），含：
+
+- **中英双语释义**（本地 LLM 生成）
+- **含该词的段落**（原文 + 中文翻译）
+- **数条含该词的例句**（原文 + 中文翻译）
+
+```bash
+# 需要本地 llama-server（自动拉起，Qwen3-14B）
+python3 vocab_card.py book.azw3 --max 30 --level 4 --sent 3 --out output/
+```
+
+译义/翻译由 `translate.py` 调用本地 `llama-server`（OpenAI 兼容 API）完成，零外部 API 依赖。
+
+---
+
 ## 智能词汇选择（wordpick）
 
 从电子书正文挑选「最值得学习」的单词，用于 SM-2 卡片：
