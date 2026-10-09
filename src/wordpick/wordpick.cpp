@@ -24,6 +24,9 @@ namespace {
 // ── 加载词频表（word\tzipf） ──────────────────────────────────
 std::unordered_map<std::string, float> g_freq;
 
+// ── 词形还原表（inflected\tlemma） ────────────────────────────
+std::unordered_map<std::string, std::string> g_lemma;
+
 inline std::string lower_ascii(const std::string& s) {
     std::string r = s;
     for (char& c : r) if (c >= 'A' && c <= 'Z') c += 32;
@@ -184,6 +187,45 @@ struct Candidate {
     int   count;
 };
 
+// ── 词形还原：内置表优先，规则回退（校验基词存在于词频表） ──
+std::string rule_lemma(const std::string& w) {
+    auto exists = [](const std::string& s) {
+        return g_freq.count(s) || g_lemma.count(s);
+    };
+    size_t n = w.size();
+    auto ends = [&](const char* s) { size_t m = strlen(s); return n > m + 1 && w.compare(n - m, m, s) == 0; };
+    if (ends("ies") && n > 4) { std::string b = w.substr(0, n - 3) + "y"; if (exists(b)) return b; }
+    if (ends("ves") && n > 4) {
+        std::string b = w.substr(0, n - 3) + "f"; if (exists(b)) return b;
+        std::string b2 = w.substr(0, n - 3) + "fe"; if (exists(b2)) return b2;
+    }
+    if (ends("es") && n > 3) {
+        std::string b = w.substr(0, n - 2); if (exists(b)) return b;
+        std::string b2 = w.substr(0, n - 1); if (exists(b2)) return b2;
+    }
+    if (ends("s") && !ends("ss") && n > 3) { std::string b = w.substr(0, n - 1); if (exists(b)) return b; }
+    if (ends("ing") && n > 5) {
+        std::string b = w.substr(0, n - 3); if (exists(b)) return b;
+        std::string b2 = b + "e"; if (exists(b2)) return b2;
+        if (b.size() > 1 && b[b.size()-1] == b[b.size()-2]) { std::string b3 = b.substr(0, b.size()-1); if (exists(b3)) return b3; }
+    }
+    if (ends("ed") && n > 4) {
+        std::string b = w.substr(0, n - 2); if (exists(b)) return b;
+        std::string b2 = b + "e"; if (exists(b2)) return b2;
+        if (b.size() > 1 && b[b.size()-1] == b[b.size()-2]) { std::string b3 = b.substr(0, b.size()-1); if (exists(b3)) return b3; }
+    }
+    if (ends("er") && n > 4) { std::string b = w.substr(0, n - 2); if (exists(b)) return b; }
+    if (ends("est") && n > 5) { std::string b = w.substr(0, n - 3); if (exists(b)) return b; }
+    if (ends("ly") && n > 4) { std::string b = w.substr(0, n - 2); if (exists(b)) return b; }
+    return w;
+}
+
+std::string to_lemma(const std::string& low) {
+    auto it = g_lemma.find(low);
+    if (it != g_lemma.end()) return it->second;
+    return rule_lemma(low);
+}
+
 std::string collapse_ws(const std::string& s) {
     std::string r;
     bool sp = false;
@@ -213,6 +255,25 @@ void* wp_create(const char* freq_path) {
         g_freq[line] = z;
     }
     fclose(f);
+
+    // 加载同级 en_lemma.tsv
+    std::string lp(freq_path);
+    size_t slash = lp.find_last_of('/');
+    std::string dir = (slash == std::string::npos) ? "" : lp.substr(0, slash + 1);
+    std::string lemma_path = dir + "en_lemma.tsv";
+    FILE* lf = fopen(lemma_path.c_str(), "r");
+    if (lf) {
+        char ll[256];
+        while (fgets(ll, sizeof(ll), lf)) {
+            char* tab = strchr(ll, '\t');
+            if (!tab) continue;
+            *tab = '\0';
+            std::string base(tab + 1);
+            while (!base.empty() && (base.back()=='\n' || base.back()=='\r')) base.pop_back();
+            if (!base.empty()) g_lemma[ll] = base;
+        }
+        fclose(lf);
+    }
     return &g_freq;
 }
 
@@ -252,11 +313,12 @@ int wp_select(void* handle, const char* text, int max_words,
             i = j;
             if (raw.empty()) continue;
             std::string low = lower_ascii(raw);
-            if ((int)low.size() < min_len || low.size() > 24) continue;
-            if (stopwords().count(low) || common_words().count(low)) continue;
             if (is_noise(raw, low)) continue;
-            WordStat& st = stats[low];
-            if (st.display.empty()) st.display = raw;
+            std::string lemma = to_lemma(low);
+            if ((int)lemma.size() < min_len || lemma.size() > 24) continue;
+            if (stopwords().count(lemma) || common_words().count(lemma)) continue;
+            WordStat& st = stats[lemma];
+            if (st.display.empty()) st.display = lemma;
             st.count++;
             if (raw == low) st.lower_seen = true;
             if (st.context.empty()) {
@@ -323,6 +385,7 @@ int wp_select(void* handle, const char* text, int max_words,
 void wp_destroy(void* handle) {
     (void)handle;
     g_freq.clear();
+    g_lemma.clear();
 }
 
 } // extern "C"
