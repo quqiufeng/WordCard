@@ -185,7 +185,6 @@ def _wrap(canvas, text, fs, max_w):
     return out
 
 def render_png(card, out_path, width=1000, min_height=0, title=''):
-    import datetime
     s = width / 1000.0
     OUT_M = int(width * 0.032)              # 画布外边距
     PAD = int(46 * s)                       # 面板内边距
@@ -300,8 +299,6 @@ def render_png(card, out_path, width=1000, min_height=0, title=''):
     fy = panel_y + ch - PAD - FOOTER_H
     c.line(TXT_X, fy, TXT_X + TEXT_W, fy, BORDER, 1.2)
     c.draw_text(FONT_CN, FS_SM, (title or 'WordCard')[:40], TXT_X, fy + int(12*s) + c.ascent(FONT_CN, FS_SM), MUTED)
-    ds = datetime.datetime.now().strftime('%Y-%m-%d')
-    c.draw_text(FONT_EN, FS_SM, ds, TXT_X + TEXT_W - c.measure(FONT_EN, FS_SM, ds), fy + int(12*s) + c.ascent(FONT_EN, FS_SM), MUTED)
 
     c.save(out_path)
     return out_path
