@@ -154,7 +154,7 @@ WordCard/
 │
 ├── design.md                    # 架构文档
 ├── README.md                    # 本文档
-└── task.md                      # 开发进度
+└── todolist.md                    # 应用方向
 ```
 
 ---

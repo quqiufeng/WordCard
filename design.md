@@ -466,7 +466,7 @@ SM-2 到期复习                      → 最弱维度匹配模式
 WordCard/
 ├── design.md                     # 本文档
 ├── README.md                     # 项目总览
-├── task.md                       # 开发进度
+├── todolist.md                     # 应用方向
 
 ├── src/                          # C 核心库 (编译 → libwordcard.so)
 │   ├── wordcard.h                # 间隔重复引擎：数据结构 + API 声明
