@@ -237,6 +237,7 @@ def _extract(path):
 _EN_CH = re.compile(r'^\s*(chapter|part|book)\s+([0-9]+|[ivxlcdm]+)\b', re.I)
 _CN_CH = re.compile(r'^\s*第\s*[0-9一二三四五六七八九十百千零两]+\s*[章回节卷篇部]')
 _MD_CH = re.compile(r'^#{1,3}\s+\S')
+_ROMAN_CH = re.compile(r'^[IVXLCDM]{1,7}$')
 
 def _safe_name(s, maxlen=60):
     s = re.sub(r'[/\\:*?"<>|\r\n\t]', '_', s.strip())
@@ -249,15 +250,33 @@ def _is_chapter_head(line):
         return None
     if _MD_CH.match(s):
         return re.sub(r'^#+\s*', '', s)
+    if _ROMAN_CH.match(s):
+        return f'Chapter {s}' if len(s) > 1 else f'Chapter {s}'
     if _EN_CH.match(s) or _CN_CH.match(s):
         return s
     return None
 
-def split_chapters(text, fallback_chars=6000):
-    """把正文按章节标题切分；无标题则按长度 fallback。返回 [(title, body)]"""
+def split_chapters(text, fallback_chars=6000, toc_gap=60):
+    """按章节标题切分；识别并跳过目录区；无标题按长度 fallback。返回 [(title, body)]"""
     lines = text.split('\n')
+    heads, off = [], 0
+    for i, l in enumerate(lines):
+        h = _is_chapter_head(l)
+        if h:
+            heads.append((i, off, h))
+        off += len(l) + 1
+
+    # 目录区检测：某标题之后紧跟着另一个标题（间隔很小）→ 判为目录项
+    is_toc = set()
+    for k in range(len(heads) - 1):
+        if heads[k + 1][1] - heads[k][1] < toc_gap:
+            is_toc.add(k)
+    toc_lines = {heads[idx][0] for idx in is_toc}
+
     chapters, title, buf = [], 'FrontMatter', []
-    for line in lines:
+    for i, line in enumerate(lines):
+        if i in toc_lines:
+            continue
         h = _is_chapter_head(line)
         if h:
             body = '\n'.join(buf).strip()
@@ -270,7 +289,6 @@ def split_chapters(text, fallback_chars=6000):
     if body:
         chapters.append((title, body))
 
-    # fallback：仅 1 段且很长 → 按长度切块
     if len(chapters) <= 1 and len(text) > fallback_chars * 1.5:
         paras = re.split(r'\n\s*\n', text)
         chunks, cur, n = [], [], 0
