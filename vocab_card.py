@@ -187,7 +187,7 @@ def _wrap(canvas, text, fs, max_w):
 def render_png(card, out_path, width=1000, min_height=0, title=''):
     import datetime
     s = width / 1000.0
-    OUT_M = int(width * 0.052)              # 画布外边距
+    OUT_M = int(width * 0.032)              # 画布外边距
     PAD = int(46 * s)                       # 面板内边距
     PANEL_X = OUT_M
     PANEL_W = width - 2 * OUT_M
@@ -216,7 +216,8 @@ def render_png(card, out_path, width=1000, min_height=0, title=''):
         for en, zh in card['sents']:
             ch += lines_h(en, FS, TEXT_W - int(40*s)) + int(4*s) + lines_h(zh, FS_SM, TEXT_W - int(40*s)) + int(24*s)
         ch += int(10*s)
-    FOOTER_H = LH(FS_SM) + int(24*s)
+    ch += int(20*s)                          # 安全缓冲
+    FOOTER_H = LH(FS_SM) + int(28*s)
     ch += FOOTER_H
     ch += PAD
 
