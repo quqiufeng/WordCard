@@ -275,13 +275,25 @@ def _clean_text(text):
     text = re.sub(r'^[-=]{3,}$', '', text, flags=re.MULTILINE)
     return text
 
-def extract_words(text, max_words=200, min_len=5, sort='difficulty'):
+def extract_words(text, max_words=200, min_len=5, sort='difficulty', target_zipf=3.8):
     """提取文本中的英文词汇，返回 [(word, context_sentence), ...]
 
-    过滤版权页/URL/缩写/专有名词/基础词等噪声。
-    sort='difficulty'（默认）：按难度（长度+低频）降序，选进阶词；
+    优先使用 C++ wordpick（基于通用词频 zipf 的学习价值评分）；
+    不可用时回退到纯 Python 启发式。
+    sort='difficulty'（默认）：按学习价值降序；
     sort='frequency'：按词频降序，选高频词。
     """
+    # ── C++ wordpick 路径 ──
+    try:
+        import wordpick as _wp
+        if _wp.available() and sort != 'frequency':
+            import html as _html
+            picked = _wp.select(_html.unescape(text), max_words=max_words,
+                                target_zipf=target_zipf, min_len=min_len)
+            return [(w, ctx) for (w, ctx, _s, _z, _n) in picked]
+    except Exception:
+        pass
+
     import html as _html
     text = _clean_text(_html.unescape(text))
     sentences = re.split(r'(?<=[.!?])\s+', text)

@@ -37,6 +37,7 @@ C/C++ 层
  ├── libwordcard.so     ───── SM-2 学习引擎 (wordcard.c + modes.c)
  ├── libcache.so        ───── KV Cache (14 个模块)
  ├── libtxt2png.so      ───── HarfBuzz + Knuth-Plass + Cairo
+ ├── libwordpick.so     ───── 智能词汇选择 (基于通用词频 zipf)
  ├── libqwen3_asr.so    ───── Qwen3-ASR (ONNX + llama.cpp)
  │                         来源: /opt/friday/agent/qwen3_asr_engine.cpp
  ├── importer/libs/
@@ -197,6 +198,7 @@ WordCard/
 | **ASR 备选** | subprocess | `/opt/friday/shell/` | SenseVoice |
 | **TTS** | C++ Piper | `voice/wrappers/` | 需编译 |
 | **电子书解析** | C++17 + libmobi/MuPDF | `importer/wrappers/` | `libmobiparse.so` / `libpdfparse.so` |
+| **词汇选择** | C++17 | 本项目 | `libwordpick.so` |
 | **业务逻辑** | Python ctypes | 本项目 | `engine.py` |
 | **CLI / API** | Python | 本项目 | `cli.py` / `api.py` |
 
