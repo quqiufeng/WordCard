@@ -228,7 +228,7 @@ def render_png(card, out_path, width=1000, min_height=0, title=''):
 
     c = txt2png.Canvas(W, h, BG)
     # 四边金色边框
-    bw = max(2, int(round(2 * s)))
+    bw = max(4, int(round(4 * s)))
     c.line(0, bw/2, W, bw/2, GOLD, bw)
     c.line(0, h - bw/2, W, h - bw/2, GOLD, bw)
     c.line(bw/2, 0, bw/2, h, GOLD, bw)
