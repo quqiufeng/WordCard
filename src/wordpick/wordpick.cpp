@@ -64,7 +64,7 @@ const std::unordered_set<std::string>& stopwords() {
             "words","already","called","eyes","five","food","given","half","read",
             "came","went","going","gone","does","done","having","upon","thing",
             "things","made","said","says","saw","looked","thought","wanted",
-            "also","just",
+            "also","just","alway","begin","gave","goes","told","took",
         };
         for (auto* p : w) v.insert(p);
         return v;
