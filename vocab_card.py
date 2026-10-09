@@ -156,74 +156,69 @@ def _wrap(canvas, text, fs, max_w):
         out.append(cur)
     return out
 
-def render_png(card, out_path):
-    FS = 27
-    FS_T = 52
-    FS_SEC = 25
-    FS_SM = 21
+def render_png(card, out_path, width=1000, min_height=0):
+    scale = width / 1000.0
+    MARGIN = int(50 * scale)
+    TEXT_W = width - 2 * MARGIN
+    FS = int(27 * scale)
+    FS_T = int(52 * scale)
+    FS_SEC = int(25 * scale)
+    FS_SM = int(21 * scale)
     LH = lambda fs: int(fs * 1.6)
 
+    W = width
     probe = txt2png.Canvas(W, 100, BG)
-    # 预估高度
+
     def para_h(text, fs):
-        n = len(_wrap(probe, text, fs, TEXT_W))
-        return n * LH(fs)
+        return len(_wrap(probe, text, fs, TEXT_W)) * LH(fs)
+
     h = MARGIN
-    h += LH(FS_SM) + 8                       # label
-    h += LH(FS_T) + 24                       # word
-    h += para_h(card['zh_def'], FS) + para_h(card['en_def'], FS_SM) + 24
+    h += LH(FS_SM) + int(8 * scale)
+    h += LH(FS_T) + int(24 * scale)
+    h += para_h(card['zh_def'], FS) + para_h(card['en_def'], FS_SM) + int(24 * scale)
     if card['para_en']:
-        h += LH(FS_SEC) + 6 + para_h(card['para_en'], FS) + para_h(card['para_zh'], FS) + 20
+        h += LH(FS_SEC) + int(6 * scale) + para_h(card['para_en'], FS) + para_h(card['para_zh'], FS) + int(20 * scale)
     if card['sents']:
-        h += LH(FS_SEC) + 6
+        h += LH(FS_SEC) + int(6 * scale)
         for en, zh in card['sents']:
-            h += para_h(en, FS) + para_h(zh, FS_SM) + 14
+            h += para_h(en, FS) + para_h(zh, FS_SM) + int(14 * scale)
     h += MARGIN
+    if min_height:
+        h = max(h, min_height)
 
     c = txt2png.Canvas(W, h, BG)
     y = MARGIN
-    # 顶部标签
     c.draw_text(FONT, FS_SM, 'WordCard', MARGIN, y + c.ascent(FONT, FS_SM), GREEN)
-    c.draw_text(FONT, FS_SM, card['level'], MARGIN + 120, y + c.ascent(FONT, FS_SM), MUTED)
-    y += LH(FS_SM) + 8
-    # 单词
+    c.draw_text(FONT, FS_SM, card['level'], MARGIN + int(120 * scale), y + c.ascent(FONT, FS_SM), MUTED)
+    y += LH(FS_SM) + int(8 * scale)
     c.draw_text(FONT, FS_T, card['word'], MARGIN, y + c.ascent(FONT, FS_T), RED)
     if card['pos']:
         xw = c.measure(FONT, FS_T, card['word'])
-        c.draw_text(FONT, FS_SM, card['pos'], MARGIN + xw + 14, y + c.ascent(FONT, FS_T), MUTED)
-    y += LH(FS_T) + 24
-    # 释义
+        c.draw_text(FONT, FS_SM, card['pos'], MARGIN + xw + int(14 * scale), y + c.ascent(FONT, FS_T), MUTED)
+    y += LH(FS_T) + int(24 * scale)
     for line in _wrap(c, card['zh_def'], FS, TEXT_W):
-        c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), INK)
-        y += LH(FS)
+        c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), INK); y += LH(FS)
     for line in _wrap(c, card['en_def'], FS_SM, TEXT_W):
-        c.draw_text(FONT, FS_SM, line, MARGIN, y + c.ascent(FONT, FS_SM), MUTED)
-        y += LH(FS_SM)
-    y += 24
-    # 段落
+        c.draw_text(FONT, FS_SM, line, MARGIN, y + c.ascent(FONT, FS_SM), MUTED); y += LH(FS_SM)
+    y += int(24 * scale)
     if card['para_en']:
         c.draw_text(FONT, FS_SEC, '段落', MARGIN, y + c.ascent(FONT, FS_SEC), GREEN)
-        y += LH(FS_SEC) + 6
+        y += LH(FS_SEC) + int(6 * scale)
         for line in _wrap(c, card['para_en'], FS, TEXT_W):
-            c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), INK)
-            y += LH(FS)
+            c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), INK); y += LH(FS)
         for line in _wrap(c, card['para_zh'], FS, TEXT_W):
-            c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), ACCENT)
-            y += LH(FS)
-        y += 20
-    # 例句
+            c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), ACCENT); y += LH(FS)
+        y += int(20 * scale)
     if card['sents']:
         c.draw_text(FONT, FS_SEC, '例句', MARGIN, y + c.ascent(FONT, FS_SEC), GREEN)
-        y += LH(FS_SEC) + 6
+        y += LH(FS_SEC) + int(6 * scale)
         for idx, (en, zh) in enumerate(card['sents'], 1):
             c.draw_text(FONT, FS_SM, f'{idx}.', MARGIN, y + c.ascent(FONT, FS_SM), RED)
-            for k, line in enumerate(_wrap(c, en, FS, TEXT_W - 24)):
-                c.draw_text(FONT, FS, line, MARGIN + 24, y + c.ascent(FONT, FS), INK)
-                y += LH(FS)
-            for line in _wrap(c, zh, FS_SM, TEXT_W - 24):
-                c.draw_text(FONT, FS_SM, line, MARGIN + 24, y + c.ascent(FONT, FS_SM), ACCENT)
-                y += LH(FS_SM)
-            y += 14
+            for line in _wrap(c, en, FS, TEXT_W - int(24 * scale)):
+                c.draw_text(FONT, FS, line, MARGIN + int(24 * scale), y + c.ascent(FONT, FS), INK); y += LH(FS)
+            for line in _wrap(c, zh, FS_SM, TEXT_W - int(24 * scale)):
+                c.draw_text(FONT, FS_SM, line, MARGIN + int(24 * scale), y + c.ascent(FONT, FS_SM), ACCENT); y += LH(FS_SM)
+            y += int(14 * scale)
     c.save(out_path)
     return out_path
 
@@ -237,6 +232,8 @@ def main():
     ap.add_argument('--sent', type=int, default=3)
     ap.add_argument('--words', default=None, help='逗号分隔，覆盖自动选词')
     ap.add_argument('--out', default='output')
+    ap.add_argument('--size', default='xhs',
+                    help='xhs/小红薯=1920x2560(3:4), sq/朋友圈=2048x2048, 或 WxH')
     ap.add_argument('--no-png', action='store_true')
     a = ap.parse_args()
 
@@ -269,10 +266,19 @@ def main():
     print('MD:', md)
 
     if not a.no_png:
+        # 尺寸预设
+        presets = {'xhs': (1920, 2560), '小红薯': (1920, 2560), 'xiaohongshu': (1920, 2560),
+                   'sq': (2048, 2048), '朋友圈': (2048, 2048), 'pyq': (2048, 2048)}
+        if a.size in presets:
+            pw, ph = presets[a.size]
+        elif 'x' in a.size:
+            pw, ph = (int(x) for x in a.size.lower().split('x'))
+        else:
+            pw, ph = 1920, 2560
         for c in cards:
             p = os.path.join(a.out, f"card_{c['word']}.png")
-            render_png(c, p)
-        print(f'PNG: {len(cards)} 张 → {a.out}/card_*.png')
+            render_png(c, p, width=pw, min_height=ph)
+        print(f'PNG: {len(cards)} 张 ({pw}x{ph}) → {a.out}/card_*.png')
 
 if __name__ == '__main__':
     main()
