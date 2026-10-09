@@ -17,9 +17,26 @@ import os, re, sys, argparse, html
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) or '.')
 import importer, wordpick, translate, txt2png
 
-FONT = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
-if not os.path.exists(FONT):
-    FONT = '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'
+# 字体预设
+FONT_PRESETS = {
+    'sans':  '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+    'serif': '/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc',
+    'kai':   '/usr/share/fonts/truetype/arphic/ukai.ttc',
+    'hei':   '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
+    'zenhei':'/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+}
+FONT_CN = FONT_PRESETS['kai']      # 中文：楷体
+FONT_EN = FONT_PRESETS['serif']    # 西文：宋体
+for _p in FONT_PRESETS.values():
+    if not os.path.exists(_p):
+        continue
+# 保证 FONT 有效
+FONT = FONT_EN  # 兼容
+def _is_cjk(s):
+    return any('\u4e00' <= ch <= '\u9fff' or '\u3000' <= ch <= '\u303f' or '\uff00' <= ch <= '\uffef' for ch in s)
+
+def _font_for(text):
+    return FONT_CN if _is_cjk(text) else FONT_EN
 
 # 中国传统配色（参考 src/dotui.h）
 BG     = 0xE2F0CB   # 霜地
@@ -134,13 +151,13 @@ def render_md(cards, book_title, out_path):
 # ── PNG ───────────────────────────────────────────────────
 
 def _measure(canvas, fs, text):
-    return canvas.measure(FONT, fs, text)
+    return canvas.measure(_font_for(text), fs, text)
 
 def _wrap(canvas, text, fs, max_w):
     if not text:
         return []
     # 中文按字断行，英文按词断行
-    is_cjk = any('\u4e00' <= ch <= '\u9fff' for ch in text)
+    is_cjk = _is_cjk(text)
     out, cur = [], ''
     units = list(text) if is_cjk else text.split()
     joiner = '' if is_cjk else ' '
@@ -188,36 +205,36 @@ def render_png(card, out_path, width=1000, min_height=0):
 
     c = txt2png.Canvas(W, h, BG)
     y = MARGIN
-    c.draw_text(FONT, FS_SM, 'WordCard', MARGIN, y + c.ascent(FONT, FS_SM), GREEN)
-    c.draw_text(FONT, FS_SM, card['level'], MARGIN + int(120 * scale), y + c.ascent(FONT, FS_SM), MUTED)
+    c.draw_text(FONT_EN, FS_SM, 'WordCard', MARGIN, y + c.ascent(FONT, FS_SM), GREEN)
+    c.draw_text(FONT_EN, FS_SM, card['level'], MARGIN + int(120 * scale), y + c.ascent(FONT, FS_SM), MUTED)
     y += LH(FS_SM) + int(8 * scale)
-    c.draw_text(FONT, FS_T, card['word'], MARGIN, y + c.ascent(FONT, FS_T), RED)
+    c.draw_text(FONT_EN, FS_T, card['word'], MARGIN, y + c.ascent(FONT, FS_T), RED)
     if card['pos']:
-        xw = c.measure(FONT, FS_T, card['word'])
-        c.draw_text(FONT, FS_SM, card['pos'], MARGIN + xw + int(14 * scale), y + c.ascent(FONT, FS_T), MUTED)
+        xw = c.measure(FONT_EN, FS_T, card['word'])
+        c.draw_text(FONT_EN, FS_SM, card['pos'], MARGIN + xw + int(14 * scale), y + c.ascent(FONT, FS_T), MUTED)
     y += LH(FS_T) + int(24 * scale)
     for line in _wrap(c, card['zh_def'], FS, TEXT_W):
-        c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), INK); y += LH(FS)
+        c.draw_text(FONT_CN, FS, line, MARGIN, y + c.ascent(FONT_CN, FS), INK); y += LH(FS)
     for line in _wrap(c, card['en_def'], FS_SM, TEXT_W):
-        c.draw_text(FONT, FS_SM, line, MARGIN, y + c.ascent(FONT, FS_SM), MUTED); y += LH(FS_SM)
+        c.draw_text(FONT_EN, FS_SM, line, MARGIN, y + c.ascent(FONT_EN, FS_SM), MUTED); y += LH(FS_SM)
     y += int(24 * scale)
     if card['para_en']:
-        c.draw_text(FONT, FS_SEC, '段落', MARGIN, y + c.ascent(FONT, FS_SEC), GREEN)
+        c.draw_text(FONT_CN, FS_SEC, '段落', MARGIN, y + c.ascent(FONT, FS_SEC), GREEN)
         y += LH(FS_SEC) + int(6 * scale)
         for line in _wrap(c, card['para_en'], FS, TEXT_W):
-            c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), INK); y += LH(FS)
+            c.draw_text(FONT_EN, FS, line, MARGIN, y + c.ascent(FONT_EN, FS), INK); y += LH(FS)
         for line in _wrap(c, card['para_zh'], FS, TEXT_W):
-            c.draw_text(FONT, FS, line, MARGIN, y + c.ascent(FONT, FS), ACCENT); y += LH(FS)
+            c.draw_text(FONT_CN, FS, line, MARGIN, y + c.ascent(FONT_CN, FS), ACCENT); y += LH(FS)
         y += int(20 * scale)
     if card['sents']:
-        c.draw_text(FONT, FS_SEC, '例句', MARGIN, y + c.ascent(FONT, FS_SEC), GREEN)
+        c.draw_text(FONT_CN, FS_SEC, '例句', MARGIN, y + c.ascent(FONT, FS_SEC), GREEN)
         y += LH(FS_SEC) + int(6 * scale)
         for idx, (en, zh) in enumerate(card['sents'], 1):
-            c.draw_text(FONT, FS_SM, f'{idx}.', MARGIN, y + c.ascent(FONT, FS_SM), RED)
+            c.draw_text(FONT_EN, FS_SM, f'{idx}.', MARGIN, y + c.ascent(FONT_EN, FS_SM), RED)
             for line in _wrap(c, en, FS, TEXT_W - int(24 * scale)):
-                c.draw_text(FONT, FS, line, MARGIN + int(24 * scale), y + c.ascent(FONT, FS), INK); y += LH(FS)
+                c.draw_text(FONT_EN, FS, line, MARGIN + int(24 * scale), y + c.ascent(FONT_EN, FS), INK); y += LH(FS)
             for line in _wrap(c, zh, FS_SM, TEXT_W - int(24 * scale)):
-                c.draw_text(FONT, FS_SM, line, MARGIN + int(24 * scale), y + c.ascent(FONT, FS_SM), ACCENT); y += LH(FS_SM)
+                c.draw_text(FONT_CN, FS_SM, line, MARGIN + int(24 * scale), y + c.ascent(FONT_CN, FS_SM), ACCENT); y += LH(FS_SM)
             y += int(14 * scale)
     c.save(out_path)
     return out_path
@@ -234,8 +251,17 @@ def main():
     ap.add_argument('--out', default='output')
     ap.add_argument('--size', default='xhs',
                     help='xhs/小红薯=1920x2560(3:4), sq/朋友圈=2048x2048, 或 WxH')
+    ap.add_argument('--font', default='serif',
+                    help='sans/serif/kai/hei/zenhei 或字体文件路径')
     ap.add_argument('--no-png', action='store_true')
     a = ap.parse_args()
+
+    global FONT_CN, FONT_EN
+    if a.font in FONT_PRESETS:
+        FONT_EN = FONT_PRESETS[a.font]
+    elif os.path.exists(a.font):
+        FONT_EN = a.font
+    print(f'字体: 中文={os.path.basename(FONT_CN)}  西文={os.path.basename(FONT_EN)}')
 
     os.makedirs(a.out, exist_ok=True)
     print('解析电子书...')
