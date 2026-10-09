@@ -241,3 +241,5 @@ src/stb_*.h
 src/txt2png.c
 src/txt2png.h
 src/test_txt2png.c
+output/*/
+output/
