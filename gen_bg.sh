@@ -17,12 +17,13 @@ set -uo pipefail
 BACKUP="${IMAGE_BACKUP:-/opt/static_comfyui/cpp/sd/backup.sh}"
 [ -x "$BACKUP" ] || { echo "backup.sh 不存在: $BACKUP" >&2; exit 1; }
 
-STYLE="guochao"; PRESET="xhs"; PROMPT=""; OUT=""; FORCE=0
+STYLE="frame"; PRESET="xhs"; PROMPT=""; OUT=""; FORCE=0
 W=""; H=""
 
 # 背景提示词预设（均强调 无人/无字/留白）
 declare -A STYLE_PROMPT=(
-  [paper]="soft cream paper texture background, subtle fiber grain, warm beige, clean minimal, large empty space, flat, no people, no text"
+  [frame]="minimalist clean frame background, pure soft white and very pale cream, thin elegant sage green double-line rectangular border with tiny simple corner accents, large pure blank empty center, flat vector illustration, fresh airy high-key, lots of negative space, no pattern, no texture, no people, no text, no letters"
+  [paper]="very light plain paper texture, soft cream white, extremely subtle grain, large clean empty center, minimal, no people, no text"
   [guochao]="flat decorative guochao background, pale cream and sage green, symmetric traditional Chinese ornamental border frame, subtle cloud and bamboo line motifs, empty blank center, minimal vector illustration, no people, no text"
   [grid]="minimal fine grid line paper background, pale sage green, clean geometric, large blank center, flat design, no people, no text"
   [ink]="elegant Chinese ink wash light background, very pale, subtle brush strokes at edges, wide empty center, minimalist, no people, no text"
@@ -57,7 +58,7 @@ case "$PRESET" in
 esac
 
 # 提示词：用户给定优先，否则用预设
-[ -z "$PROMPT" ] && PROMPT="${STYLE_PROMPT[$STYLE]:-${STYLE_PROMPT[guochao]}}"
+[ -z "$PROMPT" ] && PROMPT="${STYLE_PROMPT[$STYLE]:-${STYLE_PROMPT[frame]}}"
 [ -z "$OUT" ] && OUT="$HOME/bg_$(date +%Y%m%d_%H%M%S).png"
 
 # GPU 显存检查
