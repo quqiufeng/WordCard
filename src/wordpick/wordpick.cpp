@@ -58,7 +58,7 @@ const std::unordered_set<std::string>& stopwords() {
             "every","great","might","shall","still","those","under","while",
             "before","should","because","through","between","against","without",
             "himself","herself","itself","themselves","ourselves","yourself",
-            "myself","another","seemed","always","though","almost","nothing",
+            "myself","themself","oneself","another","seemed","always","though","almost","nothing",
             "others","later","away","found","better","except","began","appeared",
             "whole","year","death","hard","morning","soon","suddenly","week",
             "words","already","called","eyes","five","food","given","half","read",
