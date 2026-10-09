@@ -55,7 +55,7 @@ MUTED  = 0x5B6B4F
 ACCENT = 0x2A3C5C   # 黛蓝
 BORDER = 0xC4D6A6
 CARD   = 0xF3F8E8   # 嫩菊绿（头部卡片）
-GOLD   = 0xC9A227   # 金色（边框）
+GOLD   = 0xA3A33E   # 秋香色（边框）
 ZH_BG  = 0xEDF4DD   # 译文浅底
 
 W = 1000
