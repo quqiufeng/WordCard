@@ -824,4 +824,27 @@ void txt2png_canvas_rect(txt2png_canvas_t canvas, double x, double y,
     }
 }
 
+void txt2png_canvas_image(txt2png_canvas_t canvas, const char* path,
+                           double x, double y, double w, double h) {
+    auto *c = static_cast<CanvasData*>(canvas);
+    if (!c || !path) return;
+    cairo_surface_t* img = cairo_image_surface_create_from_png(path);
+    if (cairo_surface_status(img) != CAIRO_STATUS_SUCCESS) {
+        cairo_surface_destroy(img);
+        return;
+    }
+    int iw = cairo_image_surface_get_width(img);
+    int ih = cairo_image_surface_get_height(img);
+    if (iw > 0 && ih > 0) {
+        cairo_save(c->cr);
+        cairo_translate(c->cr, x, y);
+        cairo_scale(c->cr, w / iw, h / ih);
+        cairo_set_operator(c->cr, CAIRO_OPERATOR_OVER);
+        cairo_set_source_surface(c->cr, img, 0, 0);
+        cairo_paint(c->cr);
+        cairo_restore(c->cr);
+    }
+    cairo_surface_destroy(img);
+}
+
 } // extern "C"

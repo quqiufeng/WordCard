@@ -183,7 +183,7 @@ def _wrap(canvas, text, fs, max_w):
         out.append(cur)
     return out
 
-def render_png(card, out_path, width=1000, min_height=0, title=''):
+def render_png(card, out_path, width=1000, min_height=0, title='', bg=None):
     import datetime
     s = width / 1000.0
     MARGIN = int(52 * s)
@@ -216,7 +216,10 @@ def render_png(card, out_path, width=1000, min_height=0, title=''):
         h = max(h, min_height)
 
     c = txt2png.Canvas(W, h, BG)
-    c.rect(0, 0, W, int(7*s), GREEN, True, 0)          # 顶部色条
+    if bg:
+        c.image(bg, 0, 0, W, h)                        # 背景图
+    else:
+        c.rect(0, 0, W, int(7*s), GREEN, True, 0)      # 顶部色条
 
     y = MARGIN
     # ── 头部卡片 ──
@@ -310,6 +313,7 @@ def main():
     ap.add_argument('--font-cn', default=None, help='覆盖中文字体')
     ap.add_argument('--font', default='serif',
                     help='sans/serif/kai/hei/zenhei 或字体文件路径')
+    ap.add_argument('--bg', default=None, help='背景图 PNG（由 gen_bg.sh 生成）')
     ap.add_argument('--no-png', action='store_true')
     a = ap.parse_args()
 
@@ -365,7 +369,7 @@ def main():
             pw, ph = 1920, 2560
         for c in cards:
             p = os.path.join(a.out, f"card_{c['word']}.png")
-            render_png(c, p, width=pw, min_height=ph, title=title)
+            render_png(c, p, width=pw, min_height=ph, title=title, bg=a.bg)
         print(f'PNG: {len(cards)} 张 ({pw}x{ph}) → {a.out}/card_*.png')
 
 if __name__ == '__main__':
