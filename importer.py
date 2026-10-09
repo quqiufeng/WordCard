@@ -33,6 +33,34 @@ little long own thing things man men way ways make made must upon shall
 unto thee thou thy hath did does done being having having
 """.split())
 
+# 常用基础词（太简单，不作为学习目标）
+_COMMON_WORDS = set("""
+animal animals farm day days night time year years life world man men woman
+women people thing things way home house work part place case week company
+system program question government number point water room mother father
+money story fact month right study book eye eyes job word words business
+issue side kind head service friend power hour game line end member law
+car city community name team minute idea kid body information back parent
+face level office door health person art war history party result change
+morning reason research girl guy moment air teacher force education foot
+boy age policy process music market sense nation plan college interest
+death experience effect use class control care field development role
+effort rate heart drug show leader light voice wife police mind price
+report decision son view relationship town road arm difference value
+building action model season society tax director position player record
+paper space ground form event official matter center couple site project
+activity star table need court production eat food sense state area
+picture practice piece land hand high small large great little long
+good new first last next early young important public bad able
+know think take come want look give use find tell ask work seem feel try
+leave call need become mean keep let begin help talk turn start show hear
+play run move live believe hold bring happen write provide sit stand lose
+pay meet include continue set learn change lead understand watch follow
+stop create speak read allow add spend grow open walk win offer remember
+love consider appear buy wait serve die send expect build stay fall cut
+reach kill remain suggest raise pass sell require report decide pull
+""".split())
+
 # ── 导入路径 ────────────────────────────────────────────────
 
 def _find_lib(name):
@@ -247,10 +275,12 @@ def _clean_text(text):
     text = re.sub(r'^[-=]{3,}$', '', text, flags=re.MULTILINE)
     return text
 
-def extract_words(text, max_words=200):
+def extract_words(text, max_words=200, min_len=5, sort='difficulty'):
     """提取文本中的英文词汇，返回 [(word, context_sentence), ...]
 
-    过滤版权页/URL/缩写等噪声，按词频从高到低排序（高频＝更常用）。
+    过滤版权页/URL/缩写/专有名词/基础词等噪声。
+    sort='difficulty'（默认）：按难度（长度+低频）降序，选进阶词；
+    sort='frequency'：按词频降序，选高频词。
     """
     import html as _html
     text = _clean_text(_html.unescape(text))
@@ -267,9 +297,11 @@ def extract_words(text, max_words=200):
         words = re.findall(r"[a-zA-Z]+(?:'[a-zA-Z]+)?", sent)
         for w in words:
             wl = w.lower()
-            if len(wl) < 3 or len(wl) > 20:
+            if len(wl) < min_len or len(wl) > 20:
                 continue
             if wl in _STOPWORDS or _is_noise_token(w):
+                continue
+            if wl in _COMMON_WORDS:
                 continue
             if w == wl:            # 该词曾以小写出现
                 lower_seen.add(wl)
@@ -281,8 +313,12 @@ def extract_words(text, max_words=200):
                 ctx[wl] = c
     # 专有名词过滤：只以大写形式出现的词（人名/地名/品牌）
     ranked = [w for w in freq if w in lower_seen]
-    # 按词频降序，频次相同按字母序
-    ranked.sort(key=lambda w: (-freq[w], w))
+    if sort == 'frequency':
+        # 词频降序（高频＝更常用）
+        ranked.sort(key=lambda w: (-freq[w], w))
+    else:
+        # 难度降序：长词优先；同长度时低频优先（更生僻）
+        ranked.sort(key=lambda w: (-len(w), freq[w], w))
     return [(wl, ctx[wl]) for wl in ranked[:max_words]]
 
 # ── 导入流程 ────────────────────────────────────────────────
