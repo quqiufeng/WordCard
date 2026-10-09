@@ -232,6 +232,47 @@ def _extract(path):
     else:
         raise ValueError(f'Unsupported format: {ext}')
 
+# ── 文本清洗 ───────────────────────────────────────────────
+
+_CSS_PROPS = set("""font text line margin padding color background border display
+width height vertical position letter word white overflow list flex align
+justify content opacity box transform transition cursor visibility float
+clear outline fill stroke gap grid order space""".split())
+
+def _is_css_line(s):
+    if len(s) > 90 or not s:
+        return False
+    if any('\u4e00' <= ch <= '\u9fff' for ch in s):
+        return False
+    m = re.match(r'^(-?[a-zA-Z][-a-zA-Z]*)\s*:', s)
+    if not m:
+        return False
+    prop = m.group(1).lower().lstrip('-').split('-')[0]
+    if s.lstrip().startswith('-') or prop.startswith('webkit'):
+        return True
+    return prop in _CSS_PROPS
+
+def clean_text(text):
+    """去 HTML/CSS 残留、实体解码、规整空白"""
+    import html as _html
+    text = _html.unescape(text)
+    text = re.sub(r'(?is)<(script|style)\b[^>]*>.*?</\1>', '', text)   # style/script 块
+    text = re.sub(r'(?is)<[a-zA-Z/][^>]{0,200}>', '', text)             # HTML 标签
+    text = re.sub(r'(?s)\{[^{}]*:[^{}]*;[^{}]*\}', ' ', text)          # CSS { ... } 块
+    text = re.sub(r'(?m)^\s*[.#][\w.#\-]+\s*\{?\s*$', '', text)     # CSS 选择器行
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    out = []
+    for line in text.split('\n'):
+        s = line.strip()
+        if s and _is_css_line(s):
+            continue
+        out.append(line)
+    text = '\n'.join(out)
+    text = re.sub(r'[ \t\u3000]+', ' ', text)
+    text = re.sub(r' *\n *', '\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
 # ── 章节切分 + 保存 ────────────────────────────────────────
 
 _EN_CH = re.compile(r'^\s*(chapter|part|book)\s+([0-9]+|[ivxlcdm]+)\b', re.I)
@@ -306,7 +347,7 @@ def save_book(book_path, out_dir, info=None):
     import json, html as _html
     if info is None:
         info = extract(book_path)
-    text = _html.unescape(info['text'])
+    text = clean_text(info['text'])
     chapters = split_chapters(text)
     os.makedirs(os.path.join(out_dir, 'chapters'), exist_ok=True)
     with open(os.path.join(out_dir, 'book.txt'), 'w', encoding='utf-8') as f:
