@@ -30,8 +30,8 @@ MUTED  = 0x5B6B4F
 ACCENT = 0x2A3C5C   # 黛蓝
 BORDER = 0xC4D6A6
 
-W = 820
-MARGIN = 40
+W = 1000
+MARGIN = 50
 TEXT_W = W - 2 * MARGIN
 
 # ── 文本解析 ──────────────────────────────────────────────
@@ -157,11 +157,11 @@ def _wrap(canvas, text, fs, max_w):
     return out
 
 def render_png(card, out_path):
-    FS = 18
-    FS_T = 30
-    FS_SEC = 16
-    FS_SM = 15
-    LH = lambda fs: int(fs * 1.55)
+    FS = 27
+    FS_T = 52
+    FS_SEC = 25
+    FS_SM = 21
+    LH = lambda fs: int(fs * 1.6)
 
     probe = txt2png.Canvas(W, 100, BG)
     # 预估高度
