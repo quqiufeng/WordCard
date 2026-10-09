@@ -127,6 +127,47 @@ def build_card(word, level_name, text, max_sent=3):
         card['sents'].append((s, translate.translate(s)))
     return card
 
+# ── 导入 SM-2 复习库 ───────────────────────────────────
+
+def _trunc(s, n):
+    b = s.encode('utf-8')
+    if len(b) <= n:
+        return s
+    return b[:n].decode('utf-8', 'ignore')
+
+def save_to_db(cards, db_path, book_title='', user_id=1):
+    """把卡片(单词+释义+上下文)写入 SM-2 数据库，供间隔重复复习"""
+    import engine
+    os.makedirs(os.path.dirname(db_path) or '.', exist_ok=True)
+    db = engine.WordCardDB.open(db_path)
+    added = 0
+    try:
+        db.create_user('default', 'Default User')  # 已存在则忽略
+        for c in cards:
+            if db.find_item(question=c['word']):
+                continue
+            ctx = []
+            if c['para_en']:
+                ctx.append(c['para_en'])
+            if c['para_zh']:
+                ctx.append(c['para_zh'])
+            for en, zh in c['sents'][:2]:
+                ctx.append(en)
+                if zh:
+                    ctx.append(zh)
+            db.add_item(
+                question=c['word'],
+                answer=_trunc(c['zh_def'], 500),
+                explanation=_trunc('\n'.join(ctx), 1000),
+                hint=_trunc(c['en_def'], 250),
+                tags=_trunc(f'book:{book_title}', 120),
+            )
+            added += 1
+        db.save()
+    finally:
+        db.close()
+    return added
+
 # ── 音频（英文朗读）─────────────────────────────────────
 
 def render_audio_all(cards, out_path, sid=3, card_gap=1.5):
@@ -354,6 +395,7 @@ def main():
     ap.add_argument('--font-cn', default=None, help='覆盖中文字体')
     ap.add_argument('--font', default='serif',
                     help='sans/serif/kai/hei/zenhei 或字体文件路径')
+    ap.add_argument('--save-db', default=None, help='导入 SM-2 数据库路径 (如 data/wordcard.db)')
     ap.add_argument('--audio', action='store_true', help='生成英文朗读 WAV')
     ap.add_argument('--sid', type=int, default=3, help='Kokoro 音色 (英文 0-19, 默认3)')
     ap.add_argument('--no-png', action='store_true')
@@ -398,6 +440,10 @@ def main():
     md = os.path.join(a.out, 'vocab_cards.md')
     render_md(cards, title, md)
     print('MD:', md)
+
+    if a.save_db:
+        n = save_to_db(cards, a.save_db, book_title=title)
+        print(f'DB: 新增 {n} 词 → {a.save_db}')
 
     if a.audio:
         ap_ = os.path.join(a.out, 'vocab_audio.wav')
