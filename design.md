@@ -1,7 +1,7 @@
 # WordCard 设计方案
 
 > C 核心引擎 + Python 业务层 + HarfBuzz/Cairo 文本渲染
-> 文档版本: v4.0 — 2026-07-26
+> 文档版本: v4.1 — 2026-10-09
 
 ---
 
@@ -11,7 +11,7 @@
 
 - **C 共享库**：`libwordcard.so` SM-2 间隔重复引擎 + 哈希索引 + 结构体直写磁盘
 - **Python 业务层**：`engine.py` ctypes 绑定 + `cli.py` 终端复习 + `api.py` REST 接口
-- **电子书导入**：PDF/MOBI/AZW3/MD → C++ 解析 → 词汇提取 → SM-2 数据库
+- **电子书导入**：PDF/MOBI/AZW3/EPUB/MD → C++ 解析 → 词汇提取 → SM-2 数据库
 - **高质量文本渲染**：HarfBuzz shaping + Knuth-Plass 断行 + Cairo → PNG 卡片
 - **零外部数据库**：SQLite/Redis 零依赖，C 结构体直写 mmap 文件
 
@@ -242,7 +242,8 @@ LRU 淘汰: access_time 排序 → 淘汰最旧非永久条目 → 直到内存 
 |------|------|------|
 | **KV Cache 存储** | `src/cache/*.c` | 集成到 libwordcard.so |
 | **MOBI/AZW3 解析** | `importer/wrappers/mobi_wrapper.cpp` | 基于 libmobi 的 C++ Wrapper |
-| **PDF/EPUB 解析** | `importer/wrappers/pdf_wrapper.cpp` | 基于 MuPDF 的 C++ Wrapper |
+| **EPUB 解析** | `importer/wrappers/epub_wrapper.cpp` | 基于 libzip + libxml2 的 C++ Wrapper |
+| **PDF 解析** | `importer/wrappers/pdf_wrapper.cpp` | 基于 MuPDF 的 C++ Wrapper |
 | **import_book** | tools/import_book.c（预期位置） | C 版电子书导入程序 |
 | **Jina 嵌入** | ONNX Runtime + TensorRT 加速 | 768 维向量 |
 | **HNSW 索引** | `src/cache/hnsw.c` | 分层可导航小世界图 |
@@ -507,8 +508,22 @@ WordCard/
 
 ├── importer/wrappers/            # C++ 电子书解析 Wrapper
 │   ├── mobi_wrapper.cpp          # MOBI/AZW3 解析（基于 libmobi）
-│   ├── pdf_wrapper.cpp           # PDF/EPUB 解析（基于 MuPDF）
+│   ├── pdf_wrapper.cpp           # PDF 解析（基于 MuPDF）
+│   ├── epub_wrapper.cpp          # EPUB 解析（基于 libzip + libxml2）
 │   └── Makefile                  # 编译 → importer/libs/ 目录
+
+├── voice/                       # 语音引擎
+│   ├── libs/libvoice_engine.so  # ASR/TTS C++ 引擎
+│   └── wrappers/
+│       └── voice_engine.cpp/h    # C++ 语音引擎（ASR + TTS + ALSA/VAD）
+
+├── src/                          # C 核心库
+│   ├── dotui.h                   # 中国传统配色（来自 /opt/my-agent）
+│   ├── dotui_bridge.cpp/h        # dotui C ABI 桥接
+│   └── txt2png/                  # C++ txt2png 桥接
+│       ├── linebreak.h/cpp       # Knuth-Plass 算法
+│       ├── textrender_core.cpp   # HarfBuzz + Cairo 渲染
+│       └── txt2png_bridge.cpp/h  # C ABI 接口
 
 └── data/                         # 数据目录
     ├── wordcard.db               # 间隔重复数据库
@@ -528,6 +543,9 @@ WordCard/
 | **my_db 基础设施** | `/opt/my_db` 项目 | - | mmap 池 + metrics + crc32 |
 | **libmobi 解析库** | `/opt/libmobi` | GPL | 静态链接到 libmobiparse.so |
 | **MuPDF 解析库** | `/opt/mupdf` | AGPL | 静态链接到 libpdfparse.so |
+| **libzip + libxml2** | 系统 | LGPL/MIT | EPUB 解析（libepubparse.so） |
+| **Kokoro TTS** | `/opt/sherpa-onnx` | Apache 2.0 | 语音合成（libvoice_engine.so） |
+| **SenseVoice ASR** | `/opt/SenseVoice.cpp` | Apache 2.0 | 语音识别（libvoice_engine.so） |
 | **Jina v2 嵌入** | HuggingFace / ONNX | Apache 2.0 | 可选语义搜索组件 |
 | **ONNX Runtime** | Microsoft | MIT | 可选 GPU 加速推理 |
 | **TensorRT** | NVIDIA | NVIDIA EULA | 可选 GPU 加速（4090D 优化） |
@@ -541,7 +559,7 @@ cd src && make clean && make && make test
 
 # 2. 编译电子书解析 Wrapper（可选）
 cd importer/wrappers && make
-# 输出: importer/libs/libmobiparse.so, importer/libs/libpdfparse.so
+# 输出: importer/libs/libmobiparse.so, importer/libs/libpdfparse.so, importer/libs/libepubparse.so
 ```
 
 ---
@@ -640,4 +658,4 @@ int main() {
 | v3.0 | 2025-05 | 通用学习引擎，支持任意知识类型 |
 | **v4.0** | **2026-06** | **纯 C 重构：移除 Python，集成 KV Cache + 电子书语义搜索** |
 
-*最后更新: 2026-06-17*
+*最后更新: 2026-10-09*

@@ -9,7 +9,7 @@
 WordCard 是一个**电子书驱动**的间隔重复学习系统：
 
 - **C 核心引擎**：零依赖 SM-2 算法 + 哈希索引 + 结构体直写磁盘
-- **电子书导入**：PDF/MOBI/AZW3/MD → 提取词汇 → 上下文关联
+- **电子书导入**：PDF/MOBI/AZW3/EPUB/MD → 提取词汇 → 上下文关联
 - **双接口**：CLI 终端复习 + FastAPI REST 接口
 - **卡片图片**：HarfBuzz shaping + Knuth-Plass 最优断行 + Cairo 渲染
 - **15 天掌握周期**：SM-2 算法确保到期复习
@@ -23,13 +23,13 @@ WordCard 是一个**电子书驱动**的间隔重复学习系统：
  ├── CLI (cli.py) ──────── 终端交互复习
  ├── API (api.py) ──────── FastAPI REST (port 8000)
  ├── 卡片图片 ───────────── txt2png Canvas → PNG
- └── 语音 ──────────────── ASR (Qwen3-ASR / SenseVoice) + TTS
+ └── 语音 ──────────────── ASR (SenseVoice) + TTS (Kokoro)
 
 Python 层
  ├── engine.py    ────────── SM-2 ctypes 绑定 → libwordcard.so
  ├── importer.py  ────────── 电子书解析 → 词汇提取 → DB
  ├── txt2png.py   ────────── 画布 API → libtxt2png.so
- ├── voice.py     ────────── ASR/TTS 接口
+ ├── voice.py     ────────── ASR/TTS → libvoice_engine.so
  ├── sound.py     ────────── 音频录制/播放/转换
  └── generate_card.py ────── 多格式输出 (MD/PNG/PDF)
 
@@ -132,7 +132,8 @@ WordCard/
 ├── importer/
 │   ├── wrappers/                # C++ 电子书解析
 │   │   ├── mobi_wrapper.cpp     # MOBI/AZW3 (libmobi)
-│   │   ├── pdf_wrapper.cpp      # PDF/EPUB (MuPDF)
+│   │   ├── pdf_wrapper.cpp      # PDF (MuPDF)
+│   │   ├── epub_wrapper.cpp     # EPUB (libzip + libxml2)
 │   │   └── Makefile
 │   └── libs/                    # 编译产物
 │       ├── libmobiparse.so
