@@ -54,22 +54,24 @@ class _ImportPageState extends State<ImportPage> {
         },
       );
       if (!mounted) return;
-      // 词条已入库，释义异步生成、逐条回填
-      final total = extract.words.length;
-      setState(() {
-        _ebookStage = '生成释义 0/$total';
-        _ebookMsg = null;
-      });
-      final defined = await importer.defineAll(
-        extract,
-        onProgress: (d, t) {
-          if (mounted) setState(() => _ebookStage = '生成释义 $d/$t');
-        },
-      );
+      // ECDICT 已离线给出多数释义；仅未收录词异步 LLM 回填
+      final missing = extract.undefinedWords.length;
+      var defined = 0;
+      if (missing > 0) {
+        setState(() => _ebookStage = '补释义 0/$missing');
+        defined = await importer.defineAll(
+          extract,
+          onProgress: (d, t) {
+            if (mounted) setState(() => _ebookStage = '补释义 $d/$t');
+          },
+        );
+      }
       if (!mounted) return;
       setState(() {
         _ebookStage = null;
-        _ebookMsg = '《${extract.title}》新增 $added 词，释义 $defined 条';
+        _ebookMsg = '《${extract.title}》新增 $added 词，'
+            'ECDICT 释义 ${extract.words.length - missing} 条，'
+            'LLM 补 $defined 条；对照文件: ${extract.bilingualPath}';
       });
     } catch (e) {
       if (!mounted) return;

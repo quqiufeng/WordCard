@@ -38,6 +38,22 @@ def main():
     else:
         words = [l.strip() for l in sys.stdin if l.strip()]
 
+    import bilingual
+    cache = bilingual.load_cache()
+
+    # 命中缓存直接输出，不用启动 LLM
+    remaining = []
+    for w in words:
+        if w.lower() in cache:
+            pos, tr = cache[w.lower()]
+            print(json.dumps({'w': w, 'p': pos, 'd': tr}, ensure_ascii=False),
+                  flush=True)
+        else:
+            remaining.append(w)
+
+    if not remaining:
+        return
+
     try:
         import translate
         ok = translate.available()
@@ -49,12 +65,14 @@ def main():
         return
     print('READY', file=sys.stderr, flush=True)
 
-    total = len(words)
-    for i, w in enumerate(words, 1):
+    total = len(remaining)
+    for i, w in enumerate(remaining, 1):
         try:
             _en, zh, pos = translate.define(w)
         except Exception:  # noqa: BLE001
             zh, pos = '', ''
+        if zh:
+            bilingual.append_cache(w, pos, zh)
         print(json.dumps({'w': w, 'p': pos, 'd': zh}, ensure_ascii=False),
               flush=True)
         print(f'DEFINE {i}/{total}', file=sys.stderr, flush=True)

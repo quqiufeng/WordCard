@@ -82,9 +82,13 @@ UI 层**只负责展示与交互**，不重写任何学习算法；算法与数�
 - **电子书解析不在 Flutter 重写**：App 调用 `tools/ebook_extract.py`
   （内部复用 `importer.extract` + `extract_words` + `wordpick`）拿到词条 JSON，
   再经 FFI 写入 DB；解析逻辑完全复用 Python 管道。
-- **释义异步回填**：词条先快速入库（可立即复习），释义再由 `tools/ebook_define.py`
-  逐条生成，每出一条经 FFI `wc_update_item_answer` **动态更新**对应学习项
-  （复用 `translate.define` / llama-server）。
+- **释义离线优先 + 中英文对照文件**：单词先离线查本地 ECDICT
+  （`tools/bilingual.py`，秒级、含音标/词性/中文），并写出**中英文对照文件**
+  `data/books/<slug>.tsv`（word / phonetic / pos / translation / context），
+  导入时即已可用，无需逐词等 LLM。
+- **未收录词异步 LLM 回填**：ECDICT 未收录的词由 `tools/ebook_define.py`
+  逐条生成（复用 `translate.define` / llama-server），结果缓存到
+  `data/dict_cache.tsv`，并经 FFI `wc_update_item_answer` **动态更新**对应学习项。
 - 复习端 `StudySession` 只按 `wc_generate_daily_queue` 取队列，**不区分来源**；
   因此无需为词典/电子书各写一套复习逻辑。
 - 若需「只复习 CET4」这类过滤，用 `tags` 之上再加一层筛选即可，属增量功能。

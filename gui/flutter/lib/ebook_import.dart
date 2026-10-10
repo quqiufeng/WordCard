@@ -5,11 +5,12 @@ import 'ffi/wordcard.dart';
 
 /// 电子书解析结果中的一个词条。
 final class BookWord {
-  BookWord(this.word, this.context, this.definition, this.pos);
+  BookWord(this.word, this.context, this.definition, this.pos, this.phonetic);
   final String word;
   final String context;
-  String definition; // 中文释义（LLM 异步回填，可能为空）
-  String pos;
+  final String definition; // 中文释义（ECDICT 离线 / LLM 回填，可能为空）
+  final String pos;
+  final String phonetic;
 }
 
 /// 电子书解析结果。
@@ -18,16 +19,24 @@ final class BookExtract {
     required this.title,
     required this.author,
     required this.words,
+    this.bilingualPath,
   });
 
   final String title;
   final String author;
   final List<BookWord> words;
+
+  /// 生成的中英文对照文件路径（word/phonetic/pos/translation/context）。
+  final String? bilingualPath;
+
+  /// 释义为空的词（需要 LLM 回填）。
+  List<String> get undefinedWords =>
+      words.where((w) => w.definition.isEmpty).map((w) => w.word).toList();
 }
 
 /// 电子书导入：解析**复用**现有 Python 管道（`tools/ebook_extract.py`），
-/// 释义**异步复用**本地 LLM（`tools/ebook_define.py`），
-/// Flutter 端只负责选文件、调脚本、把结果经 FFI 写入同一 DB。
+/// 释义优先**离线 ECDICT**，并生成中英文对照文件；未收录词由
+/// `tools/ebook_define.py` 异步 LLM 回填。
 final class EbookImporter {
   EbookImporter(this.engine);
 
@@ -39,6 +48,13 @@ final class EbookImporter {
       if (File('$c/tools/ebook_extract.py').existsSync()) return c;
     }
     return null;
+  }
+
+  static String _slug(String path) {
+    final base = path.split('/').last;
+    final name =
+        base.contains('.') ? base.substring(0, base.lastIndexOf('.')) : base;
+    return name.replaceAll(RegExp(r'[^\w\u4e00-\u9fff-]+'), '_');
   }
 
   /// 用 zenity 选择电子书文件；取消返回 null。
@@ -54,7 +70,7 @@ final class EbookImporter {
     return path.isEmpty ? null : path;
   }
 
-  /// 仅解析电子书（快速，不含 LLM 释义）。[onStage] 回调阶段文本。
+  /// 解析电子书并生成中英文对照文件（快速，ECDICT 离线释义）。
   Future<BookExtract> extract(
     String bookPath, {
     int max = 200,
@@ -63,12 +79,21 @@ final class EbookImporter {
     final root = _root();
     if (root == null) throw StateError('未找到 tools/ebook_extract.py');
     onStage?.call('解析中');
-    final tmp = _tmp('json');
+    final slug = _slug(bookPath);
+    final bilingual = File('$root/data/books/$slug.tsv');
+    bilingual.parent.createSync(recursive: true);
+    final tmp = File('${Directory.systemTemp.path}/wordcard_'
+        '${DateTime.now().microsecondsSinceEpoch}.json');
     try {
       final r = await Process.run(
         'python3',
-        ['$root/tools/ebook_extract.py', bookPath, '--max', '$max',
-         '--out', tmp.path],
+        [
+          '$root/tools/ebook_extract.py',
+          bookPath,
+          '--max', '$max',
+          '--bilingual', bilingual.path,
+          '--out', tmp.path,
+        ],
         workingDirectory: root,
       );
       if (r.exitCode != 0 || !tmp.existsSync()) {
@@ -81,12 +106,14 @@ final class EbookImporter {
                 '${e['ctx'] ?? ''}',
                 '${e['d'] ?? ''}',
                 '${e['p'] ?? ''}',
+                '${e['ph'] ?? ''}',
               ))
-          .toList(growable: true);
+          .toList(growable: false);
       return BookExtract(
         title: '${data['title'] ?? ''}',
         author: '${data['author'] ?? ''}',
         words: words,
+        bilingualPath: bilingual.path,
       );
     } finally {
       if (tmp.existsSync()) tmp.deleteSync();
@@ -106,7 +133,9 @@ final class EbookImporter {
       if (engine.hasItem(w.word)) continue;
       final id = engine.addItem(
         question: w.word,
+        answer: _answer(w),
         explanation: w.context,
+        hint: w.phonetic,
         category: 1,
         tags: 'book:${extract.title}',
       );
@@ -121,18 +150,24 @@ final class EbookImporter {
     return added;
   }
 
-  /// 异步生成中文释义：逐条从 `ebook_define.py` 读取结果并**动态回填** DB。
+  String _answer(BookWord w) {
+    if (w.definition.isEmpty) return '';
+    return w.pos.isEmpty ? w.definition : '${w.pos} ${w.definition}';
+  }
+
+  /// 对 ECDICT 未收录的词异步生成释义并**动态回填** DB。
   /// 返回成功回填的条数。
   Future<int> defineAll(
     BookExtract extract, {
     void Function(int done, int total)? onProgress,
   }) async {
+    final missing = extract.undefinedWords;
+    if (missing.isEmpty) return 0;
     final root = _root();
-    if (root == null || extract.words.isEmpty) return 0;
-    final wordsFile = _tmp('words');
-    wordsFile.writeAsStringSync(
-      extract.words.map((w) => w.word).join('\n'),
-    );
+    if (root == null) return 0;
+    final wordsFile = File('${Directory.systemTemp.path}/wordcard_words_'
+        '${DateTime.now().microsecondsSinceEpoch}');
+    wordsFile.writeAsStringSync(missing.join('\n'));
     var updated = 0;
     var done = 0;
     try {
@@ -141,7 +176,6 @@ final class EbookImporter {
         ['$root/tools/ebook_define.py', '--words', wordsFile.path],
         workingDirectory: root,
       );
-      // stderr: 进度（丢弃内容，仅用于不阻塞管道）
       proc.stderr.drain<void>();
       final lines = proc.stdout
           .transform(utf8.decoder)
@@ -162,7 +196,7 @@ final class EbookImporter {
         } catch (_) {
           // 跳过无法解析的行
         }
-        onProgress?.call(done, extract.words.length);
+        onProgress?.call(done, missing.length);
       }
       await proc.exitCode;
       engine.save();
@@ -171,8 +205,4 @@ final class EbookImporter {
     }
     return updated;
   }
-
-  static File _tmp(String tag) => File(
-      '${Directory.systemTemp.path}/wordcard_${tag}_'
-      '${DateTime.now().microsecondsSinceEpoch}');
 }
