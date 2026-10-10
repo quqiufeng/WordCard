@@ -66,16 +66,15 @@ class _TasksPageState extends State<TasksPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  tooltip: '听写整份词表',
-                  icon: const Icon(Icons.keyboard_alt_outlined,
-                      color: ChinaColors.daiLan),
+                FilledButton.tonalIcon(
                   onPressed: widget.onDictate == null
                       ? null
                       : () => widget.onDictate!(widget.engine
                           .itemsByTag(t.tag)
                           .map((e) => e.id)
                           .toList()),
+                  icon: const Icon(Icons.keyboard_alt_outlined, size: 16),
+                  label: const Text('听写'),
                 ),
                 IconButton(
                   tooltip: '删除任务',
