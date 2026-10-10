@@ -33,18 +33,26 @@ final class PasteImporter {
     final words = <String>[];
     final provided = <String, String>{};
     for (final raw in text.split('\n')) {
-      final line = raw.trim();
+      var line = raw.trim();
       if (line.isEmpty) continue;
-      String w = line;
-      String rest = '';
-      final m = RegExp(r'^([^\s]+)\s+(.*)$').firstMatch(line);
-      if (m != null) {
-        w = m.group(1)!;
-        rest = m.group(2)!.trim();
+      // 去掉序号前缀：1. / 1、 / (1)
+      line = line.replaceFirst(RegExp(r'^[\(\[]?\d+[\)\].、:：]?\s*'), '');
+      // 按首个中文字符切分：左英文(可含空格的词组)，右中文释义
+      final idx = line.indexOf(_cjk);
+      String en, zh;
+      if (idx > 0) {
+        en = line.substring(0, idx).trim();
+        zh = line.substring(idx).trim();
+      } else if (idx == 0) {
+        continue; // 中文开头，跳过
+      } else {
+        en = line;
+        zh = '';
       }
-      if (w.isEmpty || words.contains(w)) continue;
-      words.add(w);
-      if (rest.isNotEmpty && _cjk.hasMatch(rest)) provided[w] = rest;
+      en = en.replaceAll(RegExp(r'[\s\t:：,，;；\-–—]+$'), '').trim();
+      if (en.isEmpty || words.contains(en)) continue;
+      words.add(en);
+      if (zh.isNotEmpty) provided[en] = zh;
     }
     if (words.isEmpty) return 0;
 
