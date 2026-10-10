@@ -42,7 +42,13 @@ class _ImportPageState extends State<ImportPage> {
       _error = null;
     });
     try {
-      final extract = await importer.extract(path);
+      final extract = await importer.extract(
+        path,
+        define: true,
+        onStage: (s) {
+          if (mounted) setState(() => _ebookStage = s);
+        },
+      );
       if (!mounted) return;
       setState(() => _ebookStage = '导入中');
       final added = await importer.importWords(
