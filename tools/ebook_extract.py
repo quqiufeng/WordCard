@@ -43,7 +43,10 @@ def main():
 
     _stage('解析中')
     info = importer.extract(args.book)
-    words = importer.extract_words(info['text'], max_words=args.max)
+    words = importer.extract_words(info['text'], max_words=args.max * 2)
+    # 过滤所有格/缩写等噪声（如 book's / don't），并截断到 max
+    words = [(w, c) for (w, c) in words if "'" not in w and '’' not in w]
+    words = words[:args.max]
 
     _stage('查词（ECDICT）')
     ecd = bilingual.lookup_many([w for w, _ in words])
