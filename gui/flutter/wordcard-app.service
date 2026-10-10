@@ -9,7 +9,7 @@ Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=LD_LIBRARY_PATH=/opt/WordCard/src:/opt/WordCard/libs:/opt/WordCard/voice/libs
 Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
 ExecStart=/opt/WordCard/gui/flutter/run.sh
-Restart=on-failure
+Restart=no
 RestartSec=2
 
 [Install]
