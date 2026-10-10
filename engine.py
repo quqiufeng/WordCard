@@ -206,6 +206,28 @@ class WordCardDB:
                 out.append(it)
         return out
 
+    def delete_items_by_tag(self, tag):
+        """按标签(子串)删除学习项及其掌握度，返回删除条数。"""
+        self._lib.wc_delete_items_by_tag.argtypes = [c_void_p, c_char_p]
+        self._lib.wc_delete_items_by_tag.restype = c_int
+        return self._lib.wc_delete_items_by_tag(self._handle, tag.encode('utf-8'))
+
+    def tasks(self):
+        """按 tags 分组，返回 [(tag, count), ...]（保持出现顺序）。"""
+        from collections import OrderedDict
+        d = OrderedDict()
+        for it in self.all_items():
+            tag = it.tags.decode('utf-8', 'ignore').strip()
+            d[tag] = d.get(tag, 0) + 1
+        return list(d.items())
+
+    def items_by_tag(self, tag):
+        out = []
+        for it in self.all_items():
+            if it.tags.decode('utf-8', 'ignore').strip() == tag:
+                out.append(it)
+        return out
+
     def find_item(self, question=None, item_id=None):
         if question:
             self._lib.wc_find_item_by_question.argtypes = [c_void_p, c_char_p]

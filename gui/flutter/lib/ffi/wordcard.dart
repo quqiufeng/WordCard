@@ -28,6 +28,27 @@ final class QueueCard {
       };
 }
 
+/// 记忆任务（在 items 的 tags 之上分组的一层）。
+final class TaskInfo {
+  const TaskInfo({required this.tag, required this.count});
+
+  final String tag;
+  final int count;
+
+  String get name {
+    if (tag.startsWith('book:')) return tag.substring(5);
+    if (tag.startsWith('dict:')) return '词表 ${tag.substring(5)}';
+    if (tag.isEmpty) return '(未分类)';
+    return tag;
+  }
+
+  String get kind {
+    if (tag.startsWith('book:')) return '电子书';
+    if (tag.startsWith('dict:')) return '词表';
+    return '其它';
+  }
+}
+
 /// 复习提交后的掌握度快照（Dart 侧只读副本）。
 final class MasterySnapshot {
   const MasterySnapshot({
@@ -144,6 +165,14 @@ final class WordCardEngine {
         Int32 Function(Pointer<Void>, Uint32, Pointer<Utf8>),
         int Function(Pointer<Void>, int, Pointer<Utf8>)>(
         'wc_update_item_explanation');
+    _itemCount = _lib.lookupFunction<Size Function(Pointer<Void>),
+        int Function(Pointer<Void>)>('wc_item_count');
+    _itemIdAt = _lib.lookupFunction<
+        Uint32 Function(Pointer<Void>, Size),
+        int Function(Pointer<Void>, int)>('wc_item_id_at');
+    _deleteItemsByTag = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Utf8>),
+        int Function(Pointer<Void>, Pointer<Utf8>)>('wc_delete_items_by_tag');
   }
 
   final Pointer<Void> _db;
@@ -174,6 +203,9 @@ final class WordCardEngine {
   late final int Function(Pointer<Void>, int, Pointer<Utf8>) _updateItemAnswer;
   late final int Function(Pointer<Void>, int, Pointer<Utf8>)
       _updateItemExplanation;
+  late final int Function(Pointer<Void>) _itemCount;
+  late final int Function(Pointer<Void>, int) _itemIdAt;
+  late final int Function(Pointer<Void>, Pointer<Utf8>) _deleteItemsByTag;
 
   String get version => _version().toDartString();
 
@@ -309,6 +341,45 @@ final class WordCardEngine {
       return _updateItemExplanation(_db, itemId, e) == 0;
     } finally {
       malloc.free(e);
+    }
+  }
+
+  /// 遍历所有学习项。
+  List<ItemEntry> allItems() {
+    final n = _itemCount(_db);
+    final out = <ItemEntry>[];
+    for (var i = 0; i < n; i++) {
+      final it = itemById(_itemIdAt(_db, i));
+      if (it != null) out.add(it);
+    }
+    return out;
+  }
+
+  /// 记忆任务列表（按 tags 分组）。
+  List<TaskInfo> tasks() {
+    final map = <String, int>{};
+    final order = <String>[];
+    for (final it in allItems()) {
+      final tag = it.tagsText.trim();
+      if (!map.containsKey(tag)) order.add(tag);
+      map[tag] = (map[tag] ?? 0) + 1;
+    }
+    return [
+      for (final tag in order) TaskInfo(tag: tag, count: map[tag]!),
+    ];
+  }
+
+  /// 某任务下的学习项。
+  List<ItemEntry> itemsByTag(String tag) =>
+      allItems().where((it) => it.tagsText.trim() == tag).toList();
+
+  /// 删除某任务（含掌握度），返回删除条数。
+  int deleteItemsByTag(String tag) {
+    final t = tag.toNativeUtf8();
+    try {
+      return _deleteItemsByTag(_db, t);
+    } finally {
+      malloc.free(t);
     }
   }
 

@@ -791,6 +791,39 @@ int wc_update_item_explanation(wordcard_db_t *db, uint32_t item_id, const char *
     return WC_OK;
 }
 
+/* 按标签(子串)删除学习项及其掌握度记录，返回删除条数 */
+int wc_delete_items_by_tag(wordcard_db_t *db, const char *tag) {
+    if (!db || !tag || !*tag) return WC_ERR_INVALID;
+    LOCK();
+    int removed = 0;
+    for (size_t i = 0; i < db->item_count; ) {
+        if (strstr(db->items[i].tags, tag)) {
+            uint32_t del_id = db->items[i].id;
+            /* 删除引用该 item 的掌握度记录 */
+            size_t w = 0;
+            for (size_t m = 0; m < db->mastery_count; m++) {
+                if (db->mastery[m].item_id != del_id) {
+                    if (w != m) db->mastery[w] = db->mastery[m];
+                    w++;
+                }
+            }
+            db->mastery_count = w;
+            /* 用尾元覆盖删除 */
+            db->items[i] = db->items[db->item_count - 1];
+            db->item_count--;
+            removed++;
+        } else {
+            i++;
+        }
+    }
+    if (removed) {
+        rebuild_indexes(db);
+        wc_mark_dirty(db);
+    }
+    UNLOCK();
+    return removed;
+}
+
 /* ========================================================================
  * 载体/内容源操作
  * ======================================================================== */

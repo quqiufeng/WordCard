@@ -312,6 +312,9 @@ int wc_update_item_explanation(wordcard_db_t *db, uint32_t item_id, const char *
 size_t wc_item_count(wordcard_db_t *db);
 uint32_t wc_item_id_at(wordcard_db_t *db, size_t index);
 
+/* 按标签(子串)删除学习项及其掌握度记录，返回删除条数 */
+int wc_delete_items_by_tag(wordcard_db_t *db, const char *tag);
+
 /* -------- 载体/内容源操作 -------- */
 
 uint32_t wc_add_source(wordcard_db_t *db, const content_source_t *source);

@@ -10,9 +10,9 @@ import '../automation/automation.dart';
 import '../tts.dart';
 import '../memo_service.dart';
 import '../widgets/flash_card.dart';
-import '../widgets/review_queue.dart';
 import '../widgets/stats_widget.dart';
 import 'import_page.dart';
+import 'tasks_page.dart';
 
 /// 主页面：初始化引擎与会话，承载可折叠侧栏布局。
 class StudyPage extends StatefulWidget {
@@ -23,7 +23,7 @@ class StudyPage extends StatefulWidget {
 }
 
 class _StudyPageState extends State<StudyPage> {
-  static const _titles = ['复习', '队列', '统计', '导入'];
+  static const _titles = ['复习', '任务', '统计', '导入'];
   static const _navIds = ['review', 'queue', 'stats', 'import'];
   static const _icons = [
     Icons.school_outlined,
@@ -134,7 +134,10 @@ class _StudyPageState extends State<StudyPage> {
 
   Widget _content(StudySession session) => switch (_index) {
         0 => _ReviewPage(session: session),
-        1 => _QueuePage(session: session),
+        1 => TasksPage(
+            engine: _engine!,
+            onSpeak: (t) => TtsService.instance.speak(t),
+          ),
         2 => _StatsPage(session: session, engine: _engine!),
         _ => ImportPage(engine: _engine!),
       };
@@ -436,24 +439,7 @@ class _ReviewPageState extends State<_ReviewPage> {
   }
 }
 
-// ────────────────────────────── 队列 / 统计 ──────────────────────────────
-
-class _QueuePage extends StatelessWidget {
-  const _QueuePage({required this.session});
-
-  final StudySession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: session,
-      builder: (context, _) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: ReviewQueue(session: session),
-      ),
-    );
-  }
-}
+// ────────────────────────────── 统计 ──────────────────────────────
 
 class _StatsPage extends StatelessWidget {
   const _StatsPage({required this.session, required this.engine});
