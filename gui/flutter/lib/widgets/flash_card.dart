@@ -131,6 +131,7 @@ class FlashCard extends StatelessWidget {
 
   /// 把 explanation 按行拆开：
   /// 【用法】高亮；【段落】整段一个朗读图标；例句行直接点读（无图标）；中文行作对照。
+  /// 无标记（旧卡片）时，把连续的英文行合并为一段朗读。
   List<Widget> _explanationLines(ThemeData theme) {
     final cjk = RegExp(r'[\u4e00-\u9fff]');
     final latin = RegExp(r'[A-Za-z]');
@@ -139,7 +140,34 @@ class FlashCard extends StatelessWidget {
         .map((l) => l.trim())
         .where((l) => l.isNotEmpty)
         .toList();
+    bool isEn(String s) => latin.hasMatch(s) && !cjk.hasMatch(s);
+    final hasMarkers = card.explanation.contains('【段落】') ||
+        card.explanation.contains('【例句】');
     final out = <Widget>[];
+
+    if (!hasMarkers) {
+      final buf = <String>[];
+      void flush() {
+        if (buf.isEmpty) return;
+        out.add(_speakBlock(theme, buf.join(' ')));
+        buf.clear();
+      }
+
+      for (final line in lines) {
+        if (line.startsWith('【用法】')) {
+          flush();
+          out.add(_usageBox(theme, line.substring('【用法】'.length).trim()));
+        } else if (onSpeak != null && isEn(line)) {
+          buf.add(line);
+        } else {
+          flush();
+          out.add(_zhLine(theme, line));
+        }
+      }
+      flush();
+      return out;
+    }
+
     var seenPara = false;
     for (final line in lines) {
       if (line.startsWith('【用法】')) {
@@ -156,8 +184,7 @@ class FlashCard extends StatelessWidget {
                 letterSpacing: 1,
               )),
         ));
-      } else if (latin.hasMatch(line) && !cjk.hasMatch(line) && onSpeak != null) {
-        // 无标记时：首条英文行按段落处理（带图标），其余按例句（无图标）
+      } else if (isEn(line) && onSpeak != null) {
         if (!seenPara) {
           seenPara = true;
           out.add(_speakBlock(theme, line));
