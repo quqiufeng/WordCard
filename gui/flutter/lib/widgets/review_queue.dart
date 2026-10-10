@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../state/study_session.dart';
 import '../theme/app_theme.dart';
-import '../ffi/wordcard.dart';
 
 /// 今日复习队列列表：已完成项淡化，当前项高亮。
 class ReviewQueue extends StatelessWidget {

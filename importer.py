@@ -510,3 +510,86 @@ def import_book(book_path, db_path='data/wordcard.db', user_id=1, max_words=200)
         return added
     finally:
         db.close()
+
+# ── 词典 / 考试词表导入 ──────────────────────────────────────
+
+_WORDLIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             'data', 'wordlists')
+
+def list_wordlists():
+    """返回可用词表清单 {name: {title, tag, count, file, source}}。"""
+    mf = os.path.join(_WORDLIST_DIR, 'manifest.json')
+    if not os.path.exists(mf):
+        return {}
+    with open(mf, encoding='utf-8') as f:
+        return json.load(f)
+
+def _read_wordlist(name):
+    """读取词表 TSV，返回 [(word, phonetic, pos, translation), ...]。"""
+    path = os.path.join(_WORDLIST_DIR, f'{name}.tsv')
+    if not os.path.exists(path):
+        raise FileNotFoundError(f'词表不存在: {path}（先运行 tools/build_wordlists.py）')
+    import csv
+    rows = []
+    with open(path, newline='', encoding='utf-8') as f:
+        for r in csv.reader(f, delimiter='\t'):
+            if len(r) < 5:
+                continue
+            word, phonetic, pos, translation, _tag = r[:5]
+            if word:
+                rows.append((word, phonetic, pos, translation))
+    return rows
+
+def import_wordlist(names, db_path='data/wordcard.db', user_id=1,
+                    limit=None, progress=None):
+    """导入考试词表（cet4/cet6/ky/toefl/ielts/gre/gk）。
+
+    names: 词表名，或字符串/list；传 'all' 表示全部。
+    limit: 每个词表最多导入多少（None=全部）。
+    progress: 可选回调 progress(name, done, total)。
+    返回 {name: 新增条数}。
+    """
+    manifest = list_wordlists()
+    if not manifest:
+        raise RuntimeError('未找到词表清单 data/wordlists/manifest.json；'
+                           '先运行: python3 tools/build_wordlists.py')
+    if isinstance(names, str):
+        names = [names]
+    if 'all' in names:
+        names = list(manifest)
+    unknown = [n for n in names if n not in manifest]
+    if unknown:
+        raise ValueError(f'未知词表: {unknown}；可选: {list(manifest)}')
+
+    db = engine.WordCardDB.open(db_path)
+    result = {}
+    try:
+        for name in names:
+            rows = _read_wordlist(name)
+            if limit:
+                rows = rows[:limit]
+            added = 0
+            for i, (word, phonetic, pos, translation) in enumerate(rows, 1):
+                if db.find_item(question=word):   # 已存在则跳过（幂等）
+                    continue
+                definition = translation
+                if pos:
+                    definition = f'[{pos}] {translation}' if translation else pos
+                item_id = db.add_item(
+                    question=word,
+                    answer=translation,
+                    explanation='',
+                    hint=phonetic,
+                    category=1,                    # CAT_ENGLISH_VOCAB
+                    tags=f'dict:{name}',
+                )
+                if item_id:
+                    added += 1
+                if progress:
+                    progress(name, i, len(rows))
+            result[name] = added
+        db.save()
+        return result
+    finally:
+        db.close()
+

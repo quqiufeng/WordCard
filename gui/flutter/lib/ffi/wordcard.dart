@@ -95,9 +95,6 @@ final class WordCardEngine {
     _findUser = _lib.lookupFunction<
         Pointer<User> Function(Pointer<Void>, Pointer<Utf8>),
         Pointer<User> Function(Pointer<Void>, Pointer<Utf8>)>('wc_find_user');
-    _findUserById = _lib.lookupFunction<
-        Pointer<User> Function(Pointer<Void>, Uint32),
-        Pointer<User> Function(Pointer<Void>, int)>('wc_find_user_by_id');
     _createUser = _lib.lookupFunction<
         Uint32 Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>),
         int Function(Pointer<Void>, Pointer<Utf8>,
@@ -132,6 +129,13 @@ final class WordCardEngine {
     _now = _lib.lookupFunction<Uint32 Function(), int Function()>('wc_now');
     _version = _lib.lookupFunction<Pointer<Utf8> Function(),
         Pointer<Utf8> Function()>('wc_version_string');
+    _addItem = _lib.lookupFunction<
+        Uint32 Function(Pointer<Void>, Pointer<ItemEntry>),
+        int Function(Pointer<Void>, Pointer<ItemEntry>)>('wc_add_item');
+    _findItemByQuestion = _lib.lookupFunction<
+        Pointer<ItemEntry> Function(Pointer<Void>, Pointer<Utf8>),
+        Pointer<ItemEntry> Function(
+            Pointer<Void>, Pointer<Utf8>)>('wc_find_item_by_question');
   }
 
   final Pointer<Void> _db;
@@ -142,7 +146,6 @@ final class WordCardEngine {
   late final int Function(Pointer<Void>, Pointer<Utf8>) _saveDb;
   late final void Function(Pointer<Void>) _markDirty;
   late final Pointer<User> Function(Pointer<Void>, Pointer<Utf8>) _findUser;
-  late final Pointer<User> Function(Pointer<Void>, int) _findUserById;
   late final int Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>)
       _createUser;
   late final Pointer<ItemEntry> Function(Pointer<Void>, int) _findItemById;
@@ -157,6 +160,9 @@ final class WordCardEngine {
   late final void Function(Pointer<Void>, int, int, int, int) _recordActivity;
   late final int Function() _now;
   late final Pointer<Utf8> Function() _version;
+  late final int Function(Pointer<Void>, Pointer<ItemEntry>) _addItem;
+  late final Pointer<ItemEntry> Function(Pointer<Void>, Pointer<Utf8>)
+      _findItemByQuestion;
 
   String get version => _version().toDartString();
 
@@ -252,6 +258,45 @@ final class WordCardEngine {
   ItemEntry? itemById(int itemId) {
     final p = _findItemById(_db, itemId);
     return p == nullptr ? null : p.ref;
+  }
+
+  /// 判断学习项（按 question）是否已存在。
+  bool hasItem(String question) {
+    final q = question.toNativeUtf8();
+    try {
+      return _findItemByQuestion(_db, q) != nullptr;
+    } finally {
+      malloc.free(q);
+    }
+  }
+
+  /// 新增学习项，返回其 id（0 表示失败）。
+  int addItem({
+    required String question,
+    String answer = '',
+    String explanation = '',
+    String hint = '',
+    int difficulty = 1,
+    int category = 1,
+    int sourceId = 0,
+    String tags = '',
+  }) {
+    final p = calloc<ItemEntry>();
+    try {
+      final r = p.ref;
+      writeCString(r.question, question, 512);
+      writeCString(r.answer, answer, 512);
+      writeCString(r.explanation, explanation, 1024);
+      writeCString(r.hint, hint, 256);
+      r.difficulty = difficulty;
+      r.sourceId = sourceId;
+      r.category = category;
+      writeCString(r.tags, tags, 128);
+      r.frequency = 0;
+      return _addItem(_db, p);
+    } finally {
+      calloc.free(p);
+    }
   }
 
   /// 读取掌握度；不存在返回 null。

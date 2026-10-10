@@ -64,6 +64,25 @@ UI 层**只负责展示与交互**，不重写任何学习算法；算法与数�
      → wc_save_db / wc_mark_dirty → 统计更新
 ```
 
+### 统一导入模型（来源 ≠ 算法）
+
+**词典导入与电子书导入只是「来源（source）」不同，记忆方式与算法完全通用。**
+
+```
+来源 (source)                     统一学习项              统一复习
+──────────────                    (item_entry_t)          (SM-2)
+ 考试词表 (cet4/cet6/…)   ─┐
+ 电子书 (PDF/MOBI/EPUB…)  ─┼─►  同一 wordcard.db    ─►  同一 daily_queue
+                            │     同一结构 (question/       同一 6 维掌握度
+ 其他来源 (题库/短文…)     ─┘      answer/hint/tags)        同一 modes 推荐
+```
+
+- 两种导入都调用 `wc_add_item`，写入**同一张 items 表**，仅 `tags` 不同
+  （`dict:cet4` / `book:<title>`）以标记来源。
+- 复习端 `StudySession` 只按 `wc_generate_daily_queue` 取队列，**不区分来源**；
+  因此无需为词典/电子书各写一套复习逻辑。
+- 若需「只复习 CET4」这类过滤，用 `tags` 之上再加一层筛选即可，属增量功能。
+
 ---
 
 ## 四、Yaru 融合主题策略

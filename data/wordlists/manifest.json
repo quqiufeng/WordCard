@@ -1,0 +1,51 @@
+{
+  "cet4": {
+    "title": "CET-4 四级",
+    "tag": "cet4",
+    "count": 3840,
+    "file": "cet4.tsv",
+    "source": "ECDICT (skywind3000)"
+  },
+  "cet6": {
+    "title": "CET-6 六级",
+    "tag": "cet6",
+    "count": 5397,
+    "file": "cet6.tsv",
+    "source": "ECDICT (skywind3000)"
+  },
+  "ky": {
+    "title": "考研",
+    "tag": "ky",
+    "count": 4801,
+    "file": "ky.tsv",
+    "source": "ECDICT (skywind3000)"
+  },
+  "toefl": {
+    "title": "托福 TOEFL",
+    "tag": "toefl",
+    "count": 6951,
+    "file": "toefl.tsv",
+    "source": "ECDICT (skywind3000)"
+  },
+  "ielts": {
+    "title": "雅思 IELTS",
+    "tag": "ielts",
+    "count": 5013,
+    "file": "ielts.tsv",
+    "source": "ECDICT (skywind3000)"
+  },
+  "gre": {
+    "title": "GRE",
+    "tag": "gre",
+    "count": 7479,
+    "file": "gre.tsv",
+    "source": "ECDICT (skywind3000)"
+  },
+  "gk": {
+    "title": "高考",
+    "tag": "gk",
+    "count": 3677,
+    "file": "gk.tsv",
+    "source": "ECDICT (skywind3000)"
+  }
+}

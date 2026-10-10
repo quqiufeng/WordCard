@@ -14,6 +14,16 @@ String readCString(Array<Uint8> arr, int max) {
   return utf8.decode(codes, allowMalformed: true);
 }
 
+/// 将字符串以 UTF-8 写入定长 `char[N]`（[max] 为容量，含结尾 NUL）。
+void writeCString(Array<Uint8> arr, String s, int max) {
+  final bytes = utf8.encode(s);
+  final n = bytes.length < max - 1 ? bytes.length : max - 1;
+  for (var i = 0; i < n; i++) {
+    arr[i] = bytes[i];
+  }
+  arr[n] = 0;
+}
+
 /// 通用学习项 —— 对齐 `item_entry_t`（src/wordcard.h）。
 final class ItemEntry extends Struct {
   @Uint32()

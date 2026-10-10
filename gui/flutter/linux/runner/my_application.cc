@@ -25,6 +25,10 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
+  // 窗口/任务栏图标（按图标主题名查找，匹配 ~/.local/share/icons 下的 wordcard.png）
+  gtk_window_set_default_icon_name("wordcard");
+  gtk_window_set_icon_name(window, "wordcard");
+
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
   // desktop).
@@ -45,11 +49,11 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "wordcard");
+    gtk_header_bar_set_title(header_bar, "WordCard");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "wordcard");
+    gtk_window_set_title(window, "WordCard");
   }
 
   gtk_window_set_default_size(window, 1280, 720);

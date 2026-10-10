@@ -76,7 +76,7 @@ class _StudyPageState extends State<StudyPage> {
         0 => _ReviewPage(session: session),
         1 => _QueuePage(session: session),
         2 => _StatsPage(session: session, engine: _engine!),
-        _ => const ImportPage(),
+        _ => ImportPage(engine: _engine!),
       },
     );
   }
@@ -120,18 +120,20 @@ class _ReviewPage extends StatefulWidget {
 class _ReviewPageState extends State<_ReviewPage> {
   StudySession get s => widget.session;
 
-  void _space() {
+  void _know() {
     if (s.finished) {
       s.start();
-    } else if (s.awaitingNext) {
-      s.next();
-    } else {
-      s.flip();
+      return;
     }
+    s.grade(4);
   }
 
-  void _score(int quality) {
-    if (s.current != null && !s.awaitingNext) s.submit(quality);
+  void _dontKnow() {
+    if (s.finished) {
+      s.start();
+      return;
+    }
+    s.grade(1);
   }
 
   @override
@@ -140,11 +142,9 @@ class _ReviewPageState extends State<_ReviewPage> {
       animation: s,
       builder: (context, _) => CallbackShortcuts(
         bindings: {
-          const SingleActivator(LogicalKeyboardKey.space): _space,
-          const SingleActivator(LogicalKeyboardKey.digit1): () => _score(1),
-          const SingleActivator(LogicalKeyboardKey.digit2): () => _score(3),
-          const SingleActivator(LogicalKeyboardKey.digit3): () => _score(4),
-          const SingleActivator(LogicalKeyboardKey.digit4): () => _score(5),
+          // 空格 = 不会；方向右键 = 记得并下一张
+          const SingleActivator(LogicalKeyboardKey.space): _dontKnow,
+          const SingleActivator(LogicalKeyboardKey.arrowRight): _know,
         },
         child: Focus(
           autofocus: true,
@@ -181,60 +181,35 @@ class _ReviewPageState extends State<_ReviewPage> {
 
   Widget _controls(BuildContext context) {
     final theme = Theme.of(context);
-    if (s.awaitingNext) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          StatsWidget(session: s),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: s.next,
-              icon: const Icon(Icons.arrow_forward),
-              label: const Text('下一张（空格）'),
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (!s.flipped) {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: s.flip,
-          icon: const Icon(Icons.visibility_outlined),
-          label: const Text('显示答案（空格）'),
-        ),
-      );
-    }
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('这张卡片记得如何？', style: theme.textTheme.bodySmall),
+        Text('点击卡片看释义，然后自评', style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _scoreButton(1, '忘记', ChinaColors.zhusha)),
-            const SizedBox(width: 8),
-            Expanded(child: _scoreButton(3, '勉强', ChinaColors.warn)),
-            const SizedBox(width: 8),
-            Expanded(child: _scoreButton(4, '良好', ChinaColors.qinglv)),
-            const SizedBox(width: 8),
-            Expanded(child: _scoreButton(5, '简单', ChinaColors.daiLan)),
+            Expanded(
+              child: FilledButton.icon(
+                style:
+                    FilledButton.styleFrom(backgroundColor: ChinaColors.zhusha),
+                onPressed: _dontKnow,
+                icon: const Icon(Icons.close),
+                label: const Text('不会（空格）'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                style:
+                    FilledButton.styleFrom(backgroundColor: ChinaColors.qinglv),
+                onPressed: _know,
+                icon: const Icon(Icons.check),
+                label: const Text('记得（→）'),
+              ),
+            ),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _scoreButton(int quality, String label, Color color) {
-    return FilledButton(
-      style: FilledButton.styleFrom(backgroundColor: color),
-      onPressed: () => _score(quality),
-      child: Text(label),
     );
   }
 

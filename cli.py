@@ -69,6 +69,30 @@ def cmd_stats(args):
     finally:
         db.close()
 
+def cmd_dict(args):
+    """wordcard dict — 列出可用考试词表"""
+    lists = importer.list_wordlists()
+    if not lists:
+        print('未找到词表。运行: python3 tools/build_wordlists.py')
+        return
+    print('可用词表（wordcard import-dict <name>）:')
+    for name, meta in lists.items():
+        print(f'  {name:8} {meta["title"]:14} {meta["count"]:5} 词')
+
+def cmd_import_dict(args):
+    """wordcard import-dict <name...>|all"""
+    if not args:
+        print('Usage: wordcard import-dict <cet4|cet6|ky|toefl|ielts|gre|gk|all> ...')
+        return
+    names = args
+    def _progress(name, done, total):
+        if done == 1 or done == total or done % 200 == 0:
+            print(f'  {name}: {done}/{total}', flush=True)
+    result = importer.import_wordlist(names, progress=_progress)
+    for name, added in result.items():
+        print(f'  {name}: 新增 {added} 词')
+    print(f'  合计新增 {sum(result.values())} 词')
+
 def cmd_card(args):
     """wordcard card <item_id>"""
     if not args:
@@ -112,6 +136,8 @@ def cmd_help(args=None):
 Usage: wordcard <command> [args]
 Commands:
   import <file>   Import ebook (pdf/mobi/md)
+  dict            List available exam wordlists (cet4/cet6/...)
+  import-dict <name...|all>  Import exam wordlist(s) into DB
   review           Interactive review session
   stats           Show learning statistics
   card <id>       Generate card PNG for item
@@ -121,6 +147,8 @@ Commands:
 def main():
     cmds = {
         'import': cmd_import,
+        'dict':   cmd_dict,
+        'import-dict': cmd_import_dict,
         'review': cmd_review,
         'stats':  cmd_stats,
         'card':   cmd_card,

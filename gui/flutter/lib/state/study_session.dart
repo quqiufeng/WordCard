@@ -40,9 +40,6 @@ class StudySession extends ChangeNotifier {
   MasterySnapshot? get lastResult => _lastResult;
   String? get error => _error;
 
-  /// 已作答等待进入下一张。
-  bool get awaitingNext => _lastResult != null;
-
   QueueCard? get _currentQueue =>
       _index < _queue.length ? _queue[_index] : null;
 
@@ -77,8 +74,10 @@ class StudySession extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 提交评分（quality 0-5），更新 SM-2。
-  void submit(int quality) {
+  /// 提交评分（quality 0-5）并立即进入下一张。
+  ///
+  /// 不会 → quality 1；记得 → quality 4。
+  void grade(int quality) {
     final card = current;
     if (card == null) return;
     try {
@@ -91,14 +90,12 @@ class StudySession extends ChangeNotifier {
     } catch (e) {
       _error = e.toString();
     }
-    notifyListeners();
+    _advance();
   }
 
-  /// 进入下一张。队列结束时自动落盘。
-  void next() {
+  void _advance() {
     if (_index < _queue.length) _index++;
     _flipped = false;
-    _lastResult = null;
     if (_index >= _queue.length) {
       try {
         engine.save();
