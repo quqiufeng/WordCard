@@ -152,3 +152,31 @@ def convert_to_wav(input_path, output_path=None, sample_rate=16000):
         output_path = os.path.splitext(input_path)[0] + '.wav'
     lib.voice_convert_to_wav(input_path.encode(), output_path.encode(), sample_rate)
     return output_path
+
+
+class Tts:
+    """常驻 TTS 引擎：模型只加载一次，后续合成快（供常驻服务使用）。"""
+
+    def __init__(self, sid=None, n_threads=4):
+        self.lib = _load()
+        if not self.lib:
+            raise RuntimeError('libvoice_engine.so not loaded')
+        self.engine = self.lib.voice_tts_create(None)
+        if not self.engine:
+            raise RuntimeError('TTS engine creation failed')
+        self.lib.voice_tts_load(self.engine, None, None, n_threads, 0)
+        if sid is not None:
+            self.lib.voice_tts_set_sid(self.engine, int(sid))
+
+    def synthesize(self, text, output_path):
+        text_p = self.lib.voice_tts_synthesize(self.engine, text.encode(),
+                                               output_path.encode())
+        result = ctypes.cast(text_p, ctypes.c_char_p).value.decode('utf-8') if text_p else ''
+        if text_p:
+            self.lib.voice_tts_free_text(text_p)
+        return result
+
+    def close(self):
+        if getattr(self, 'engine', None):
+            self.lib.voice_tts_destroy(self.engine)
+            self.engine = None

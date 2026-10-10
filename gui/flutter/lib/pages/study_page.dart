@@ -5,6 +5,7 @@ import '../ffi/wordcard.dart';
 import '../state/study_session.dart';
 import '../theme/app_theme.dart';
 import '../automation/automation.dart';
+import '../tts.dart';
 import '../widgets/flash_card.dart';
 import '../widgets/review_queue.dart';
 import '../widgets/stats_widget.dart';
@@ -178,10 +179,15 @@ class _ReviewPageState extends State<_ReviewPage> {
   void initState() {
     super.initState();
     final a = Automation.instance;
-    a.register('review.flip', () => s.flip());
+    a.register('review.flip', () {
+      s.flip();
+      final w = s.current?.question;
+      if (w != null) TtsService.instance.speak(w);
+    });
     a.register('review.know', _know);
     a.register('review.dontKnow', _dontKnow);
     a.register('review.restart', () => s.start());
+    TtsService.instance.start(); // 预加载 TTS 模型
   }
 
   void _know() {
@@ -246,7 +252,7 @@ class _ReviewPageState extends State<_ReviewPage> {
               child: FlashCard(
                 card: card,
                 flipped: s.flipped,
-                onFlip: s.flip,
+                onFlip: () => Automation.instance.invoke('review.flip'),
               ),
             ),
             const SizedBox(height: 16),
