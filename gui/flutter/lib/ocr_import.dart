@@ -12,16 +12,38 @@ final class OcrImporter {
     return null;
   }
 
-  Future<String?> pickImage() async {
+  /// 选择多张图片；取消返回空。
+  Future<List<String>> pickImages() async {
     final r = await Process.run('zenity', [
       '--file-selection',
-      '--title=选择单词表图片',
+      '--multiple',
+      '--separator=\n',
+      '--title=选择单词表图片（可多选）',
       '--file-filter=图片 | *.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff',
       '--file-filter=所有文件 | *',
     ]);
-    if (r.exitCode != 0) return null;
-    final path = (r.stdout as String).trim();
-    return path.isEmpty ? null : path;
+    if (r.exitCode != 0) return const [];
+    return (r.stdout as String)
+        .split('\n')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  /// 逐张识别并合并文本。
+  Future<String> recognizeMany(
+    List<String> imagePaths, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final parts = <String>[];
+    for (var i = 0; i < imagePaths.length; i++) {
+      try {
+        final t = await recognize(imagePaths[i]);
+        if (t.trim().isNotEmpty) parts.add(t.trim());
+      } catch (_) {}
+      onProgress?.call(i + 1, imagePaths.length);
+    }
+    return parts.join('\n');
   }
 
   Future<String> recognize(String imagePath) async {

@@ -62,23 +62,28 @@ class _ImportPageState extends State<ImportPage> {
 
   Future<void> _importImage() async {
     final ocr = OcrImporter();
-    final path = await ocr.pickImage();
-    if (path == null || !mounted) return;
+    final paths = await ocr.pickImages();
+    if (paths.isEmpty || !mounted) return;
     setState(() {
-      _pasteStage = '识别中';
+      _pasteStage = '识别中 0/${paths.length}';
       _pasteMsg = null;
     });
     try {
-      final text = await ocr.recognize(path);
+      final text = await ocr.recognizeMany(paths, onProgress: (d, t) {
+        if (mounted) setState(() => _pasteStage = '识别中 $d/$t');
+      });
       if (!mounted) return;
       setState(() => _pasteStage = null);
       if (text.trim().isEmpty) {
         setState(() => _pasteMsg = '未识别到文字');
         return;
       }
-      _nameCtrl.text = path.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '');
+      _nameCtrl.text = paths.first
+          .split('/')
+          .last
+          .replaceAll(RegExp(r'\.[^.]+$'), '');
       _pasteCtrl.text = text;
-      setState(() => _pasteMsg = '已识别，请核对下方文本后点「创建任务」');
+      setState(() => _pasteMsg = '已识别 ${paths.length} 张，请核对下方文本后点「创建任务」');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -276,10 +281,12 @@ class _ImportPageState extends State<ImportPage> {
           leading: const Icon(Icons.image_outlined),
           title: const Text('拍照/截图单词表 → 识别导入'),
           subtitle: Text(
-            _pasteStage == '识别中' ? '识别中…' : 'PP-OCRv4 文字识别，识别后自动建任务',
+            _pasteStage == '识别中' || (_pasteStage?.startsWith('识别中') ?? false)
+                ? '识别中…'
+                : 'PP-OCRv4 文字识别（可多选图片），识别后自动建任务',
             style: theme.textTheme.bodySmall,
           ),
-          trailing: _pasteStage == '识别中'
+          trailing: (_pasteStage?.startsWith('识别中') ?? false)
               ? const SizedBox(
                   width: 24,
                   height: 24,
