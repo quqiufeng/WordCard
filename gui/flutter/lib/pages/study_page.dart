@@ -112,7 +112,7 @@ class _StudyPageState extends State<StudyPage> {
           for (var i = 0; i < _titles.length; i++)
             ListTile(
               selected: i == _index,
-              selectedTileColor: ChinaColors.shuangdi,
+              selectedTileColor: Kami.tint,
               leading: Icon(_icons[i]),
               title: Text(_titles[i]),
               onTap: () => Automation.instance.invoke('nav.${_navIds[i]}'),

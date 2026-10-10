@@ -11,7 +11,7 @@ class MemoryCurve extends StatelessWidget {
     super.key,
     required this.values,
     this.height = 40,
-    this.color = ChinaColors.daiLan,
+    this.color = Kami.inkBlue,
   });
 
   final List<double> values;

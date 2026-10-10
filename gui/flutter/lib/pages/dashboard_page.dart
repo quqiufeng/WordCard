@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../ffi/wordcard.dart';
 import '../theme/app_theme.dart';
+import '../theme/fonts.dart';
 import '../widgets/memory_curve.dart';
 import '../widgets/task_bar_chart.dart';
 
-/// 首页：记忆数据面板（总览 + 任务进度 + 开始今日记忆）。
+/// 首页：记忆数据面板（总览 + 任务完成度 + 遗忘曲线 + 开始今日记忆）。
+/// 排版遵循 Kami：暖米纸感底、单一油墨蓝强调、衬线标题、留白、细线。
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
     super.key,
@@ -19,6 +21,13 @@ class DashboardPage extends StatelessWidget {
   final int userId;
   final VoidCallback onStartReview;
   final void Function(TaskInfo task) onOpenTask;
+
+  TextStyle _serif(double size, FontWeight w, Color c) => TextStyle(
+      fontFamily: AppFonts.tsangerJinKai,
+      fontSize: size,
+      fontWeight: w,
+      color: c,
+      height: 1.4);
 
   @override
   Widget build(BuildContext context) {
@@ -43,34 +52,41 @@ class DashboardPage extends StatelessWidget {
 
     return ListView(
       primary: false,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
       children: [
-        Text('记忆数据', style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 16),
+        Text('记忆数据', style: _serif(30, FontWeight.w500, Kami.ink)),
+        const SizedBox(height: 6),
+        Container(width: 48, height: 3, color: Kami.inkBlue),
+        const SizedBox(height: 24),
         Wrap(
-          spacing: 14,
-          runSpacing: 14,
+          spacing: 16,
+          runSpacing: 16,
           children: [
-            _stat(theme, '任务数', tasks.length, ChinaColors.daiLan),
-            _stat(theme, '总词数', total, ChinaColors.ink),
-            _stat(theme, '已记住', mastered, ChinaColors.qinglv),
-            _stat(theme, '未记住', notMemorized, ChinaColors.zhusha),
-            _stat(theme, '完成度', completion, ChinaColors.warn, suffix: '%'),
-            _stat(theme, '待复习', due, ChinaColors.muted),
+            _stat('任务数', tasks.length),
+            _stat('总词数', total),
+            _stat('已记住', mastered, accent: true),
+            _stat('未记住', notMemorized),
+            _stat('完成度', completion, suffix: '%', accent: true),
+            _stat('待复习', due),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Kami.inkBlue,
+              foregroundColor: Kami.parchment,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
             onPressed: onStartReview,
             icon: const Icon(Icons.play_arrow),
             label: Text('开始今日记忆（$due）'),
           ),
         ),
-        const SizedBox(height: 32),
-        Text('任务完成度', style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
+        const SizedBox(height: 40),
+        _section(theme, '任务完成度'),
+        const SizedBox(height: 12),
         TaskBarChart(
           bars: [
             for (final t in tasks)
@@ -84,44 +100,50 @@ class DashboardPage extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 24),
-        Text('任务进度', style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
+        const SizedBox(height: 40),
+        _section(theme, '任务进度'),
+        const SizedBox(height: 4),
         if (tasks.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text('暂无任务：去「导入」添加电子书 / 词表 / 图片',
                 style: theme.textTheme.bodySmall
-                    ?.copyWith(color: ChinaColors.muted)),
+                    ?.copyWith(color: Kami.muted)),
           ),
         for (final t in tasks) _taskRow(context, theme, t, status),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
         Text('引擎 libwordcard.so · v${engine.version}',
-            style: theme.textTheme.bodySmall?.copyWith(color: ChinaColors.dim)),
+            style: theme.textTheme.bodySmall?.copyWith(color: Kami.faint)),
       ],
     );
   }
 
-  Widget _stat(ThemeData theme, String label, int value, Color color,
-      {String suffix = ''}) {
+  Widget _section(ThemeData theme, String title) => Row(
+        children: [
+          Container(width: 3, height: 16, color: Kami.inkBlue),
+          const SizedBox(width: 8),
+          Text(title, style: _serif(18, FontWeight.w500, Kami.ink)),
+        ],
+      );
+
+  Widget _stat(String label, int value,
+      {String suffix = '', bool accent = false}) {
     return Container(
-      width: 150,
-      padding: const EdgeInsets.all(16),
+      width: 158,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        color: ChinaColors.shuangdi,
+        color: Kami.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: ChinaColors.border),
+        border: Border.all(color: Kami.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('$value$suffix',
-              style: theme.textTheme.headlineMedium
-                  ?.copyWith(color: color, fontWeight: FontWeight.w600)),
+              style: _serif(30, FontWeight.w500,
+                  accent ? Kami.inkBlue : Kami.ink)),
           const SizedBox(height: 4),
-          Text(label,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: ChinaColors.muted)),
+          Text(label, style: const TextStyle(color: Kami.muted, fontSize: 13)),
         ],
       ),
     );
@@ -133,37 +155,57 @@ class DashboardPage extends StatelessWidget {
     final done = items.where((e) => status[e.id] == 2).length;
     final frac = items.isEmpty ? 0.0 : done / items.length;
     final curve = forgettingCurve(engine, userId, items, days: 30);
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(t.name),
-      subtitle: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: frac,
-              minHeight: 6,
-              backgroundColor: ChinaColors.border,
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(ChinaColors.qinglv),
+          InkWell(
+            onTap: () => onOpenTask(t),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(t.name,
+                        style: _serif(16, FontWeight.w500, Kami.ink)),
+                  ),
+                  Text('$done / ${items.length}',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: Kami.muted)),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text('掌握 $done / ${items.length}',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: ChinaColors.muted)),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: frac,
+              minHeight: 5,
+              backgroundColor: Kami.hairline,
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(Kami.inkBlue),
+            ),
+          ),
           if (curve.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text('遗忘曲线',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: ChinaColors.dim)),
-            MemoryCurve(values: curve, height: 36, color: ChinaColors.qinglv),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Text('遗忘曲线',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: Kami.faint)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: MemoryCurve(
+                      values: curve, height: 34, color: Kami.inkBlue),
+                ),
+              ],
+            ),
           ],
+          const Divider(color: Kami.hairline, height: 20),
         ],
       ),
-      onTap: () => onOpenTask(t),
     );
   }
 }

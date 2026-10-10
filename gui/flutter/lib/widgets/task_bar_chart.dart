@@ -37,12 +37,12 @@ class TaskBarChart extends StatelessWidget {
                   children: [
                     Text('${(b.frac * 100).round()}%',
                         style: theme.textTheme.labelSmall
-                            ?.copyWith(color: ChinaColors.daiLan)),
+                            ?.copyWith(color: Kami.inkBlue)),
                     const SizedBox(height: 4),
                     Container(
                       height: 6 + b.frac * maxBar,
                       decoration: const BoxDecoration(
-                        color: ChinaColors.qinglv,
+                        color: Kami.inkBlue,
                         borderRadius:
                             BorderRadius.vertical(top: Radius.circular(4)),
                       ),
@@ -56,7 +56,7 @@ class TaskBarChart extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.labelSmall
-                            ?.copyWith(color: ChinaColors.muted),
+                            ?.copyWith(color: Kami.muted),
                       ),
                     ),
                   ],
