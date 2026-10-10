@@ -13,6 +13,7 @@ class FlashCard extends StatelessWidget {
     required this.flipped,
     required this.onFlip,
     this.onSpeak,
+    this.loading = false,
   });
 
   final ActiveCard card;
@@ -21,6 +22,9 @@ class FlashCard extends StatelessWidget {
 
   /// 点击英文段落/例句时回调（朗读）。
   final void Function(String text)? onSpeak;
+
+  /// 是否正在生成翻译/助记（显示等待动画）。
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +169,7 @@ class FlashCard extends StatelessWidget {
         }
       }
       flush();
+      if (loading) out.add(_loadingRow(theme));
       return out;
     }
 
@@ -195,7 +200,29 @@ class FlashCard extends StatelessWidget {
         out.add(_zhLine(theme, line));
       }
     }
+    if (loading) out.add(_loadingRow(theme));
     return out;
+  }
+
+  /// 翻译/助记生成中的等待动画。
+  Widget _loadingRow(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 8),
+          Text('翻译中…',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: ChinaColors.muted,
+              )),
+        ],
+      ),
+    );
   }
 
   Widget _usageBox(ThemeData theme, String text) {

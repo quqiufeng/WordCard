@@ -179,6 +179,15 @@ class _ReviewPageState extends State<_ReviewPage> {
   StudySession get s => widget.session;
   final Set<String> _memoRequested = {};
   final Set<String> _paraRequested = {};
+  int _pending = 0;
+
+  void _beginLoad() {
+    if (mounted) setState(() => _pending++);
+  }
+
+  void _endLoad() {
+    if (mounted) setState(() => _pending = _pending > 0 ? _pending - 1 : 0);
+  }
 
   static String _truncUtf8(String s, int maxBytes) {
     final b = utf8.encode(s);
@@ -227,7 +236,9 @@ class _ReviewPageState extends State<_ReviewPage> {
     if (word.isEmpty || _memoRequested.contains(word)) return;
     _memoRequested.add(word);
     final ctx = card.explanation.split('\n').first;
+    _beginLoad();
     MemoService.instance.request(word, ctx, (memo) {
+      _endLoad();
       if (!mounted || memo.isEmpty) return;
       final id = s.engine.itemIdByQuestion(word);
       if (id == null) return;
@@ -262,7 +273,9 @@ class _ReviewPageState extends State<_ReviewPage> {
         .join(' ');
     if (eng.isEmpty || _paraRequested.contains(card.question)) return;
     _paraRequested.add(card.question);
+    _beginLoad();
     MemoService.instance.translateText(eng, (zh) {
+      _endLoad();
       if (!mounted || zh.isEmpty) return;
       final id = s.engine.itemIdByQuestion(card.question);
       if (id == null) return;
@@ -327,6 +340,7 @@ class _ReviewPageState extends State<_ReviewPage> {
                 flipped: s.flipped,
                 onFlip: () => Automation.instance.invoke('review.flip'),
                 onSpeak: (t) => TtsService.instance.speak(t),
+                loading: _pending > 0,
               ),
             ),
             const SizedBox(height: 16),
