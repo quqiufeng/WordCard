@@ -6,9 +6,13 @@ PKGS := opencv4
 CFLAGS += $(shell pkg-config --cflags $(PKGS))
 LDLIBS := $(shell pkg-config --libs $(PKGS)) -lpthread
 
-.PHONY: all dotui wordcard wordpick txt2png clean
+.PHONY: all dotui wordcard wordpick txt2png automation clean
 
-all: dotui wordpick wordcard
+all: dotui wordpick wordcard automation
+
+automation:
+	$(CC_C) -shared -fPIC -O2 -Wall -Wextra automation/automation_ctl.c -o libwordcard_ctl.so
+	@echo "  -> libwordcard_ctl.so"
 
 wordcard:
 	$(CC_C) -shared -fPIC -O2 -Wall -Wextra wordcard.c modes.c -o libwordcard.so -lpthread
@@ -27,4 +31,4 @@ wordpick:
 	@echo "  -> libwordpick.so"
 
 clean:
-	rm -f libdotui.so libtxt2png.so libwordpick.so libwordcard.so *.o
+	rm -f libdotui.so libtxt2png.so libwordpick.so libwordcard.so libwordcard_ctl.so *.o

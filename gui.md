@@ -313,7 +313,63 @@ cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/ap
 
 ---
 
-## 十一、待办 / 后续
+## 十一、UI 自动化接口（AI 驱动）
+
+**目标：每个按钮都可被 AI agent 模拟点击，实现全自动操作。**
+
+```
+Flutter App                        外部 agent
+ ┌─────────────────────────┐       ┌──────────────────────────┐
+ │ Automation 服务          │  UDS  │ libwordcard_ctl.so        │
+ │ · 动作注册表 register()  │◄─────►│ (C 客户端, JSON Lines)    │
+ │ · invoke() 统一触发      │socket │        ▲                  │
+ │ · 事件广播 click         │       │        │ LuaJIT FFI       │
+ │ · state 查询             │       │ automation/wordcard.lua   │
+ └─────────────────────────┘       │        ▲                  │
+   /tmp/wordcard-automation.sock   │ agent 脚本 / LLM 工具调用 │
+                                   └──────────────────────────┘
+```
+
+- **同一条路径**：UI 按钮与 AI 调用都走 `Automation.invoke(id)`，所以任何点击都会
+  以 `{"event":"click","id":...}` 广播给外部；AI 也可发 `click` 命令模拟点击。
+- **协议**（Unix domain socket，JSON Lines）：
+
+  | 请求 | 响应 |
+  |------|------|
+  | `{"cmd":"list"}` | `{"ok":true,"actions":[...]}` |
+  | `{"cmd":"state"}` | `{"ok":true,"state":{page,total,done,word,...}}` |
+  | `{"cmd":"click","id":"..."}` | `{"ok":true,"id":"..."}` |
+  | `{"cmd":"ping"}` | `{"ok":true,"pong":true}` |
+
+  事件推送（服务端主动）：`{"event":"click","id":...,"source":"ui"|"ai"}`。
+
+- **动作 id 约定**：`review.flip` / `review.know` / `review.dontKnow` / `review.restart`；
+  `import.dict.<name>` / `import.dict.all` / `import.ebook`。
+  （动作在对应页面实例化时注册，因此 `list` 反映当前页面可用的动作。）
+
+- **用法**（LuaJIT）：
+
+  ```lua
+  local wc = require("wordcard")
+  local c = assert(wc.open())
+  for _, id in ipairs(c:actions()) do print(id) end
+  c:click("review.flip")
+  c:click("review.know")
+  print(c:state())
+  c:close()
+  ```
+
+- **构建与运行**：
+  ```bash
+  cd src && make automation     # -> libwordcard_ctl.so
+  luajit gui/flutter/automation/agent_demo.lua
+  ```
+  环境变量：`WC_AUTOMATION_SOCK`（socket 路径，默认 `/tmp/wordcard-automation.sock`）、
+  `WORDCARD_ROOT`（默认 `/opt/WordCard`）、`WCCTL_LIB`（.so 路径）。
+
+---
+
+## 十二、待办 / 后续
 
 - [ ] 复习队列页跑通 FFI 闭环（首个里程碑）
 - [ ] 电子书导入面板（对接 `importer`）

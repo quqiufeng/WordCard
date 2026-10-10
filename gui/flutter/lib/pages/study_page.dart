@@ -5,6 +5,7 @@ import 'package:yaru/yaru.dart';
 import '../ffi/wordcard.dart';
 import '../state/study_session.dart';
 import '../theme/app_theme.dart';
+import '../automation/automation.dart';
 import '../widgets/flash_card.dart';
 import '../widgets/review_queue.dart';
 import '../widgets/stats_widget.dart';
@@ -120,6 +121,16 @@ class _ReviewPage extends StatefulWidget {
 class _ReviewPageState extends State<_ReviewPage> {
   StudySession get s => widget.session;
 
+  @override
+  void initState() {
+    super.initState();
+    final a = Automation.instance;
+    a.register('review.flip', () => s.flip());
+    a.register('review.know', _know);
+    a.register('review.dontKnow', _dontKnow);
+    a.register('review.restart', () => s.start());
+  }
+
   void _know() {
     if (s.finished) {
       s.start();
@@ -140,17 +151,31 @@ class _ReviewPageState extends State<_ReviewPage> {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: s,
-      builder: (context, _) => CallbackShortcuts(
-        bindings: {
-          // 空格 = 不会；方向右键 = 记得并下一张
-          const SingleActivator(LogicalKeyboardKey.space): _dontKnow,
-          const SingleActivator(LogicalKeyboardKey.arrowRight): _know,
-        },
-        child: Focus(
-          autofocus: true,
-          child: _body(context),
-        ),
-      ),
+      builder: (context, _) {
+        Automation.instance.updateState({
+          'page': 'review',
+          'total': s.total,
+          'done': s.done,
+          'finished': s.finished,
+          'flipped': s.flipped,
+          'word': s.current?.question,
+          'mode': s.current?.modeName,
+          'lastOverall': s.lastResult?.overall,
+        });
+        return CallbackShortcuts(
+          bindings: {
+            // 空格 = 不会；方向右键 = 记得并下一张
+            const SingleActivator(LogicalKeyboardKey.space): () =>
+                Automation.instance.invoke('review.dontKnow'),
+            const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+                Automation.instance.invoke('review.know'),
+          },
+          child: Focus(
+            autofocus: true,
+            child: _body(context),
+          ),
+        );
+      },
     );
   }
 
@@ -192,7 +217,8 @@ class _ReviewPageState extends State<_ReviewPage> {
               child: FilledButton.icon(
                 style:
                     FilledButton.styleFrom(backgroundColor: ChinaColors.orange),
-                onPressed: _dontKnow,
+                onPressed: () =>
+                    Automation.instance.invoke('review.dontKnow'),
                 icon: const Icon(Icons.close),
                 label: const Text('不会（空格）'),
               ),
@@ -202,7 +228,7 @@ class _ReviewPageState extends State<_ReviewPage> {
               child: FilledButton.icon(
                 style:
                     FilledButton.styleFrom(backgroundColor: ChinaColors.qinglv),
-                onPressed: _know,
+                onPressed: () => Automation.instance.invoke('review.know'),
                 icon: const Icon(Icons.check),
                 label: const Text('记得（→）'),
               ),
@@ -227,7 +253,7 @@ class _ReviewPageState extends State<_ReviewPage> {
           Text('共 ${s.total} 张', style: theme.textTheme.bodyMedium),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: () => s.start(),
+            onPressed: () => Automation.instance.invoke('review.restart'),
             icon: const Icon(Icons.refresh),
             label: const Text('再来一轮'),
           ),

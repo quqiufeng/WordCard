@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../automation/automation.dart';
 import '../ebook_import.dart';
 import '../ffi/wordcard.dart';
 import '../theme/app_theme.dart';
@@ -31,6 +32,17 @@ class _ImportPageState extends State<ImportPage> {
 
   String? _ebookStage;
   String? _ebookMsg;
+
+  @override
+  void initState() {
+    super.initState();
+    final a = Automation.instance;
+    a.register('import.ebook', () => _importEbook());
+    a.register('import.dict.all', () => _importAll());
+    for (final info in _lists) {
+      a.register('import.dict.${info.name}', () => _import(info));
+    }
+  }
 
   Future<void> _importEbook() async {
     final importer = EbookImporter(widget.engine);
@@ -112,6 +124,13 @@ class _ImportPageState extends State<ImportPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    Automation.instance.updateState({
+      'page': 'import',
+      'lists': _lists.map((l) => l.name).toList(),
+      'busy': _busy,
+      'stage': _ebookStage,
+      'msg': _ebookMsg,
+    });
     return ListView(
       primary: false,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -134,7 +153,9 @@ class _ImportPageState extends State<ImportPage> {
           theme,
           '考试词表',
           trailing: OutlinedButton.icon(
-            onPressed: _busy == null && _lists.isNotEmpty ? _importAll : null,
+            onPressed: _busy == null && _lists.isNotEmpty
+                ? () => Automation.instance.invoke('import.dict.all')
+                : null,
             icon: const Icon(Icons.download_for_offline_outlined, size: 18),
             label: const Text('全部导入'),
           ),
@@ -165,7 +186,9 @@ class _ImportPageState extends State<ImportPage> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2))
               : FilledButton.tonal(
-                  onPressed: _busy == null ? _importEbook : null,
+                  onPressed: _busy == null
+                      ? () => Automation.instance.invoke('import.ebook')
+                      : null,
                   child: const Text('选择电子书…'),
                 ),
         ),
@@ -207,7 +230,10 @@ class _ImportPageState extends State<ImportPage> {
               height: 24,
               child: CircularProgressIndicator(strokeWidth: 2))
           : FilledButton.tonal(
-              onPressed: _busy == null ? () => _import(info) : null,
+              onPressed: _busy == null
+                  ? () => Automation.instance
+                      .invoke('import.dict.${info.name}')
+                  : null,
               child: const Text('导入'),
             ),
     );
