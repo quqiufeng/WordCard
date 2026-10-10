@@ -27,6 +27,8 @@
 ## 核心特性
 
 - **C 核心引擎**：零依赖 SM-2 算法 + 哈希索引 + 结构体直写磁盘
+- **桌面应用**：Flutter + Yaru（Ubuntu），首页记忆数据 / 任务 / 听写 / 图片 OCR 导入
+- **多来源导入**：考试词表 / 电子书 / 粘贴词表（含词组）/ 图片 OCR → 统一记忆任务
 - **智能选词**：`libwordpick.so` 内置 6 万词频表 + 词形还原，偏态难度曲线 + 覆盖率加权
 - **完整解析**：PDF/MOBI/AZW3/EPUB/MD → 清洗后的完整正文，按章节切分
 - **双语材料**：本地 LLM 翻译 + Kokoro 语音 + HarfBuzz/Cairo 卡片
@@ -48,6 +50,8 @@
 
 ```
 用户
+ ├── 桌面 App (gui/flutter) ─ Flutter + Yaru；dart:ffi 直连 libwordcard.so
+ │                         首页/任务/记忆/听写/导入(词表·电子书·粘贴·图片OCR)
  ├── CLI (cli.py) ──────── 终端交互复习
  ├── API (api.py) ──────── FastAPI REST (port 8000)
  ├── 卡片图片 ───────────── txt2png Canvas → PNG
@@ -133,6 +137,15 @@ python3 api.py
 # → http://localhost:8000/docs
 ```
 
+### 6. 启动桌面应用（Flutter / Ubuntu）
+
+```bash
+gui/flutter/build.sh    # 编译 C 核心 + flutter build linux --release
+gui/flutter/run.sh      # 运行；或用桌面图标 / systemctl --user restart wordcard-app
+```
+
+详见 `gui.md`（UI 层技术架构）。
+
 ---
 
 ## 项目结构
@@ -181,6 +194,8 @@ WordCard/
 │
 ├── output/                      # 卡片输出
 │
+├── gui/                         # 桌面应用（Flutter + Yaru）
+├── gui.md                       # UI 层技术架构
 ├── design.md                    # 架构文档
 ├── README.md                    # 本文档
 └── todolist.md                    # 应用方向
@@ -288,5 +303,6 @@ words = importer.extract_words(text, max_words=50, mode=1)
 | v2.0 | 2025-05 | C + Python 架构，SM-2 单词记忆 |
 | v3.0 | 2025-05 | 通用学习引擎 |
 | **v4.0** | **2026-07** | **纯 C 重构 + 电子书导入 + CLI/API + 卡片图片** |
+| **v4.1** | **2026-10** | **Flutter/Yaru 桌面应用：记忆数据 · 任务 · 听写 · 图片OCR · Kami 排版** |
 
-*最后更新: 2026-07-26*
+*最后更新: 2026-10-11*
