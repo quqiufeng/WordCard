@@ -4,6 +4,7 @@ import '../automation/automation.dart';
 import '../ffi/wordcard.dart';
 import '../state/study_session.dart';
 import '../theme/app_theme.dart';
+import '../theme/fonts.dart';
 import '../tts.dart';
 import 'dashboard_page.dart';
 import 'import_page.dart';
@@ -123,7 +124,6 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _header(BuildContext context) {
-    final theme = Theme.of(context);
     return SizedBox(
       height: 48,
       child: Row(
@@ -134,7 +134,12 @@ class _StudyPageState extends State<StudyPage> {
             icon: Icon(_showNav ? Icons.menu_open : Icons.menu),
             onPressed: () => Automation.instance.invoke('nav.toggle'),
           ),
-          Text(_titles[_index], style: theme.textTheme.titleMedium),
+          Text(_titles[_index],
+              style: const TextStyle(
+                  fontFamily: AppFonts.tsangerJinKai,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w500,
+                  color: Kami.ink)),
         ],
       ),
     );

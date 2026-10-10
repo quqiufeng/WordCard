@@ -100,14 +100,14 @@ class _DictationExamPageState extends State<DictationExamPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.keyboard_alt_outlined,
-              size: 56, color: ChinaColors.daiLan),
+              size: 56, color: Kami.inkBlue),
           const SizedBox(height: 16),
           Text('本次听写 ${_items.length} 个（随机一半）',
               style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text('每 8 秒读一个，请准备好纸笔',
               style: theme.textTheme.bodySmall
-                  ?.copyWith(color: ChinaColors.muted)),
+                  ?.copyWith(color: Kami.muted)),
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: _items.isEmpty ? null : _run,
@@ -145,19 +145,19 @@ class _DictationExamPageState extends State<DictationExamPage> {
                   child: CircularProgressIndicator(
                     value: _countdown / _gap,
                     strokeWidth: 6,
-                    backgroundColor: ChinaColors.border,
+                    backgroundColor: Kami.hairline,
                   ),
                 ),
                 Text('$_countdown',
                     style: theme.textTheme.displaySmall
-                        ?.copyWith(color: ChinaColors.ink)),
+                        ?.copyWith(color: Kami.ink)),
               ],
             ),
           ),
           const SizedBox(height: 12),
           Text('（写完请等待下一词）',
               style:
-                  theme.textTheme.bodySmall?.copyWith(color: ChinaColors.muted)),
+                  theme.textTheme.bodySmall?.copyWith(color: Kami.muted)),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -186,10 +186,10 @@ class _DictationExamPageState extends State<DictationExamPage> {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          color: ChinaColors.shuangdi,
+          color: Kami.tint,
           child: Row(
             children: [
-              const Icon(Icons.check_circle, color: ChinaColors.qinglv),
+              const Icon(Icons.check_circle, color: Kami.inkBlue),
               const SizedBox(width: 8),
               Text('听写完成 · 共 ${_items.length} 个',
                   style: theme.textTheme.titleMedium),
@@ -211,13 +211,13 @@ class _DictationExamPageState extends State<DictationExamPage> {
               return ListTile(
                 leading: Text('${i + 1}',
                     style: theme.textTheme.bodySmall
-                        ?.copyWith(color: ChinaColors.dim)),
+                        ?.copyWith(color: Kami.faint)),
                 title: Text(it.word,
                     style: theme.textTheme.titleMedium
-                        ?.copyWith(color: ChinaColors.ink)),
+                        ?.copyWith(color: Kami.ink)),
                 subtitle: Text(it.answer.isEmpty ? '—' : it.answer,
                     style: theme.textTheme.bodySmall
-                        ?.copyWith(color: ChinaColors.muted)),
+                        ?.copyWith(color: Kami.muted)),
               );
             },
           ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../ffi/wordcard.dart';
 import '../theme/app_theme.dart';
+import '../theme/fonts.dart';
 import '../widgets/memory_curve.dart';
 import 'dictation_exam.dart';
 
@@ -48,7 +49,7 @@ class _TasksPageState extends State<TasksPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.assignment_outlined,
-                size: 48, color: ChinaColors.dim),
+                size: 48, color: Kami.faint),
             const SizedBox(height: 12),
             Text('暂无记忆任务', style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
@@ -96,7 +97,7 @@ class _TasksPageState extends State<TasksPage> {
                 IconButton(
                   tooltip: '删除任务',
                   icon: const Icon(Icons.delete_outline,
-                      color: ChinaColors.zhusha),
+                      color: Kami.error),
                   onPressed: () => _confirmDelete(t),
                 ),
               ],
@@ -134,14 +135,18 @@ class _TasksPageState extends State<TasksPage> {
               Expanded(
                 child: Text(
                   '${_nameOf(tag)} · ${items.length} 词',
-                  style: theme.textTheme.titleMedium,
+                  style: const TextStyle(
+                      fontFamily: AppFonts.tsangerJinKai,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w500,
+                      color: Kami.ink),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (items.isNotEmpty && widget.onStudy != null)
                 IconButton(
                   tooltip: '学习这组单词',
-                  icon: const Icon(Icons.play_arrow, color: ChinaColors.qinglv),
+                  icon: const Icon(Icons.play_arrow, color: Kami.inkBlue),
                   onPressed: () => widget.onStudy!(
                       items.map((e) => e.id).toList(), _nameOf(tag)),
                 ),
@@ -158,7 +163,7 @@ class _TasksPageState extends State<TasksPage> {
                 IconButton(
                   tooltip: '听写整份词表',
                   icon: const Icon(Icons.keyboard_alt_outlined,
-                      color: ChinaColors.daiLan),
+                      color: Kami.inkBlue),
                   onPressed: () => _startExam(context, tag, _nameOf(tag)),
                 ),
             ],
@@ -173,7 +178,7 @@ class _TasksPageState extends State<TasksPage> {
               children: [
                 Text('遗忘曲线 · 未来 30 天记忆保持率',
                     style: theme.textTheme.bodySmall
-                        ?.copyWith(color: ChinaColors.muted)),
+                        ?.copyWith(color: Kami.muted)),
                 const SizedBox(height: 4),
                 MemoryCurve(values: _curveOf(items), height: 64),
               ],

@@ -22,13 +22,13 @@ class ReviewQueue extends StatelessWidget {
         final isCurrent = i == session.done;
         final isDone = i < session.done;
         final color = isDone
-            ? ChinaColors.dim
-            : (isCurrent ? ChinaColors.daiLan : ChinaColors.ink);
+            ? Kami.faint
+            : (isCurrent ? Kami.inkBlue : Kami.ink);
 
         return ListTile(
           dense: true,
           selected: isCurrent,
-          selectedTileColor: ChinaColors.shuangdi,
+          selectedTileColor: Kami.tint,
           leading: Text(
             '${i + 1}',
             style: theme.textTheme.bodySmall?.copyWith(color: color),

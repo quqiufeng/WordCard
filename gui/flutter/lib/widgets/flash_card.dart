@@ -49,11 +49,11 @@ class FlashCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Kami.hairline),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
+      padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 44),
       child: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
+            constraints: const BoxConstraints(maxWidth: 860),
             child: flipped ? _back(context) : _front(context),
           ),
         ),
@@ -84,19 +84,19 @@ class FlashCard extends StatelessWidget {
         Text(
           card.question,
           textAlign: TextAlign.center,
-          style: _serif(46, FontWeight.w500, Kami.ink),
+          style: _serif(64, FontWeight.w500, Kami.ink),
         ),
         if (card.hint.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(
             card.hint,
             textAlign: TextAlign.center,
-            style: _serif(16, FontWeight.w400, Kami.muted),
+            style: _serif(22, FontWeight.w400, Kami.muted),
           ),
         ],
         const SizedBox(height: 40),
         Text('点击卡片查看释义',
-            style: theme.textTheme.labelSmall?.copyWith(color: Kami.faint)),
+            style: theme.textTheme.bodySmall?.copyWith(color: Kami.faint)),
       ],
     );
   }
@@ -110,13 +110,13 @@ class FlashCard extends StatelessWidget {
         Text(
           card.question,
           textAlign: TextAlign.center,
-          style: _serif(26, FontWeight.w500, Kami.inkBlue),
+          style: _serif(34, FontWeight.w500, Kami.inkBlue),
         ),
         const SizedBox(height: 14),
         Text(
           card.answer,
           textAlign: TextAlign.center,
-          style: _serif(24, FontWeight.w500, Kami.ink),
+          style: _serif(34, FontWeight.w500, Kami.ink),
         ),
         if (card.explanation.isNotEmpty) ...[
           const SizedBox(height: 28),
@@ -262,7 +262,7 @@ class FlashCard extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: _serif(15, FontWeight.w400, Kami.ink),
+              style: _serif(19, FontWeight.w400, Kami.ink),
             ),
           ),
         ],
@@ -317,7 +317,7 @@ class FlashCard extends StatelessWidget {
   /// 英文文本：目标词（含简单变形）用油墨蓝强调。
   TextSpan _enSpan(String text) {
     const base = TextStyle(
-        fontFamily: AppFonts.tsangerJinKai, fontSize: 17, color: Kami.ink,
+        fontFamily: AppFonts.tsangerJinKai, fontSize: 23, color: Kami.ink,
         height: 1.8);
     final word = card.question.trim();
     if (word.isEmpty) return TextSpan(text: text, style: base);
@@ -345,7 +345,7 @@ class FlashCard extends StatelessWidget {
   /// 中文文本：释义词命中处用油墨蓝强调。
   TextSpan _zhSpan(String text) {
     const base = TextStyle(
-        fontFamily: AppFonts.tsangerJinKai, fontSize: 15, color: Kami.muted,
+        fontFamily: AppFonts.tsangerJinKai, fontSize: 20, color: Kami.muted,
         height: 1.7);
     text = text.replaceAll('【', '').replaceAll('】', '');
     final terms = _glossTerms();

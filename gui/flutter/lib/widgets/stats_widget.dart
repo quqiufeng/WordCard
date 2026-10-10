@@ -32,9 +32,9 @@ class StatsWidget extends StatelessWidget {
           child: LinearProgressIndicator(
             value: percent,
             minHeight: 6,
-            backgroundColor: ChinaColors.border,
+            backgroundColor: Kami.hairline,
             valueColor:
-                const AlwaysStoppedAnimation<Color>(ChinaColors.daiLan),
+                const AlwaysStoppedAnimation<Color>(Kami.inkBlue),
           ),
         ),
         if (result != null) ...[
@@ -43,10 +43,10 @@ class StatsWidget extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _chip(theme, '综合', '${result.overall}%', ChinaColors.daiLan),
-              _chip(theme, '识别', '${result.recognition}%', ChinaColors.muted),
-              _chip(theme, '记忆', '${result.recall}%', ChinaColors.muted),
-              _chip(theme, '间隔', '${result.intervalDays}天', ChinaColors.qinglv),
+              _chip(theme, '综合', '${result.overall}%', Kami.inkBlue),
+              _chip(theme, '识别', '${result.recognition}%', Kami.muted),
+              _chip(theme, '记忆', '${result.recall}%', Kami.muted),
+              _chip(theme, '间隔', '${result.intervalDays}天', Kami.inkBlue),
             ],
           ),
         ],
@@ -60,13 +60,13 @@ class StatsWidget extends StatelessWidget {
         Text(
           value,
           style: theme.textTheme.headlineSmall?.copyWith(
-            color: ChinaColors.ink,
+            color: Kami.ink,
             fontWeight: FontWeight.w600,
           ),
         ),
         Text(
           label,
-          style: theme.textTheme.labelSmall?.copyWith(color: ChinaColors.muted),
+          style: theme.textTheme.labelSmall?.copyWith(color: Kami.muted),
         ),
       ],
     );
@@ -75,9 +75,9 @@ class StatsWidget extends StatelessWidget {
   Widget _chip(ThemeData theme, String label, String value, Color color) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: ChinaColors.shuangdi,
+        color: Kami.tint,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: ChinaColors.border),
+        border: Border.all(color: Kami.hairline),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

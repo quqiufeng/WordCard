@@ -217,27 +217,35 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   Widget _controls(BuildContext context) {
+    const label = TextStyle(
+        fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white);
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 460),
+      constraints: const BoxConstraints(maxWidth: 520),
       child: Row(
         children: [
           Expanded(
             child: FilledButton.icon(
-              style:
-                  FilledButton.styleFrom(backgroundColor: ChinaColors.orange),
+              style: FilledButton.styleFrom(
+                backgroundColor: Kami.error,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
               onPressed: () => Automation.instance.invoke('review.dontKnow'),
-              icon: const Icon(Icons.close),
-              label: const Text('不会'),
+              icon: const Icon(Icons.close, color: Colors.white),
+              label: const Text('不会', style: label),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: FilledButton.icon(
-              style:
-                  FilledButton.styleFrom(backgroundColor: ChinaColors.qinglv),
+              style: FilledButton.styleFrom(
+                backgroundColor: Kami.inkBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
               onPressed: () => Automation.instance.invoke('review.know'),
-              icon: const Icon(Icons.check),
-              label: const Text('记得'),
+              icon: const Icon(Icons.check, color: Colors.white),
+              label: const Text('记得', style: label),
             ),
           ),
         ],
@@ -252,7 +260,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.check_circle_outline,
-              size: 56, color: ChinaColors.qinglv),
+              size: 56, color: Kami.inkBlue),
           const SizedBox(height: 16),
           Text('本组记忆完成！', style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
@@ -274,7 +282,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.inbox_outlined, size: 48, color: ChinaColors.dim),
+          const Icon(Icons.inbox_outlined, size: 48, color: Kami.faint),
           const SizedBox(height: 16),
           Text('这组没有可复习的内容', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),

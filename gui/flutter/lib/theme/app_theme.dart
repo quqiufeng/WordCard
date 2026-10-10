@@ -13,6 +13,7 @@ abstract final class Kami {
   static const faint = Color(0xFF9A948A); // 更弱
   static const hairline = Color(0xFFE4DFD3); // 细线
   static const tint = Color(0xFFF1EFE6); // 浅暖底
+  static const error = Color(0xFFB23A2E); // 克制的朱红（错误/危险）
 }
 
 /// 中国传统色（**仅作语义数据色**，不覆盖 Yaru / 系统主色）。

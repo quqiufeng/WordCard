@@ -6,6 +6,7 @@ import '../ffi/wordcard.dart';
 import '../ocr_import.dart';
 import '../paste_import.dart';
 import '../theme/app_theme.dart';
+import '../theme/fonts.dart';
 import '../wordlist.dart';
 
 /// 导入页。
@@ -221,7 +222,7 @@ class _ImportPageState extends State<ImportPage> {
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
           child: Text(
             '来源不同，记忆相同：导入后进入同一复习队列，共用 SM-2。',
-            style: theme.textTheme.bodySmall?.copyWith(color: ChinaColors.muted),
+            style: theme.textTheme.bodySmall?.copyWith(color: Kami.muted),
           ),
         ),
         if (_error != null)
@@ -244,7 +245,7 @@ class _ImportPageState extends State<ImportPage> {
         ),
         if (_lists.isEmpty)
           const ListTile(
-            leading: Icon(Icons.folder_off_outlined, color: ChinaColors.dim),
+            leading: Icon(Icons.folder_off_outlined, color: Kami.faint),
             title: Text('未找到词表数据'),
             subtitle: Text('运行: python3 tools/build_wordlists.py'),
           )
@@ -332,7 +333,7 @@ class _ImportPageState extends State<ImportPage> {
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: _pasteMsg != null && _pasteMsg!.startsWith('失败')
                             ? theme.colorScheme.error
-                            : ChinaColors.muted,
+                            : Kami.muted,
                       ),
                     ),
                   ),
@@ -354,10 +355,19 @@ class _ImportPageState extends State<ImportPage> {
 
   Widget _sectionHeader(ThemeData theme, String title, {Widget? trailing}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
+      padding: const EdgeInsets.fromLTRB(8, 18, 8, 6),
       child: Row(
         children: [
-          Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+          Container(width: 3, height: 16, color: Kami.inkBlue),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(title,
+                style: const TextStyle(
+                    fontFamily: AppFonts.tsangerJinKai,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w500,
+                    color: Kami.ink)),
+          ),
           if (trailing != null) trailing,
         ],
       ),
@@ -377,7 +387,7 @@ class _ImportPageState extends State<ImportPage> {
                 ? '已导入 $imported 词'
                 : '${info.count} 词',
         style: theme.textTheme.bodySmall?.copyWith(
-          color: imported != null ? ChinaColors.qinglv : ChinaColors.muted,
+          color: imported != null ? Kami.inkBlue : Kami.muted,
         ),
       ),
       trailing: isBusy
