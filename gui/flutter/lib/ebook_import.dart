@@ -154,13 +154,16 @@ final class EbookImporter {
     final parts = <String>[];
     if (w.memo.isNotEmpty) parts.add('【用法】${w.memo}');
     if (w.para.isNotEmpty) {
-      parts.add(w.para);
+      parts.add('【段落】${w.para}');
       if (w.paraZh.isNotEmpty) parts.add(w.paraZh);
     }
-    for (var i = 0; i < w.sents.length; i++) {
-      parts.add(w.sents[i]);
-      if (i < w.sentsZh.length && w.sentsZh[i].isNotEmpty) {
-        parts.add(w.sentsZh[i]);
+    if (w.sents.isNotEmpty) {
+      parts.add('【例句】');
+      for (var i = 0; i < w.sents.length; i++) {
+        parts.add(w.sents[i]);
+        if (i < w.sentsZh.length && w.sentsZh[i].isNotEmpty) {
+          parts.add(w.sentsZh[i]);
+        }
       }
     }
     return _truncUtf8(parts.join('\n'), 1000);

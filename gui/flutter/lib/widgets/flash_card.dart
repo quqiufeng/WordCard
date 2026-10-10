@@ -129,7 +129,8 @@ class FlashCard extends StatelessWidget {
     );
   }
 
-  /// 把 explanation 按行拆开：英文行可点朗读，中文行作对照。
+  /// 把 explanation 按行拆开：
+  /// 【用法】高亮；【段落】整段一个朗读图标；例句行直接点读（无图标）；中文行作对照。
   List<Widget> _explanationLines(ThemeData theme) {
     final cjk = RegExp(r'[\u4e00-\u9fff]');
     final latin = RegExp(r'[A-Za-z]');
@@ -138,77 +139,139 @@ class FlashCard extends StatelessWidget {
         .map((l) => l.trim())
         .where((l) => l.isNotEmpty)
         .toList();
-    return [
-      for (final line in lines)
-        if (line.startsWith('【用法】'))
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: ChinaColors.shuangdi,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: ChinaColors.border),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.lightbulb_outline,
-                    size: 16, color: ChinaColors.daiLan),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    line.substring('【用法】'.length).trim(),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: ChinaColors.daiLan,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else if (latin.hasMatch(line) && !cjk.hasMatch(line) && onSpeak != null)
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => onSpeak!(line),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4, right: 6),
-                      child: Icon(Icons.volume_up_outlined,
-                          size: 16, color: ChinaColors.dim),
-                    ),
-                    Expanded(
-                      child: Text(
-                        line,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: ChinaColors.ink,
-                          height: 1.6,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+    final out = <Widget>[];
+    var seenPara = false;
+    for (final line in lines) {
+      if (line.startsWith('【用法】')) {
+        out.add(_usageBox(theme, line.substring('【用法】'.length).trim()));
+      } else if (line.startsWith('【段落】')) {
+        seenPara = true;
+        out.add(_speakBlock(theme, line.substring('【段落】'.length).trim()));
+      } else if (line.startsWith('【例句】')) {
+        out.add(Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 2),
+          child: Text('例句',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: ChinaColors.dim,
+                letterSpacing: 1,
+              )),
+        ));
+      } else if (latin.hasMatch(line) && !cjk.hasMatch(line) && onSpeak != null) {
+        // 无标记时：首条英文行按段落处理（带图标），其余按例句（无图标）
+        if (!seenPara) {
+          seenPara = true;
+          out.add(_speakBlock(theme, line));
+        } else {
+          out.add(_speakLine(theme, line));
+        }
+      } else {
+        out.add(_zhLine(theme, line));
+      }
+    }
+    return out;
+  }
+
+  Widget _usageBox(ThemeData theme, String text) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: ChinaColors.shuangdi,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ChinaColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.lightbulb_outline,
+              size: 16, color: ChinaColors.daiLan),
+          const SizedBox(width: 6),
+          Expanded(
             child: Text(
-              line,
+              text,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: ChinaColors.muted,
-                height: 1.6,
+                color: ChinaColors.daiLan,
+                height: 1.5,
               ),
             ),
           ),
-    ];
+        ],
+      ),
+    );
+  }
+
+  /// 段落：整段一个朗读图标（点图标或整段文字都朗读整段）。
+  Widget _speakBlock(ThemeData theme, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconButton(
+            tooltip: '朗读整段',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+            icon: const Icon(Icons.volume_up,
+                size: 18, color: ChinaColors.daiLan),
+            onPressed: onSpeak == null ? null : () => onSpeak!(text),
+          ),
+          const SizedBox(width: 2),
+          Expanded(
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: onSpeak == null ? null : () => onSpeak!(text),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    text,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: ChinaColors.ink,
+                      height: 1.6,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 例句：直接点读，不带图标。
+  Widget _speakLine(ThemeData theme, String text) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => onSpeak!(text),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            text,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: ChinaColors.ink,
+              height: 1.6,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _zhLine(ThemeData theme, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Text(
+        text,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: ChinaColors.muted,
+          height: 1.6,
+        ),
+      ),
+    );
   }
 
   Widget _modeBadge(ThemeData theme) {
