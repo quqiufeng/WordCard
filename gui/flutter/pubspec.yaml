@@ -1,0 +1,31 @@
+name: wordcard
+description: "WordCard — spaced-repetition vocabulary reader (Flutter / Yaru desktop UI)."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  yaru: ^11.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: MapleMonoNF
+      fonts:
+        - asset: assets/fonts/MapleMono-NF-CN-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/MapleMono-NF-CN-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/MapleMono-NF-CN-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/MapleMono-NF-CN-Bold.ttf
+          weight: 700
