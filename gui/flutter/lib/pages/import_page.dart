@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../automation/automation.dart';
 import '../ebook_import.dart';
 import '../ffi/wordcard.dart';
+import '../ocr_import.dart';
 import '../paste_import.dart';
 import '../theme/app_theme.dart';
 import '../wordlist.dart';
@@ -46,6 +47,7 @@ class _ImportPageState extends State<ImportPage> {
     a.register('import.ebook', () => _importEbook());
     a.register('import.dict.all', () => _importAll());
     a.register('import.paste', () => _createPasteTask());
+    a.register('import.image', () => _importImage());
     for (final info in _lists) {
       a.register('import.dict.${info.name}', () => _import(info));
     }
@@ -56,6 +58,34 @@ class _ImportPageState extends State<ImportPage> {
     _pasteCtrl.dispose();
     _nameCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _importImage() async {
+    final ocr = OcrImporter();
+    final path = await ocr.pickImage();
+    if (path == null || !mounted) return;
+    setState(() {
+      _pasteStage = '识别中';
+      _pasteMsg = null;
+    });
+    try {
+      final text = await ocr.recognize(path);
+      if (!mounted) return;
+      setState(() => _pasteStage = null);
+      if (text.trim().isEmpty) {
+        setState(() => _pasteMsg = '未识别到文字');
+        return;
+      }
+      _nameCtrl.text = path.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '');
+      _pasteCtrl.text = text;
+      setState(() => _pasteMsg = '已识别，请核对下方文本后点「创建任务」');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _pasteStage = null;
+        _pasteMsg = '识别失败: $e';
+      });
+    }
   }
 
   Future<void> _createPasteTask() async {
@@ -237,6 +267,28 @@ class _ImportPageState extends State<ImportPage> {
                       ? () => Automation.instance.invoke('import.ebook')
                       : null,
                   child: const Text('选择电子书…'),
+                ),
+        ),
+
+        const Divider(height: 32),
+        _sectionHeader(theme, '图片识别'),
+        ListTile(
+          leading: const Icon(Icons.image_outlined),
+          title: const Text('拍照/截图单词表 → 识别导入'),
+          subtitle: Text(
+            _pasteStage == '识别中' ? '识别中…' : 'PP-OCRv4 文字识别，识别后自动建任务',
+            style: theme.textTheme.bodySmall,
+          ),
+          trailing: _pasteStage == '识别中'
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : FilledButton.tonal(
+                  onPressed: _busy == null
+                      ? () => Automation.instance.invoke('import.image')
+                      : null,
+                  child: const Text('选择图片…'),
                 ),
         ),
 
