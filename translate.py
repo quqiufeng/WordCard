@@ -9,6 +9,7 @@ LLAMA_BIN = os.environ.get('LLAMA_SERVER', '/opt/llama.cpp/build/bin/llama-serve
 # 翻译用小模型即可；按优先级选第一个存在的（WC_LLM_MODEL 可覆盖）
 _MODEL_CANDIDATES = [
     os.environ.get('WC_LLM_MODEL'),
+    '/data/models/Hunyuan-MT-7B-Q4_K_M.gguf',
     '/data/models/image/Qwen3-4B-Instruct-2507-Q4_K_M.gguf',
 ]
 MODEL = next((m for m in _MODEL_CANDIDATES if m and os.path.exists(m)),
