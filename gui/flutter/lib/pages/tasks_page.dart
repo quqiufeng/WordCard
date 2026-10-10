@@ -4,15 +4,15 @@ import 'package:flutter/material.dart';
 
 import '../ffi/wordcard.dart';
 import '../theme/app_theme.dart';
+import 'dictation_exam.dart';
 
 /// 记忆任务：每个电子书/词表导入 = 一个任务（在 items 的 tags 之上分组的一层）。
-/// 点任务 → 翻页查看其所有单词；任务可删除。
+/// 点任务 → 翻页查看其所有单词；任务可删除 / 听写整份。
 class TasksPage extends StatefulWidget {
-  const TasksPage({super.key, required this.engine, this.onSpeak, this.onDictate});
+  const TasksPage({super.key, required this.engine, this.onSpeak});
 
   final WordCardEngine engine;
   final void Function(String text)? onSpeak;
-  final void Function(List<int> itemIds)? onDictate;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -67,12 +67,7 @@ class _TasksPageState extends State<TasksPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 FilledButton.tonalIcon(
-                  onPressed: widget.onDictate == null
-                      ? null
-                      : () => widget.onDictate!(widget.engine
-                          .itemsByTag(t.tag)
-                          .map((e) => e.id)
-                          .toList()),
+                  onPressed: () => _startExam(context, t.tag, t.name),
                   icon: const Icon(Icons.keyboard_alt_outlined, size: 16),
                   label: const Text('听写'),
                 ),
@@ -130,13 +125,12 @@ class _TasksPageState extends State<TasksPage> {
                       : () => widget
                           .onSpeak!(slice.map((e) => e.questionText).join(', ')),
                 ),
-              if (items.isNotEmpty && widget.onDictate != null)
+              if (items.isNotEmpty)
                 IconButton(
                   tooltip: '听写整份词表',
                   icon: const Icon(Icons.keyboard_alt_outlined,
                       color: ChinaColors.daiLan),
-                  onPressed: () =>
-                      widget.onDictate!(items.map((e) => e.id).toList()),
+                  onPressed: () => _startExam(context, tag, _nameOf(tag)),
                 ),
             ],
           ),
@@ -186,6 +180,18 @@ class _TasksPageState extends State<TasksPage> {
         ),
       ],
     );
+  }
+
+  void _startExam(BuildContext context, String tag, String name) {
+    final ids = widget.engine.itemsByTag(tag).map((e) => e.id).toList();
+    if (ids.isEmpty) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => DictationExamPage(
+        engine: widget.engine,
+        itemIds: ids,
+        title: '听写 · $name',
+      ),
+    ));
   }
 
   Future<void> _confirmDelete(TaskInfo t) async {

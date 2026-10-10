@@ -37,7 +37,6 @@ class _StudyPageState extends State<StudyPage> {
   String? _error;
   int _index = 0;
   bool _showNav = true;
-  bool _dictationFlag = false;
 
   @override
   void initState() {
@@ -134,30 +133,14 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _content(StudySession session) => switch (_index) {
-        0 => _ReviewPage(
-            session: session,
-            startDictation: _dictationFlag,
-            onDictationConsumed: () =>
-                setState(() => _dictationFlag = false),
-          ),
+        0 => _ReviewPage(session: session),
         1 => TasksPage(
             engine: _engine!,
             onSpeak: (t) => TtsService.instance.speak(t),
-            onDictate: _startTaskDictation,
           ),
         2 => _StatsPage(session: session, engine: _engine!),
         _ => ImportPage(engine: _engine!),
       };
-
-  /// 用某任务的整份词表开始听写。
-  void _startTaskDictation(List<int> ids) {
-    if (ids.isEmpty) return;
-    _session?.startItems(ids);
-    setState(() {
-      _index = 0;
-      _dictationFlag = true;
-    });
-  }
 
   Widget _errorView(BuildContext context) {
     final theme = Theme.of(context);
@@ -187,15 +170,9 @@ class _StudyPageState extends State<StudyPage> {
 // ────────────────────────────── 复习 ──────────────────────────────
 
 class _ReviewPage extends StatefulWidget {
-  const _ReviewPage({
-    required this.session,
-    this.startDictation = false,
-    this.onDictationConsumed,
-  });
+  const _ReviewPage({required this.session});
 
   final StudySession session;
-  final bool startDictation;
-  final VoidCallback? onDictationConsumed;
 
   @override
   State<_ReviewPage> createState() => _ReviewPageState();
@@ -206,12 +183,6 @@ class _ReviewPageState extends State<_ReviewPage> {
   final Set<String> _memoRequested = {};
   final Set<String> _paraRequested = {};
   int _pending = 0;
-
-  bool _dictation = false;
-  bool _revealed = false;
-  bool _correct = false;
-  int? _lastCardId;
-  final TextEditingController _input = TextEditingController();
 
   void _beginLoad() {
     if (mounted) setState(() => _pending++);
@@ -230,13 +201,6 @@ class _ReviewPageState extends State<_ReviewPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.startDictation) {
-      _dictation = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        TtsService.instance.speak(s.current?.question ?? '');
-        widget.onDictationConsumed?.call();
-      });
-    }
     final a = Automation.instance;
     a.register('review.flip', () {
       s.flip();
@@ -246,16 +210,6 @@ class _ReviewPageState extends State<_ReviewPage> {
     a.register('review.know', _know);
     a.register('review.dontKnow', _dontKnow);
     a.register('review.restart', () => s.start());
-    a.register('review.dictation', () {
-      setState(() {
-        _dictation = !_dictation;
-        _revealed = false;
-        _correct = false;
-        _input.clear();
-      });
-      if (_dictation) TtsService.instance.speak(s.current?.question ?? '');
-    });
-    a.register('review.check', _check);
     a.register('review.speakParagraph', () {
       final c = s.current;
       if (c == null) return;
@@ -272,38 +226,6 @@ class _ReviewPageState extends State<_ReviewPage> {
       }
     });
     TtsService.instance.start(); // 预加载 TTS 模型
-  }
-
-  @override
-  void dispose() {
-    _input.dispose();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant _ReviewPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.startDictation && !oldWidget.startDictation && !_dictation) {
-      setState(() => _dictation = true);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        TtsService.instance.speak(s.current?.question ?? '');
-        widget.onDictationConsumed?.call();
-      });
-    }
-  }
-
-  /// 听写判分：忽略大小写/空格/标点。
-  void _check() {
-    final card = s.current;
-    if (card == null) return;
-    String norm(String x) =>
-        x.toLowerCase().replaceAll(RegExp(r"[^a-z0-9\u4e00-\u9fff]+"), '');
-    final ok =
-        _input.text.trim().isNotEmpty && norm(_input.text) == norm(card.question);
-    setState(() {
-      _revealed = true;
-      _correct = ok;
-    });
   }
 
   void _know() {
@@ -389,24 +311,12 @@ class _ReviewPageState extends State<_ReviewPage> {
     return AnimatedBuilder(
       animation: s,
       builder: (context, _) {
-        final cid = s.current?.itemId;
-        if (cid != _lastCardId) {
-          _lastCardId = cid;
-          _revealed = false;
-          _correct = false;
-          _input.clear();
-          if (_dictation && cid != null) {
-            WidgetsBinding.instance.addPostFrameCallback(
-                (_) => TtsService.instance.speak(s.current?.question ?? ''));
-          }
-        }
         Automation.instance.updateState({
           'page': 'review',
           'total': s.total,
           'done': s.done,
           'finished': s.finished,
           'flipped': s.flipped,
-          'dictation': _dictation,
           'word': s.current?.question,
           'mode': s.current?.modeName,
           'lastOverall': s.lastResult?.overall,
@@ -416,17 +326,15 @@ class _ReviewPageState extends State<_ReviewPage> {
           _ensureParaZh();
         });
         return CallbackShortcuts(
-          bindings: _dictation
-              ? const {}
-              : {
-                  // 空格 = 不会；方向右键 = 记得并下一张
-                  const SingleActivator(LogicalKeyboardKey.space): () =>
-                      Automation.instance.invoke('review.dontKnow'),
-                  const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                      Automation.instance.invoke('review.know'),
-                },
+          bindings: {
+            // 空格 = 不会；方向右键 = 记得并下一张
+            const SingleActivator(LogicalKeyboardKey.space): () =>
+                Automation.instance.invoke('review.dontKnow'),
+            const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+                Automation.instance.invoke('review.know'),
+          },
           child: Focus(
-            autofocus: !_dictation,
+            autofocus: true,
             child: _body(context),
           ),
         );
@@ -438,33 +346,7 @@ class _ReviewPageState extends State<_ReviewPage> {
     if (s.finished) return _finished(context);
     final card = s.current;
     if (card == null) return _empty(context);
-
-    return Column(
-      children: [
-        _dictationBar(context),
-        Expanded(
-          child: _dictation
-              ? _dictationBody(context, card)
-              : _normalBody(context, card),
-        ),
-      ],
-    );
-  }
-
-  Widget _dictationBar(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 12, top: 4),
-        child: FilterChip(
-          avatar: const Icon(Icons.keyboard_alt_outlined, size: 16),
-          label: const Text('听写'),
-          selected: _dictation,
-          onSelected: (_) =>
-              Automation.instance.invoke('review.dictation'),
-        ),
-      ),
-    );
+    return _normalBody(context, card);
   }
 
   Widget _normalBody(BuildContext context, ActiveCard card) {
@@ -487,88 +369,6 @@ class _ReviewPageState extends State<_ReviewPage> {
             _controls(context),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _dictationBody(BuildContext context, ActiveCard card) {
-    final theme = Theme.of(context);
-    final word = card.question;
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: '重听',
-                    icon: const Icon(Icons.volume_up,
-                        size: 56, color: ChinaColors.daiLan),
-                    onPressed: () => TtsService.instance.speak(word),
-                  ),
-                  const SizedBox(height: 8),
-                  Text('听写：写下你听到的单词/词组',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: ChinaColors.muted)),
-                  const SizedBox(height: 20),
-                  if (_revealed) ...[
-                    Icon(_correct ? Icons.check_circle : Icons.cancel,
-                        size: 48,
-                        color: _correct
-                            ? ChinaColors.qinglv
-                            : ChinaColors.zhusha),
-                    const SizedBox(height: 12),
-                    Text(word,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineSmall
-                            ?.copyWith(color: ChinaColors.daiLan)),
-                    if (!_correct) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                          '你写的是：${_input.text.trim().isEmpty ? '（空）' : _input.text}',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: ChinaColors.muted)),
-                    ],
-                  ] else
-                    SizedBox(
-                      width: 340,
-                      child: TextField(
-                        controller: _input,
-                        autofocus: true,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge,
-                        decoration: const InputDecoration(
-                          hintText: '在此输入',
-                          border: OutlineInputBorder(),
-                        ),
-                        onSubmitted: (_) => _check(),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor:
-                      _revealed ? ChinaColors.daiLan : ChinaColors.qinglv,
-                ),
-                onPressed: () => _revealed
-                    ? s.grade(_correct ? 4 : 1)
-                    : _check(),
-                icon: Icon(_revealed ? Icons.arrow_forward : Icons.check),
-                label: Text(_revealed ? '下一张' : '检查'),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
