@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../automation/automation.dart';
 import '../ebook_import.dart';
 import '../ffi/wordcard.dart';
+import '../paste_import.dart';
 import '../theme/app_theme.dart';
 import '../wordlist.dart';
 
@@ -33,14 +34,60 @@ class _ImportPageState extends State<ImportPage> {
   String? _ebookStage;
   String? _ebookMsg;
 
+  final TextEditingController _pasteCtrl = TextEditingController();
+  final TextEditingController _nameCtrl = TextEditingController();
+  String? _pasteStage;
+  String? _pasteMsg;
+
   @override
   void initState() {
     super.initState();
     final a = Automation.instance;
     a.register('import.ebook', () => _importEbook());
     a.register('import.dict.all', () => _importAll());
+    a.register('import.paste', () => _createPasteTask());
     for (final info in _lists) {
       a.register('import.dict.${info.name}', () => _import(info));
+    }
+  }
+
+  @override
+  void dispose() {
+    _pasteCtrl.dispose();
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createPasteTask() async {
+    final text = _pasteCtrl.text;
+    if (text.trim().isEmpty) {
+      setState(() => _pasteMsg = '请先粘贴单词表');
+      return;
+    }
+    final name = _nameCtrl.text.trim().isEmpty
+        ? '粘贴词表 ${DateTime.now().toString().substring(0, 16)}'
+        : _nameCtrl.text.trim();
+    setState(() {
+      _pasteStage = '导入中';
+      _pasteMsg = null;
+    });
+    try {
+      final importer = PasteImporter(widget.engine);
+      final added = await importer.import(name, text, onProgress: (d, t) {
+        if (mounted) setState(() => _pasteStage = '导入中 $d/$t');
+      });
+      if (!mounted) return;
+      setState(() {
+        _pasteStage = null;
+        _pasteMsg = '任务「$name」：新增 $added 词';
+        _pasteCtrl.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _pasteStage = null;
+        _pasteMsg = '失败: $e';
+      });
     }
   }
 
@@ -191,6 +238,56 @@ class _ImportPageState extends State<ImportPage> {
                       : null,
                   child: const Text('选择电子书…'),
                 ),
+        ),
+
+        const Divider(height: 32),
+        _sectionHeader(theme, '粘贴单词表'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: '任务名称（可空）',
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _pasteCtrl,
+                minLines: 3,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  hintText: '每行一个单词；可带释义：\nabandon 放弃\norbit',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _pasteStage ?? _pasteMsg ?? '',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _pasteMsg != null && _pasteMsg!.startsWith('失败')
+                            ? theme.colorScheme.error
+                            : ChinaColors.muted,
+                      ),
+                    ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _pasteStage == null
+                        ? () => Automation.instance.invoke('import.paste')
+                        : null,
+                    icon: const Icon(Icons.add_task, size: 18),
+                    label: const Text('创建任务'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
