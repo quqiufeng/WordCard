@@ -165,19 +165,20 @@ class _TasksPageState extends State<TasksPage> {
           ),
         ),
         const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('记忆曲线 · 未来 14 天复习安排',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: ChinaColors.muted)),
-              const SizedBox(height: 4),
-              MemoryCurve(values: _dueCurve(items, 14), height: 64),
-            ],
+        if (_curveOf(items).isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('遗忘曲线 · 未来 30 天记忆保持率',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: ChinaColors.muted)),
+                const SizedBox(height: 4),
+                MemoryCurve(values: _curveOf(items), height: 64),
+              ],
+            ),
           ),
-        ),
         Expanded(
           child: ListView.builder(
             primary: false,
@@ -224,19 +225,8 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  List<int> _dueCurve(List<ItemEntry> items, int days) {
-    final now = widget.engine.now();
-    final v = List<int>.filled(days, 0);
-    for (final it in items) {
-      final m = widget.engine.mastery(userId: widget.userId, itemId: it.id);
-      final nr = m?.nextReview ?? 0;
-      final d = (nr == 0 || nr <= now)
-          ? 0
-          : ((nr - now) / 86400).ceil().clamp(0, days - 1);
-      v[d]++;
-    }
-    return v;
-  }
+  List<double> _curveOf(List<ItemEntry> items) =>
+      forgettingCurve(widget.engine, widget.userId, items, days: 30);
 
   void _startExam(BuildContext context, String tag, String name) {
     final ids = widget.engine.itemsByTag(tag).map((e) => e.id).toList();

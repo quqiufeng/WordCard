@@ -115,6 +115,7 @@ class DashboardPage extends StatelessWidget {
     final items = engine.itemsByTag(t.tag);
     final done = items.where((e) => status[e.id] == 2).length;
     final frac = items.isEmpty ? 0.0 : done / items.length;
+    final curve = forgettingCurve(engine, userId, items, days: 30);
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(t.name),
@@ -133,32 +134,19 @@ class DashboardPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text('掌握 $done / ${items.length} · 记忆曲线（未来10天）',
+          Text('掌握 $done / ${items.length}',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: ChinaColors.muted)),
-          const SizedBox(height: 2),
-          MemoryCurve(values: _dueCurve(items, 10), height: 38),
+          if (curve.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text('遗忘曲线',
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: ChinaColors.dim)),
+            MemoryCurve(values: curve, height: 36, color: ChinaColors.qinglv),
+          ],
         ],
       ),
       onTap: () => onOpenTask(t),
     );
-  }
-
-  /// 未来 N 天的复习量（用于记忆曲线）。
-  List<int> _dueCurve(List<ItemEntry> items, int days) {
-    final now = engine.now();
-    final v = List<int>.filled(days, 0);
-    for (final it in items) {
-      final m = engine.mastery(userId: userId, itemId: it.id);
-      final nr = m?.nextReview ?? 0;
-      int d;
-      if (nr == 0 || nr <= now) {
-        d = 0;
-      } else {
-        d = ((nr - now) / 86400).ceil().clamp(0, days - 1);
-      }
-      v[d]++;
-    }
-    return v;
   }
 }

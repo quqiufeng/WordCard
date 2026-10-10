@@ -68,6 +68,7 @@ final class MasterySnapshot {
     required this.streakDays,
     required this.status,
     required this.nextReview,
+    required this.lastReview,
   });
 
   factory MasterySnapshot.from(UserItemMastery m) => MasterySnapshot(
@@ -87,6 +88,7 @@ final class MasterySnapshot {
         streakDays: m.streakDays,
         status: m.sm2Status,
         nextReview: m.nextReview,
+        lastReview: m.lastReview,
       );
 
   final int overall;
@@ -105,6 +107,7 @@ final class MasterySnapshot {
   final int streakDays;
   final int status; // 0 新, 1 学习, 2 掌握
   final int nextReview;
+  final int lastReview;
 }
 
 /// `libwordcard.so` 的 Dart 封装，仅暴露 UI 需要的最小子集。
