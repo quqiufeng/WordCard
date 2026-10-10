@@ -19,6 +19,8 @@ class WordCardApp extends StatelessWidget {
         // 全局窗口标题栏（含 Ubuntu 窗口控制按钮），置于路由之外。
         builder: (context, child) => Scaffold(
           appBar: const YaruWindowTitleBar(
+            // 关闭 → 隐藏到任务栏（最小化），而不是退出/重启
+            onClose: YaruWindow.minimize,
             title: Text('WordCard · 读前预习词汇'),
           ),
           body: child ?? const SizedBox.shrink(),
