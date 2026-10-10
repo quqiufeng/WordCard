@@ -36,7 +36,9 @@ flutter:
           weight: 600
         - asset: assets/fonts/MapleMono-NF-CN-Bold.ttf
           weight: 700
-    - family: WenKai
+    - family: TsangerJinKai
       fonts:
-        - asset: assets/fonts/LXGWWenKai-Regular.ttf
+        - asset: assets/fonts/TsangerJinKai02-W04.ttf
           weight: 400
+        - asset: assets/fonts/TsangerJinKai02-W05.ttf
+          weight: 500

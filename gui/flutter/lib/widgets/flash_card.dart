@@ -62,7 +62,7 @@ class FlashCard extends StatelessWidget {
   }
 
   TextStyle _serif(double size, FontWeight w, Color c) => TextStyle(
-      fontFamily: AppFonts.wenKai,
+      fontFamily: AppFonts.tsangerJinKai,
       fontSize: size,
       fontWeight: w,
       color: c,
@@ -84,7 +84,7 @@ class FlashCard extends StatelessWidget {
         Text(
           card.question,
           textAlign: TextAlign.center,
-          style: _serif(46, FontWeight.w600, Kami.ink),
+          style: _serif(46, FontWeight.w500, Kami.ink),
         ),
         if (card.hint.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -110,7 +110,7 @@ class FlashCard extends StatelessWidget {
         Text(
           card.question,
           textAlign: TextAlign.center,
-          style: _serif(26, FontWeight.w600, Kami.inkBlue),
+          style: _serif(26, FontWeight.w500, Kami.inkBlue),
         ),
         const SizedBox(height: 14),
         Text(
@@ -317,7 +317,7 @@ class FlashCard extends StatelessWidget {
   /// 英文文本：目标词（含简单变形）用油墨蓝强调。
   TextSpan _enSpan(String text) {
     const base = TextStyle(
-        fontFamily: AppFonts.wenKai, fontSize: 17, color: Kami.ink,
+        fontFamily: AppFonts.tsangerJinKai, fontSize: 17, color: Kami.ink,
         height: 1.8);
     final word = card.question.trim();
     if (word.isEmpty) return TextSpan(text: text, style: base);
@@ -332,7 +332,7 @@ class FlashCard extends StatelessWidget {
       children.add(TextSpan(
         text: m.group(0),
         style: const TextStyle(
-            color: Kami.inkBlue, fontWeight: FontWeight.w600),
+            color: Kami.inkBlue, fontWeight: FontWeight.w500),
       ));
       last = m.end;
     }
@@ -345,7 +345,7 @@ class FlashCard extends StatelessWidget {
   /// 中文文本：释义词命中处用油墨蓝强调。
   TextSpan _zhSpan(String text) {
     const base = TextStyle(
-        fontFamily: AppFonts.wenKai, fontSize: 15, color: Kami.muted,
+        fontFamily: AppFonts.tsangerJinKai, fontSize: 15, color: Kami.muted,
         height: 1.7);
     text = text.replaceAll('【', '').replaceAll('】', '');
     final terms = _glossTerms();
@@ -359,7 +359,7 @@ class FlashCard extends StatelessWidget {
       }
       children.add(TextSpan(
         text: m.group(0),
-        style: const TextStyle(color: Kami.inkBlue, fontWeight: FontWeight.w600),
+        style: const TextStyle(color: Kami.inkBlue, fontWeight: FontWeight.w500),
       ));
       last = m.end;
     }

@@ -6,6 +6,6 @@ abstract final class AppFonts {
   /// Suited to headwords, phonetics and example sentences.
   static const mapleMono = 'MapleMonoNF';
 
-  /// 霞鹜文楷（LXGW WenKai）— 优雅衬线楷体，用于卡片正文。
-  static const wenKai = 'WenKai';
+  /// 仓耳今楷 02（TsangerJinKai02）— Kami 默认中文衬线字体。权重 400/500。
+  static const tsangerJinKai = 'TsangerJinKai';
 }
