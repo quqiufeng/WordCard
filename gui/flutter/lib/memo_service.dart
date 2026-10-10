@@ -13,6 +13,7 @@ final class MemoService {
   Process? _proc;
   String? _root;
   final Map<String, void Function(String memo)> _pending = {};
+  final Map<String, void Function(String zh)> _pendingText = {};
 
   String? _findRoot() {
     for (final c in ['.', '/opt/WordCard']) {
@@ -48,8 +49,11 @@ final class MemoService {
     if (line.trim().isEmpty) return;
     try {
       final d = json.decode(line) as Map<String, dynamic>;
-      final cb = _pending.remove('${d['w']}');
-      cb?.call('${d['memo'] ?? ''}');
+      if (d.containsKey('zh')) {
+        _pendingText.remove('${d['t']}')?.call('${d['zh'] ?? ''}');
+      } else {
+        _pending.remove('${d['w']}')?.call('${d['memo'] ?? ''}');
+      }
     } catch (_) {}
   }
 
@@ -59,16 +63,30 @@ final class MemoService {
     _pending[word] = onMemo;
     final p = _proc;
     if (p == null) {
-      start().then((_) => _send(word, context));
+      start().then((_) => _send({'w': word, 'ctx': context}));
     } else {
-      _send(word, context);
+      _send({'w': word, 'ctx': context});
     }
   }
 
-  void _send(String word, String context) {
+  /// 翻译一段文本（英文→中文）。
+  void translateText(String text, void Function(String zh) onZh) {
+    if (text.trim().isEmpty) return;
+    _pendingText[text] = onZh;
+    final p = _proc;
+    if (p == null) {
+      start().then((_) => _send({'t': text}));
+    } else {
+      _send({'t': text});
+    }
+  }
+
+  void _send(Map<String, dynamic> req) {
     try {
-      _proc?.stdin.writeln(
-          jsonEncode({'w': word, 'ctx': context.length > 200 ? context.substring(0, 200) : context}));
+      if (req['ctx'] is String && (req['ctx'] as String).length > 200) {
+        req['ctx'] = (req['ctx'] as String).substring(0, 200);
+      }
+      _proc?.stdin.writeln(jsonEncode(req));
     } catch (_) {
       _proc = null;
     }

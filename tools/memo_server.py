@@ -37,6 +37,31 @@ def main():
             req = json.loads(line)
         except Exception:  # noqa: BLE001
             continue
+
+        # 确保本地 LLM 在线（若被关闭则自动拉起）
+        try:
+            translate.available()
+        except Exception:  # noqa: BLE001
+            pass
+
+        # 翻译一段文本: {"t":"English..."} -> {"t":..., "zh":...}
+        text = req.get('t')
+        if text:
+            key = bilingual.trans_key(text)
+            zh = cache.get(key, '')
+            if not zh:
+                try:
+                    zh = translate.translate(text)
+                except Exception:  # noqa: BLE001
+                    zh = ''
+                if zh:
+                    cache[key] = zh
+                    bilingual.append_trans_cache(text, zh)
+            print(json.dumps({'t': text, 'zh': zh}, ensure_ascii=False),
+                  flush=True)
+            continue
+
+        # 生成助记: {"w":"orbit","ctx":"..."} -> {"w":..., "memo":...}
         word = req.get('w', '')
         ctx = req.get('ctx', '')
         if not word:

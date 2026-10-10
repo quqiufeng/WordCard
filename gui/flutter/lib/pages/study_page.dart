@@ -178,6 +178,7 @@ class _ReviewPage extends StatefulWidget {
 class _ReviewPageState extends State<_ReviewPage> {
   StudySession get s => widget.session;
   final Set<String> _memoRequested = {};
+  final Set<String> _paraRequested = {};
 
   static String _truncUtf8(String s, int maxBytes) {
     final b = utf8.encode(s);
@@ -239,6 +240,41 @@ class _ReviewPageState extends State<_ReviewPage> {
     });
   }
 
+  /// 卡片若有英文段落但无中文译文，按需翻译并回填。
+  void _ensureParaZh() {
+    if (!mounted) return;
+    final card = s.current;
+    if (card == null) return;
+    final expl = card.explanation;
+    if (expl.contains('【段落】')) return; // 导入时已带译文
+    final cjk = RegExp(r'[\u4e00-\u9fff]');
+    final latin = RegExp(r'[A-Za-z]');
+    final lines = expl
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    final hasZh =
+        lines.any((l) => !l.startsWith('【用法】') && cjk.hasMatch(l));
+    if (hasZh) return;
+    final eng = lines
+        .where((l) => latin.hasMatch(l) && !cjk.hasMatch(l))
+        .join(' ');
+    if (eng.isEmpty || _paraRequested.contains(card.question)) return;
+    _paraRequested.add(card.question);
+    MemoService.instance.translateText(eng, (zh) {
+      if (!mounted || zh.isEmpty) return;
+      final id = s.engine.itemIdByQuestion(card.question);
+      if (id == null) return;
+      final cur = s.engine.itemById(id);
+      final old = cur?.explanationText ?? '';
+      if (old.contains(zh)) return;
+      s.engine.updateItemExplanation(id, _truncUtf8('$old\n$zh', 1000));
+      s.engine.save();
+      if (mounted) setState(() {});
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -254,7 +290,10 @@ class _ReviewPageState extends State<_ReviewPage> {
           'mode': s.current?.modeName,
           'lastOverall': s.lastResult?.overall,
         });
-        WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMemo());
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _ensureMemo();
+          _ensureParaZh();
+        });
         return CallbackShortcuts(
           bindings: {
             // 空格 = 不会；方向右键 = 记得并下一张
