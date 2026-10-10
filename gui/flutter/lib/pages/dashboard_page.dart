@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../ffi/wordcard.dart';
 import '../theme/app_theme.dart';
 import '../widgets/memory_curve.dart';
+import '../widgets/task_bar_chart.dart';
 
 /// 首页：记忆数据面板（总览 + 任务进度 + 开始今日记忆）。
 class DashboardPage extends StatelessWidget {
@@ -68,6 +69,22 @@ class DashboardPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 32),
+        Text('任务完成度', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TaskBarChart(
+          bars: [
+            for (final t in tasks)
+              TaskBar(
+                t.name,
+                engine
+                    .itemsByTag(t.tag)
+                    .where((e) => status[e.id] == 2)
+                    .length,
+                t.count,
+              ),
+          ],
+        ),
+        const SizedBox(height: 24),
         Text('任务进度', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         if (tasks.isEmpty)
