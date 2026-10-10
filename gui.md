@@ -1,16 +1,18 @@
 # WordCard UI 层技术架构
 
 > Flutter Desktop (Linux) + Yaru + dart:ffi → `libwordcard.so`
-> 文档版本: v0.1 — 2026-10-10
+> 文档版本: v1.0 — 2026-10-11
 
 ---
 
 ## 一、目标
 
-为 WordCard 提供运行于 **Ubuntu 桌面**的图形界面，复用现有 C 核心引擎（SM-2 / KV Cache / 语音），
-让「导入电子书 → 选词 → 复习 → 卡片」的流程可以在桌面端顺畅完成。
+为 WordCard 提供运行于 **Ubuntu 桌面**的图形界面，复用现有 C 核心引擎
+（SM-2 / 语音）与 Python 处理管道（解析 / 选词 / 翻译 / OCR），
+覆盖「导入 → 记忆 → 听写」全流程，兼顾**成人读原版书**与**小学生每周听写**两类场景。
 
-UI 层**只负责展示与交互**，不重写任何学习算法；算法与数据全部来自 C 共享库。
+UI 层**只负责展示与交互**，不重写学习算法；解析、翻译、查词复用 Python 脚本，
+记忆与数据全部来自 C 共享库，经 `dart:ffi` 直连。
 
 ---
 
@@ -18,137 +20,95 @@ UI 层**只负责展示与交互**，不重写任何学习算法；算法与数�
 
 | 项 | 选型 | 说明 |
 |----|------|------|
-| 框架 | **Flutter Desktop**（Linux Stable 渠道） | 同一套代码未来可扩移动端 |
-| 语言 | **Dart**（健全空安全 / Strong Null-safety） | |
-| Linux 宿主 | **GTK+ 3**（Flutter 官方 Linux 嵌入器） | 由 `flutter create` 生成 `linux/` 运行器 |
+| 框架 | **Flutter Desktop**（Linux Stable） | 同一套代码可扩移动端 |
+| 语言 | **Dart**（健全空安全） | |
+| Linux 宿主 | **GTK+ 3**（Flutter 官方嵌入器） | `flutter create` 生成 `linux/` 运行器 |
 | UI 框架 | **Yaru（主）+ Material 3（辅）** | 融合 Ubuntu 桌面生态 |
-| 窗口管理 | **YaruWindow / YaruWindowTitleBar** | 不使用 `window_manager`，避免双标题栏 |
-| 中英文字体 | **Maple Mono NF CN**（唯一字体，等宽、含 CJK） | 见第六节 |
+| 设计语言 | **Kami**（暖米纸感 + 油墨蓝单强调 + 衬线） | `github.com/tw93/Kami`；见第四节 |
+| 窗口 | **YaruWindowTitleBar**（关闭=最小化） | 不叠加 `window_manager`/托盘插件（会与 Yaru 冲突崩溃） |
+| 字体 | **Maple Mono NF CN**（界面/自动化）+ **仓耳今楷 02**（卡片衬线） | 见第六节 |
 | 数据通道 | **dart:ffi** 直连本地 `.so` | 见第五节 |
-| IDE | VS Code / Android Studio | |
+| LLM | 本地 llama.cpp：**Hunyuan-MT-7B**（翻译，默认）+ Qwen3-4B（兜底） | 见第七节 |
+| OCR | **PP-OCRv4**（libocr_simple.so + onnxruntime 1.26） | 见第七节 |
 | 打包 | **snapcraft → Snap** | Ubuntu 官方推荐分发格式 |
 
 ---
 
-## 三、分层架构
+## 三、页面与分层
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  展示层 (Flutter Widgets / Yaru)                          │
-│   · YaruMasterDetailPage 侧边栏布局                        │
-│   · YaruWindowTitleBar 自定义标题栏                        │
-│   · 业务组件：FlashCard / ReviewQueue / StatsWidget ...   │
-├──────────────────────────────────────────────────────────┤
-│  状态层 (Dart)                                            │
-│   · ChangeNotifier / ValueNotifier（按需，轻量）           │
-│   · StudySession（队列 / 当前卡 / 评分 / 统计）           │
-├──────────────────────────────────────────────────────────┤
-│  FFI 绑定层 (lib/ffi/)                                    │
-│   · ffi.cdef 声明 wc_* / voice_* C ABI                    │
-│   · 结构体内存布局 <-> Dart 对象（Struct / Pointer）      │
-│   · libwordcard.so, libvoice_engine.so                    │
-├──────────────────────────────────────────────────────────┤
-│  C 核心层（现有，未改动）                                  │
-│   · libwordcard.so  SM-2 引擎 + 哈希索引 + KV Cache       │
-│   · libvoice_engine.so  ASR/TTS                           │
-└──────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│ 展示层 (Flutter / Yaru)                                        │
+│  主界面 StudyPage（可折叠侧栏）：首页 / 任务 / 导入            │
+│   · 首页 DashboardPage   记忆数据面板 + 任务完成度柱状图 + 遗忘曲线│
+│   · 任务 TasksPage       任务列表（学习/听写/删除）+ 翻页词表      │
+│   · 导入 ImportPage      词表 / 电子书 / 粘贴 / 图片OCR           │
+│  路由页：ReviewScreen（记忆）、DictationExamPage（听写考试）      │
+├───────────────────────────────────────────────────────────────┤
+│ 状态层 (Dart, ChangeNotifier)                                  │
+│  StudySession：队列 / 当前卡 / 翻转 / SM-2 提交 / 统计          │
+├───────────────────────────────────────────────────────────────┤
+│ FFI / 服务层                                                    │
+│  lib/ffi/wordcard.dart   wc_* ABI + 结构体布局                  │
+│  tts.dart / memo_service.dart / ebook_import.dart /            │
+│  paste_import.dart / ocr_import.dart / wordlist.dart           │
+├───────────────────────────────────────────────────────────────┤
+│ C 核心 + Python 管道                                            │
+│  libwordcard.so  SM-2 引擎 / 哈希索引 / 增删改查                │
+│  tools/*.py      解析、选词、ECDICT 查词、LLM 翻译、OCR、TTS   │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-数据流（复习闭环）：
+**页面导航**：侧栏三项 `首页 / 任务 / 导入`（`nav.home / nav.tasks / nav.import`）。
+「记忆」不再是固定页，而是从 **首页「开始今日记忆」** 或 **任务行「学习」** 打开的
+`ReviewScreen` 路由；「听写」打开 `DictationExamPage` 路由。
+
+### 记忆（复习）闭环
 
 ```
-启动 → wc_load_db / wc_find_user
-     → wc_generate_daily_queue(user, now)   今日队列
-     → wc_find_item_by_id(item)             卡片详情
-     → 用户翻转 / 作答 → wc_sm2_update(quality)
-     → wc_save_db / wc_mark_dirty → 统计更新
+首页/任务 → StudySession.start() / startItems(ids)
+          → wc_generate_daily_queue(user, now)
+          → FlashCard 显示 → 翻卡（跑 TTS 读词）
+          → 不会(空格, q=1) / 记得(→, q=4) → wc_sm2_update
+          → 到期排程；结束时 wc_save_db
 ```
 
-### 统一导入模型（来源 ≠ 算法）
+### 任务模型（在 items 的 tags 之上分的一层）
 
-**词典导入与电子书导入只是「来源（source）」不同，记忆方式与算法完全通用。**
-
-```
-来源 (source)                     统一学习项              统一复习
-──────────────                    (item_entry_t)          (SM-2)
- 考试词表 (cet4/cet6/…)   ─┐
- 电子书 (PDF/MOBI/EPUB…)  ─┼─►  同一 wordcard.db    ─►  同一 daily_queue
-                            │     同一结构 (question/       同一 6 维掌握度
- 其他来源 (题库/短文…)     ─┘      answer/hint/tags)        同一 modes 推荐
-```
-
-- 两种导入都调用 `wc_add_item`，写入**同一张 items 表**，仅 `tags` 不同
-  （`dict:cet4` / `book:<title>`）以标记来源。
-- **电子书解析不在 Flutter 重写**：App 调用 `tools/ebook_extract.py`
-  （复用 `importer.extract` + `extract_words` + `wordpick` + `tools/context.py`）。
-- **单词释义 = 词典**：一律查本地 **ECDICT**（`tools/bilingual.py`，离线秒级，
-  含音标/词性/中英释义），未收录词才退回 LLM（结果缓存 `data/dict_cache.tsv`）。
-- **段落/句子 = LLM 翻译**：含词段落与例句由 `tools/ebook_translate.py` 调本地 LLM
-  异步翻译，逐条经 FFI `wc_update_item_explanation` 回填为**中英文对照**；
-  译文缓存 `data/translate_cache.jsonl`。
-- **中英文对照物料**：导入即生成 `data/books/<slug>.tsv`（词级）与
-  `<slug>.jsonl`（含段落/例句/译文，脚本原地补全），之后加载即用。
-- 复习端 `StudySession` 只按 `wc_generate_daily_queue` 取队列，**不区分来源**；
-  因此无需为词典/电子书各写一套复习逻辑。
-- 若需「只复习 CET4」这类过滤，用 `tags` 之上再加一层筛选即可，属增量功能。
+- 每个**导入来源** = 一个任务：`book:<书名>` / `dict:<词表名>` / `custom:<名称>`。
+- 任务页：一行显示名称、类型、词数；操作 **学习 / 听写 / 删除**；点进去**翻页**看词表。
+- 删除任务 = `wc_delete_items_by_tag`（删学习项及其掌握度，重建索引）。
 
 ---
 
-## 四、Yaru 融合主题策略
+## 四、Kami 设计语言
 
-**主框架 Yaru，Material 3 无缝降级。**
+参考 `github.com/tw93/Kami`「好内容，值得好版面」，UI 遵循：
 
-- 顶层用 `YaruTheme` 的 **builder 形式**全局监听 Ubuntu 系统外观
-  （注意：当前 yaru 11 已无 `YaruThemeBuilder`，等价 API 是 `YaruTheme`）：
-  ```dart
-  YaruTheme(
-    builder: (context, yaru, child) => MaterialApp(
-      theme: yaru.theme,          // 自动匹配系统浅色主题
-      darkTheme: yaru.darkTheme,  // 自动匹配系统深色主题
-      themeMode: ThemeMode.system, // 跟随系统切换
-      home: const StudyPage(),
-    ),
-  )
-  ```
-- 窗口标题栏需在启动时初始化：
-  ```dart
-  Future<void> main() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    await YaruWindowTitleBar.ensureInitialized();
-    runApp(const WordCardApp());
-  }
-  ```
-- **强调色 / 主题模式跟随系统**（当前采用系统色；「中国色」切换作为后续可选设置项）。
-- 当 Yaru 缺少某业务组件时，使用 Material 3 组件，但必须继承 YaruTheme 提供的 `ThemeData`，
-  保证颜色 / 圆角 / 间距一致。
-- 优先使用 Yaru 桌面级组件：`YaruMasterDetailPage`（侧边栏）、`YaruWindowTitleBar`、`Yaru*` 表单控件。
+- **暖米纸感底 `#F5F4ED`**（不用纯白）；卡片面 `#FBFAF4` + **细线边框**。
+- **单一强调色：油墨蓝 `#1B365D`**（目标词、朗读图标、进度）；不用多色。
+- **衬线字体**贯穿卡片正文（仓耳今楷）。
+- **字号层级 + 大量留白**，分区用**细线**分隔，**无渐变 / 无阴影 / 无 3D**。
+- 语义色（中国色）保留淡雅作用，不喧宾夺主：正确 `#2E8B57`、错误 `#D92121`。
 
-### 中国传统色（仅作语义数据色）
+```dart
+abstract final class Kami {
+  static const parchment = Color(0xFFF5F4ED); // 底
+  static const surface   = Color(0xFFFBFAF4); // 卡片
+  static const inkBlue   = Color(0xFF1B365D); // 强调（唯一）
+  static const ink       = Color(0xFF2B2A26); // 正文
+  static const muted     = Color(0xFF6B665C); // 次要
+  static const hairline  = Color(0xFFE4DFD3); // 细线
+}
+```
 
-系统色作为主色（primary/accent），以下色板取自 `src/dotui.h` 与 `vocab_card.py`，
-用于**业务语义**（生词卡底色、正确/错误反馈、边框），不覆盖系统主色。
-
-| 角色 | 色值 | 名称 |
-|------|------|------|
-| 生词卡底 / background | `#E2F0CB` | 霜地 |
-| card 渐变上 | `#F3F8E8` | 嫩菊绿 |
-| card 渐变下 | `#E7F0D6` | — |
-| border | `#C4D6A6` | — |
-| 卡片边框（强调） | `#A3A33E` | 秋香色 |
-| ink（正文） | `#1D1B1C` | 墨色 |
-| muted | `#5B6B4F` | — |
-| accent（数据） | `#2A3C5C` | 黛蓝 |
-| success | `#2E8B57` | 青绿 |
-| error | `#D92121` | 朱砂红 |
-| warn | `#C77A16` | — |
-
-> 深色模式另配「玄色 / 缃色」一套，后续补充。
+主题仍用 Yaru 接管系统色（浅/深色跟随系统），Kami 用于业务与卡片排版。
 
 ---
 
 ## 五、数据通道（dart:ffi）
 
-UI 直接通过 `dart:ffi` 调用本地共享库，不经过 Python / HTTP。
+UI 直接 `dart:ffi` 调 `libwordcard.so`，不经过 Python / HTTP。
 
 ```dart
 final lib = DynamicLibrary.open('libwordcard.so');
@@ -157,227 +117,247 @@ final wcLoadDb = lib.lookupFunction<
     Pointer<Void> Function(Pointer<Utf8>)>('wc_load_db');
 ```
 
-主要使用的 C ABI（`src/wordcard.h`）：
+主要 C ABI（`src/wordcard.h`）：
 
 | 函数 | 用途 |
 |------|------|
-| `wc_db_init` / `wc_load_db` / `wc_save_db` / `wc_db_free` | 数据库生命周期 |
-| `wc_create_user` / `wc_find_user` / `wc_find_user_by_id` | 用户 |
+| `wc_db_init` / `wc_load_db` / `wc_save_db` / `wc_db_free` | 生命周期 |
+| `wc_create_user` / `wc_find_user` | 用户 |
 | `wc_generate_daily_queue` / `wc_get_due_items` / `wc_get_new_items` | 队列 |
 | `wc_find_item_by_id` / `wc_find_item_by_question` | 卡片详情 |
-| `wc_update_item_answer` | 异步回填释义 |
-| `wc_update_item_explanation` | 异步回填段落/例句译文 |
+| `wc_add_item` | 新增学习项 |
+| `wc_update_item_answer` / `wc_update_item_explanation` | 异步回填释义 / 段落译文 |
 | `wc_get_or_create_mastery` / `wc_find_mastery` | 掌握度 |
-| `wc_sm2_update` / `wc_update_mastery_dimension` / `wc_recalc_overall` | 复习提交 |
-| `wc_record_activity` / `wc_now` / `wc_today` | 统计 |
-| `voice_*`（`libvoice_engine.so`） | ASR / TTS |
+| `wc_sm2_update` / `wc_recalc_overall` | 复习提交 |
+| `wc_item_count` / `wc_item_id_at` | 遍历学习项（任务/统计） |
+| `wc_delete_items_by_tag` | 删除某任务 |
+| `wc_now` / `wc_version_string` | 工具 |
 
-约定：
-- C 层字符串统一 `char*`（UTF-8）；Dart 侧用 `package:ffi` 的 `Utf8` 与 `.toDartString()`。
-- `item_entry_t` / `user_item_mastery_t` 等结构体在 Dart 侧用 `final class ... extends Struct` 精确对齐。
-- 返回值指针的所有权归 C 层（多为库内部指针），UI 侧只读，不手动 `free`。
+约定：C 层字符串统一 `char*`（UTF-8）；结构体在 Dart 用 `final class ... extends Struct`
+精确对齐；返回指针所有权归 C 层，只读、不手动 `free`。
 
 ---
 
 ## 六、字体
 
-**全应用统一单一字体：Maple Mono NF CN**（等宽、Nerd Font 补丁、含 CJK，中英混排统一）。
-
-声明于 `pubspec.yaml`（`gui/flutter/assets/fonts/`）：
-
-| 字重 | 文件 |
-|------|------|
-| 400 | `MapleMono-NF-CN-Regular.ttf` |
-| 500 | `MapleMono-NF-CN-Medium.ttf` |
-| 600 | `MapleMono-NF-CN-SemiBold.ttf` |
-| 700 | `MapleMono-NF-CN-Bold.ttf` |
+| 用途 | 字体 | 文件 | 字重 |
+|------|------|------|------|
+| 界面/单词/自动化 | **Maple Mono NF CN**（等宽、含 CJK） | `MapleMono-NF-CN-{Regular,Medium,SemiBold,Bold}.ttf` | 400/500/600/700 |
+| 卡片正文（衬线） | **仓耳今楷 02**（Kami 默认中文衬线） | `TsangerJinKai02-W{04,05}.ttf` | 400/500 |
 
 ```dart
 abstract final class AppFonts {
   static const mapleMono = 'MapleMonoNF';
+  static const tsangerJinKai = 'TsangerJinKai';
 }
 ```
 
-- 全局通过 `ThemeData.textTheme` 统一设置 `fontFamily`。
-- 单词 / 音标 / 例句 / 释义均使用该字体，不引入第二套字体。
-- 体积约 79MB（4 字重）随应用打包；如需瘦身可后续用 `fonttools` 子集化。
+- 全局界面用 Maple Mono；**卡片**（单词/释义/段落/例句）用仓耳今楷。
+- 仓耳今楷（`TsangerJinKai02`）个人非商用免费，取自 Kami 的 CDN；
+  下载见 `skills/kami/scripts/ensure-fonts.sh`（源：`cdn.jsdelivr.net/gh/tw93/Kami@main/assets/fonts/`）。
+- 体积较大（Maple ~79MB + 仓耳 ~38MB），后续可用 `fonttools` 子集化。
 
 ---
 
-## 七、桌面端开发规范
+## 七、导入与内容管道（复用 Python）
 
-- **响应式布局**：禁止硬编码固定宽高，使用 `LayoutBuilder` / `MediaQuery` /
-  `Row` + `Flexible`/`Expanded`，适配窗口自由缩放。
-- **窗口**：使用 `YaruWindow` 管理大小、位置、最小化/最大化与标题栏；不叠加其他窗口插件。
-- **桌面交互**：
-  - 列表/表单支持鼠标滚轮与 **hover 状态**（`MouseRegion` / Yaru 自带 hover）。
-  - 提供键盘快捷键（`Shortcuts` + `Actions`），例如翻卡（空格）、评分（1–4）。
-- **可访问性**：焦点顺序、键盘可操作性、高对比度主题跟随系统。
+**统一原则：来源不同，记忆相同** —— 所有导入都经 `wc_add_item` 写入同一张 items 表，
+仅 `tags` 区分来源，复习端不区分来源。
+
+| 入口 | 动作 id | 实现 |
+|------|---------|------|
+| 考试词表 | `import.dict.<name>` / `import.dict.all` | 读 `data/wordlists/<name>.tsv`（ECDICT 生成） |
+| 电子书 | `import.ebook` | `tools/ebook_extract.py` 解析 + ECDICT 释义 + `tools/ebook_translate.py` LLM 译段落/例句 |
+| 粘贴词表 | `import.paste` | 支持**词组**（按首个中文切分 `look after 照顾`）→ `tools/define_words.py` 查词 |
+| 图片 OCR | `import.image` | PP-OCRv4 识别（可多选）→ 复用粘贴导入 |
+
+- **单词释义 = 词典**：离线查 **ECDICT**（`tools/bilingual.py`，秒级，含音标/词性/中英释义），
+  未收录才走 LLM；缓存 `data/dict_cache.tsv`。
+- **段落/句子/助记 = LLM**：`tools/ebook_translate.py` 逐条生成，
+  经 FFI `wc_update_item_explanation` 异步回填；译文缓存 `data/translate_cache.jsonl`。
+- **中英文对照物料**：导入即生成 `data/books/<slug>.tsv` 与 `<slug>.jsonl`。
+- **按需生成**：复习到某词若无「用法」助记/段落译文，常驻 `tools/memo_server.py`
+  即时生成并回填，避免导入时长时间等待。
+
+### LLM / OCR / TTS 服务
+
+- **翻译**：`translate.py` 默认用 **Hunyuan-MT-7B**（`/data/models/Hunyuan-MT-7B-Q4_K_M.gguf`，
+  约 4.4G / 显存 ~5.3G），可 `WC_LLM_MODEL` 覆盖；兜底 Qwen3-4B。`llama-server` 自动拉起。
+- **OCR**：`tools/ocr_image.py` 调 `libocr_simple.so` + `models/ocr/` 的 PP-OCRv4 模型
+  （det/rec onnx + 字典）；需 onnxruntime `VERS_1.26.0`，App 通过
+  `LD_LIBRARY_PATH=/data/venv/onnxruntime-linux-x64-gpu-1.26.0/lib`（`WC_ORT_LIB` 可覆盖）传入。
+- **TTS**：`tools/tts_server.py` 常驻（Kokoro/sherpa-onnx，模型只加载一次），
+  合成缓存 `data/tts_cache/` 并 `paplay` 播放；默认 **2.5× 增益**（`WC_TTS_VOLUME`）。
+  点单词/段落、听写考试读词均走此服务；合成期间按钮显示等待动画。
 
 ---
 
-## 八、目录结构
+## 八、记忆数据面板（首页）
+
+- 顶部指标卡：**任务数 / 总词数 / 已记住 / 未记住 / 完成度% / 待复习**。
+- **任务完成度柱状图**：每个任务一根柱（已掌握 / 总数），柱顶百分比。
+- **遗忘曲线（每个任务一条）**：对已复习词按艾宾浩斯 `R = exp(-t/S)`（S≈间隔天数）
+  求未来记忆保持率均值，`CustomPaint` 自绘；**没有记忆数据则不显示**。
+- 「开始今日记忆」按钮 → `ReviewScreen`（今日队列）。
+
+---
+
+## 九、听写考试（任务列表入口）
+
+- 随机取该任务词表的**一半**单词/词组。
+- 逐个朗读，**每词间隔 8 秒**（圆环倒计时），可重听/结束。
+- **结束后**列出全部听写词条及对应中文翻译（答卷一页看全）。
+- **不批改、不打分**，全程**手动**（孩子纸笔写，应用只报题与给答案）。
+
+---
+
+## 十、UI 自动化接口（AI 驱动）
+
+**每个按钮都走 `Automation.invoke(id)`，UI 点击与 AI 调用同一条路径。**
+
+```
+Flutter App ── UDS(JSON Lines) ── libwordcard_ctl.so(C) ── LuaJIT FFI ── agent
+ /tmp/wordcard-automation.sock        automation_ctl.c        automation/wordcard.lua
+```
+
+协议（Unix socket）：
+
+| 请求 | 响应 |
+|------|------|
+| `{"cmd":"list"}` | `{"ok":true,"actions":[...]}` |
+| `{"cmd":"state"}` | `{"ok":true,"state":{page,total,done,word,...}}` |
+| `{"cmd":"click","id":"..."}` | `{"ok":true,"id":"..."}` |
+| `{"cmd":"ping"}` | `{"ok":true,"pong":true}` |
+
+事件推送：`{"event":"click","id":...,"source":"ui"|"ai"}`。
+
+**动作 id**：
+- 导航：`nav.toggle` / `nav.home` / `nav.tasks` / `nav.import`
+- 记忆：`review.flip` / `review.know` / `review.dontKnow` / `review.restart` / `review.speakParagraph`
+- 导入：`import.dict.<name>` / `import.dict.all` / `import.ebook` / `import.paste` / `import.image`
+
+```lua
+local wc = require("wordcard")
+local c = assert(wc.open())
+for _, id in ipairs(c:actions()) do print(id) end
+c:click("nav.tasks")
+print(c:state())
+c:close()
+```
+
+构建与运行：`cd src && make automation`（→ `libwordcard_ctl.so`）；
+`luajit gui/flutter/automation/agent_demo.lua`。
+环境变量：`WC_AUTOMATION_SOCK`、`WORDCARD_ROOT`、`WCCTL_LIB`。
+
+---
+
+## 十一、桌面端开发规范
+
+- **响应式**：`LayoutBuilder` / `Expanded`，不硬编码尺寸。
+- **窗口**：客户端标题栏 `YaruWindowTitleBar`，**关闭 = 最小化**（不退出）；
+  不引入 `window_manager` / `tray_manager`（与 Yaru 冲突会触发 `implicit view` SEGV）。
+- **桌面交互**：鼠标 hover、滚轮；键盘快捷键——空格=不会、→=记得（听写/输入时禁用）。
+- **可访问性**：焦点顺序、键盘可操作、跟随系统高/低对比度。
+
+---
+
+## 十二、目录结构
 
 ```
 gui/flutter/
-├── pubspec.yaml                 # 依赖 + 字体资产声明
-├── assets/fonts/                # MapleMono-NF-CN-{Regular,Medium,SemiBold,Bold}.ttf
+├── pubspec.yaml                 # 依赖 + 字体资产
+├── assets/fonts/                # MapleMono-NF-CN-*.ttf + TsangerJinKai02-W0{4,5}.ttf
+├── assets/icons/                # 应用图标（app 图标，供桌面项）
 ├── lib/
-│   ├── main.dart                # YaruTheme 入口 + YaruWindowTitleBar.ensureInitialized
-│   ├── app.dart                 # MaterialApp + 路由
+│   ├── main.dart                # YaruTheme 入口 + YaruWindowTitleBar.ensureInitialized + Automation
+│   ├── app.dart                 # MaterialApp + 全局标题栏
 │   ├── theme/
-│   │   ├── app_theme.dart       # Yaru 融合主题 + 中国色语义色
+│   │   ├── app_theme.dart       # Yaru 融合主题 + Kami 调色板
 │   │   └── fonts.dart           # AppFonts
 │   ├── ffi/
-│   │   ├── wordcard.dart        # wc_* 绑定
-│   │   ├── voice.dart           # voice_* 绑定
-│   │   └── structs.dart         # C 结构体布局
-│   ├── state/
-│   │   └── study_session.dart   # 队列 / 当前卡 / 统计
+│   │   ├── wordcard.dart        # wc_* 绑定 + TaskInfo/MasterySnapshot
+│   │   ├── structs.dart         # C 结构体布局
+│   │   └── voice.dart           # voice_* 绑定（占位）
+│   ├── state/study_session.dart # 队列 / 当前卡 / 评分 / startItems / restart
+│   ├── automation/automation.dart # 动作注册表 + socket + 事件
+│   ├── tts.dart / memo_service.dart                 # 常驻 TTS / 助记+翻译
+│   ├── wordlist.dart / ebook_import.dart /
+│   │   paste_import.dart / ocr_import.dart          # 各导入来源
 │   ├── pages/
-│   │   ├── study_page.dart      # 主页面（YaruMasterDetailPage：复习/队列/统计/导入）
-│   │   └── import_page.dart     # 电子书导入（占位）
+│   │   ├── study_page.dart      # 主框架 + 侧栏（首页/任务/导入）
+│   │   ├── dashboard_page.dart  # 记忆数据面板
+│   │   ├── tasks_page.dart      # 任务列表 + 翻页词表
+│   │   ├── review_screen.dart   # 记忆（路由）
+│   │   ├── dictation_exam.dart  # 听写考试（路由）
+│   │   └── import_page.dart     # 导入
 │   └── widgets/
-│       ├── flash_card.dart
-│       ├── review_queue.dart
-│       └── stats_widget.dart
+│       ├── flash_card.dart      # 卡片（Kami 排版）
+│       ├── memory_curve.dart    # 遗忘曲线（CustomPaint）
+│       └── task_bar_chart.dart  # 任务完成度柱状图
+├── automation/                  # wordcard.lua（LuaJIT FFI）+ agent_demo.lua
 ├── linux/                       # flutter create 生成（GTK 运行器）
-└── snap/                        # snapcraft.yaml（分发包 .so + 字体）
+└── snap/                        # snapcraft.yaml（预留）
 ```
 
 ---
 
-## 九、打包与分发（Snap）
+## 十三、构建 / 运行 / 桌面快捷方式
 
-1. `flutter build linux --release` → 原生 ELF 二进制。
-2. `snapcraft.yaml` 打包：
-   - 将 `libwordcard.so` / `libvoice_engine.so` 一并 stage 进包（`stage-packages` 或本地 `prime`）。
-   - 字体资产由 Flutter bundle 携带。
-   - 运行时通过 `LD_LIBRARY_PATH` 或 rpath 定位 `.so`。
-3. 目标：Ubuntu 官方推荐的 **Snap** 格式。
-
----
-
-## 十、构建 / 运行 / 桌面快捷方式
-
-依赖版本（**重要**）：`yaru: ^10.2.0`。
-yaru 11.0.0 需要 `platform 3.2.0` 的新 API，而其依赖 `platform_linux 0.1.2+1`
-仍在调用 3.2.0 已移除的 legacy `Platform.environment`，二者不兼容；
-故锁回 10.2.0，并在 `pubspec.yaml` 中 `dependency_overrides: platform: 3.1.6`。
+依赖版本（**重要**）：`yaru: ^10.2.0` + `dependency_overrides: platform: 3.1.6`。
+（yaru 11 需 platform 3.2.0 新 API，而 `platform_linux 0.1.2+1` 仍用被移除的
+`Platform.environment`，两者不兼容，故锁定。）
 
 ```bash
-# 构建（默认 Flutter 位于 ~/development/flutter，可 FLUTTER_HOME 覆盖）
+# 构建（默认 Flutter 在 ~/development/flutter，可 FLUTTER_HOME 覆盖）
 gui/flutter/build.sh            # 编译 C 核心 + flutter build linux --release
-
-# 运行（未构建会先自动构建）
-gui/flutter/run.sh
+gui/flutter/run.sh              # 运行（未构建会先自动构建）
 ```
 
 产物：`gui/flutter/build/linux/x64/release/bundle/wordcard`。
-`run.sh` 已导出 `LD_LIBRARY_PATH` 指向 `src/`、`libs/`、`voice/libs/` 以定位 C 核心库。
+`run.sh` 导出 `LD_LIBRARY_PATH` 指向 `src/`、`libs/`、`voice/libs/`。
 
-桌面快捷方式：`~/Desktop/wordcard.desktop`（已 `chmod +x`，同时装入 `~/.local/share/applications/`），
-`Exec` 指向 `run.sh`，`Icon` 指向 `assets/icons/wordcard.png`（由 `backup.sh` 生成并缩放）。
-点击即可启动。
+**systemd 用户服务**（`wordcard-app.service`）：常驻运行、`Restart=no`、
+设 `DISPLAY`/`XDG_RUNTIME_DIR`/`PULSE_SERVER`/`LD_LIBRARY_PATH`。
+```bash
+systemctl --user restart wordcard-app     # 重启（改代码 build 后）
+journalctl --user -u wordcard-app -f      # 日志
+```
+
+**桌面快捷方式**：`~/Desktop/wordcard.desktop`（`chmod +x`，同时装入
+`~/.local/share/applications/`），`Exec` 指向 `run.sh`，`Icon` 指向 `assets/icons/wordcard.png`。
 
 ### 应用图标生成（backup.sh）
 
-图标由 `/opt/static_comfyui/cpp/sd/backup.sh`（SDXL / Qwen3，HiRes 两阶段）出图，
-1024×1024，再用 ImageMagick 缩放为多尺寸：
+由 `/opt/static_comfyui/cpp/sd/backup.sh`（SDXL/Qwen3，HiRes）出 1024×1024，再缩放：
 
 ```bash
 cd /opt/static_comfyui/cpp/sd
-
-NEGATIVE_PROMPT="person, people, human, face, portrait, woman, man, girl, boy, body, hands, \
-text, letters, words, chinese characters, watermark, signature, logo, brand, photo, \
-photorealistic, 3d render, blurry, low quality, jpeg artifacts, noise, frame distortion, border artifacts" \
+NEGATIVE_PROMPT="person, people, human, face, portrait, text, letters, words, watermark, \
+signature, logo, brand, photo, photorealistic, 3d render, blurry, low quality, noise, \
+frame distortion, border artifacts" \
 SKIP_QUALITY_PREFIX=1 \
-./backup.sh \
-  "flat minimal app icon, rounded square emblem, an open book with a floating vocabulary flashcard above it, sage green cream and vermilion red palette, traditional Chinese minimal ornamental style, centered, solid soft light green background, clean vector illustration" \
-  /tmp/opencode/wordcard_icon.png 1024 1024
-# 注: backup.sh 会给输出文件名追加时间戳 → /tmp/opencode/wordcard_icon_YYYYmmdd_HHMMSS.png
+./backup.sh "flat minimal app icon, rounded square emblem, an open book with a floating \
+vocabulary flashcard above it, sage green cream and vermilion red palette, traditional \
+Chinese minimal ornamental style, centered, solid soft light green background, clean vector" \
+/tmp/opencode/wordcard_icon.png 1024 1024
 
-# 缩放并安装（在仓库根 /opt/WordCard 下执行）
 SRC=$(ls -t /tmp/opencode/wordcard_icon_*.png | head -1)
 convert "$SRC" -resize 512x512 gui/flutter/assets/icons/wordcard-512.png
 convert "$SRC" -resize 256x256 gui/flutter/assets/icons/wordcard.png
 cp "$SRC" gui/flutter/assets/icons/wordcard-1024.png
-mkdir -p ~/.local/share/icons/hicolor/256x256/apps
 cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/apps/wordcard.png
 ```
 
-要点：
-- `backup.sh` 默认是「人像档」，故用 `NEGATIVE_PROMPT` 强负面排除 人/脸/文字/水印/logo；
-  `SKIP_QUALITY_PREFIX=1` 去掉脚本层质量前缀（宽画幅易诱导主体复制）。
-- 出图约 50s（RTX 3080）；`.desktop` 的 `Icon` 用绝对路径指向 256px 版本。
-
 ---
 
-## 十一、UI 自动化接口（AI 驱动）
+## 十四、待办 / 后续
 
-**目标：每个按钮都可被 AI agent 模拟点击，实现全自动操作。**
-
-```
-Flutter App                        外部 agent
- ┌─────────────────────────┐       ┌──────────────────────────┐
- │ Automation 服务          │  UDS  │ libwordcard_ctl.so        │
- │ · 动作注册表 register()  │◄─────►│ (C 客户端, JSON Lines)    │
- │ · invoke() 统一触发      │socket │        ▲                  │
- │ · 事件广播 click         │       │        │ LuaJIT FFI       │
- │ · state 查询             │       │ automation/wordcard.lua   │
- └─────────────────────────┘       │        ▲                  │
-   /tmp/wordcard-automation.sock   │ agent 脚本 / LLM 工具调用 │
-                                   └──────────────────────────┘
-```
-
-- **同一条路径**：UI 按钮与 AI 调用都走 `Automation.invoke(id)`，所以任何点击都会
-  以 `{"event":"click","id":...}` 广播给外部；AI 也可发 `click` 命令模拟点击。
-- **协议**（Unix domain socket，JSON Lines）：
-
-  | 请求 | 响应 |
-  |------|------|
-  | `{"cmd":"list"}` | `{"ok":true,"actions":[...]}` |
-  | `{"cmd":"state"}` | `{"ok":true,"state":{page,total,done,word,...}}` |
-  | `{"cmd":"click","id":"..."}` | `{"ok":true,"id":"..."}` |
-  | `{"cmd":"ping"}` | `{"ok":true,"pong":true}` |
-
-  事件推送（服务端主动）：`{"event":"click","id":...,"source":"ui"|"ai"}`。
-
-- **动作 id 约定**：`review.flip` / `review.know` / `review.dontKnow` / `review.restart`；
-  `import.dict.<name>` / `import.dict.all` / `import.ebook`。
-  （动作在对应页面实例化时注册，因此 `list` 反映当前页面可用的动作。）
-
-- **用法**（LuaJIT）：
-
-  ```lua
-  local wc = require("wordcard")
-  local c = assert(wc.open())
-  for _, id in ipairs(c:actions()) do print(id) end
-  c:click("review.flip")
-  c:click("review.know")
-  print(c:state())
-  c:close()
-  ```
-
-- **构建与运行**：
-  ```bash
-  cd src && make automation     # -> libwordcard_ctl.so
-  luajit gui/flutter/automation/agent_demo.lua
-  ```
-  环境变量：`WC_AUTOMATION_SOCK`（socket 路径，默认 `/tmp/wordcard-automation.sock`）、
-  `WORDCARD_ROOT`（默认 `/opt/WordCard`）、`WCCTL_LIB`（.so 路径）。
-
----
-
-## 十二、待办 / 后续
-
-- [ ] 复习队列页跑通 FFI 闭环（首个里程碑）
-- [ ] 电子书导入面板（对接 `importer`）
-- [ ] 学习统计看板
 - [ ] 卡片图片导出（Flutter `RepaintBoundary` → PNG）
+- [ ] 深色模式调色板（Kami 暖米 ↔ 暖深）
 - [ ] 「中国色 / 系统色」主题切换设置项
-- [ ] 深色模式中国色板（玄色 / 缃色）
-- [ ] 字体子集化瘦身
+- [ ] 字体子集化瘦身（Maple + 仓耳今楷体积较大）
+- [ ] 每日新词上限设置（当前 10；每周词表一次练完需调大）
+- [ ] 系统托盘常驻（需绕过 Flutter 隐藏窗口的 SEGV）
 - [ ] Snap 打包与 CI
 
-*最后更新: 2026-10-10*
+*最后更新: 2026-10-11*
