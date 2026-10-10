@@ -25,15 +25,15 @@ class FlashCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final panel = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      child: _panel(context, theme),
+    );
+    // 仅在正面绑定「点击翻转」；背面保留朗读图标/例句的可点击性。
+    if (flipped) return panel;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onFlip,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: _panel(context, theme),
-        ),
-      ),
+      child: GestureDetector(onTap: onFlip, child: panel),
     );
   }
 
