@@ -18,16 +18,8 @@ class WordCardApp extends StatelessWidget {
         themeMode: ThemeMode.system, // 跟随系统切换
         // 全局窗口标题栏（含 Ubuntu 窗口控制按钮），置于路由之外。
         builder: (context, child) => Scaffold(
-          appBar: YaruWindowTitleBar(
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Image.asset(
-                'assets/icons/wordcard.png',
-                width: 18,
-                height: 18,
-              ),
-            ),
-            title: const Text('WordCard · 读前预习词汇'),
+          appBar: const YaruWindowTitleBar(
+            title: Text('WordCard · 读前预习词汇'),
           ),
           body: child ?? const SizedBox.shrink(),
         ),

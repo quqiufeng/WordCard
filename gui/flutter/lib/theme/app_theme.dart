@@ -17,6 +17,7 @@ abstract final class ChinaColors {
   static const daiLan = Color(0xFF2A3C5C); // 黛蓝（数据强调）
   static const qinglv = Color(0xFF2E8B57); // 青绿（正确）
   static const zhusha = Color(0xFFD92121); // 朱砂红（错误）
+  static const orange = Color(0xFFE95420); // Ubuntu 橙（不会）
   static const warn = Color(0xFFC77A16); // 警示
 }
 

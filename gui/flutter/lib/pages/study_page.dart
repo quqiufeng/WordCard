@@ -191,7 +191,7 @@ class _ReviewPageState extends State<_ReviewPage> {
             Expanded(
               child: FilledButton.icon(
                 style:
-                    FilledButton.styleFrom(backgroundColor: ChinaColors.zhusha),
+                    FilledButton.styleFrom(backgroundColor: ChinaColors.orange),
                 onPressed: _dontKnow,
                 icon: const Icon(Icons.close),
                 label: const Text('不会（空格）'),
