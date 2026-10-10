@@ -44,19 +44,21 @@ def main():
         except Exception:  # noqa: BLE001
             pass
 
-        # 翻译一段文本: {"t":"English..."} -> {"t":..., "zh":...}
+        # 翻译一段文本: {"t":"English...","w":"word"(可选)} -> {"t":..., "zh":...}
         text = req.get('t')
         if text:
-            key = bilingual.trans_key(text)
+            word = req.get('w', '')
+            ckey = (word + '\n' + text) if word else text
+            key = bilingual.trans_key(ckey)
             zh = cache.get(key, '')
             if not zh:
                 try:
-                    zh = translate.translate(text)
+                    zh = translate.translate(text, highlight=word or None)
                 except Exception:  # noqa: BLE001
                     zh = ''
                 if zh:
                     cache[key] = zh
-                    bilingual.append_trans_cache(text, zh)
+                    bilingual.append_trans_cache(ckey, zh)
             print(json.dumps({'t': text, 'zh': zh}, ensure_ascii=False),
                   flush=True)
             continue

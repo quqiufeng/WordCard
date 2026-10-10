@@ -276,12 +276,13 @@ class FlashCard extends StatelessWidget {
                 onTap: onSpeak == null ? null : () => onSpeak!(text),
                 child: Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    text,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: ChinaColors.ink,
-                      height: 1.6,
-                    ),
+                  child: RichText(
+                    text: _enSpan(
+                        text,
+                        theme.textTheme.bodyLarge?.copyWith(
+                          color: ChinaColors.ink,
+                          height: 1.6,
+                        )),
                   ),
                 ),
               ),
@@ -300,12 +301,13 @@ class FlashCard extends StatelessWidget {
         onTap: () => onSpeak!(text),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Text(
-            text,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: ChinaColors.ink,
-              height: 1.6,
-            ),
+          child: RichText(
+            text: _enSpan(
+                text,
+                theme.textTheme.bodyLarge?.copyWith(
+                  color: ChinaColors.ink,
+                  height: 1.6,
+                )),
           ),
         ),
       ),
@@ -339,15 +341,82 @@ class FlashCard extends StatelessWidget {
     );
   }
 
+  /// 英文文本：把目标词（含简单变形）标红。
+  TextSpan _enSpan(String text, TextStyle? base) {
+    final word = card.question.trim();
+    if (word.isEmpty) return TextSpan(text: text, style: base);
+    final re =
+        RegExp(r'\b' + RegExp.escape(word) + r'\w*', caseSensitive: false);
+    final children = <TextSpan>[];
+    var last = 0;
+    for (final m in re.allMatches(text)) {
+      if (m.start > last) {
+        children.add(TextSpan(text: text.substring(last, m.start)));
+      }
+      children.add(TextSpan(
+        text: m.group(0),
+        style: const TextStyle(
+            color: ChinaColors.zhusha, fontWeight: FontWeight.bold),
+      ));
+      last = m.end;
+    }
+    if (last < text.length) {
+      children.add(TextSpan(text: text.substring(last)));
+    }
+    return TextSpan(style: base, children: children);
+  }
+
+  /// 中文文本：把该词中文释义里的词在译文中标红（命中即红），并去掉多余的【】。
+  TextSpan _zhSpan(String text, TextStyle? base) {
+    text = text.replaceAll('【', '').replaceAll('】', '');
+    final terms = _glossTerms();
+    if (terms.isEmpty) return TextSpan(text: text, style: base);
+    final re = RegExp(terms.map(RegExp.escape).join('|'));
+    final children = <TextSpan>[];
+    var last = 0;
+    for (final m in re.allMatches(text)) {
+      if (m.start > last) {
+        children.add(TextSpan(text: text.substring(last, m.start)));
+      }
+      children.add(TextSpan(
+        text: m.group(0),
+        style: const TextStyle(
+            color: ChinaColors.zhusha, fontWeight: FontWeight.bold),
+      ));
+      last = m.end;
+    }
+    if (last < text.length) {
+      children.add(TextSpan(text: text.substring(last)));
+    }
+    return TextSpan(style: base, children: children);
+  }
+
+  /// 从释义中拆出中文词条（去掉词性/英文/标点）。
+  List<String> _glossTerms() {
+    final a = card.answer
+        .replaceAll(RegExp(r'[A-Za-z\.\[\]\(\)]'), ' ')
+        .replaceAll('【', ' ')
+        .replaceAll('】', ' ');
+    final terms = <String>[];
+    for (final t in a.split(RegExp(r'[,，;；、/\s]+'))) {
+      final s = t.trim();
+      if (s.length >= 2 && !terms.contains(s)) terms.add(s);
+    }
+    // 长的词优先，避免短词误命中过多
+    terms.sort((x, y) => y.length.compareTo(x.length));
+    return terms;
+  }
+
   Widget _zhLine(ThemeData theme, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Text(
-        text,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: ChinaColors.muted,
-          height: 1.6,
-        ),
+      child: RichText(
+        text: _zhSpan(
+            text,
+            theme.textTheme.bodyMedium?.copyWith(
+              color: ChinaColors.muted,
+              height: 1.6,
+            )),
       ),
     );
   }

@@ -69,15 +69,20 @@ final class MemoService {
     }
   }
 
-  /// 翻译一段文本（英文→中文）。
-  void translateText(String text, void Function(String zh) onZh) {
+  /// 翻译一段文本（英文→中文）；[word] 用于把对应中文用【】标出。
+  void translateText(String text, void Function(String zh) onZh,
+      {String? word}) {
     if (text.trim().isEmpty) return;
     _pendingText[text] = onZh;
     final p = _proc;
+    final req = <String, dynamic>{
+      't': text,
+      if (word != null && word.isNotEmpty) 'w': word,
+    };
     if (p == null) {
-      start().then((_) => _send({'t': text}));
+      start().then((_) => _send(req));
     } else {
-      _send({'t': text});
+      _send(req);
     }
   }
 

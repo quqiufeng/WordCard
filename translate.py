@@ -60,18 +60,22 @@ def _chat(prompt, system=None, max_tokens=400, temperature=0.2):
 def available():
     return ensure_server() if not _health() else True
 
-def translate(text, system=None):
-    """英译中，只返回中文"""
-    key = ('t', text)
+def translate(text, system=None, highlight=None):
+    """英译中，只返回中文。highlight=目标英文词时，把其对应中文用【】括出。"""
+    key = ('t', text, highlight)
     if key in _cache:
         return _cache[key]
     if not text.strip():
         return ''
-    out = _chat('/no_think Translate the following English into natural, fluent Chinese. '
-                'Output ONLY the Chinese translation. Do NOT add explanations, '
-                'parentheses, notes, alternatives, or any extra content; keep it '
-                'concise and faithful to the source length:\n' + text,
-                system=system or '你是专业英译中译者，只输出简洁忠实的中文译文，不加任何解释、括号或补充说明。')
+    instr = ('/no_think Translate the following English into natural, fluent Chinese. '
+             'Output ONLY the Chinese translation. Do NOT add explanations, '
+             'parentheses, notes, alternatives, or any extra content; keep it '
+             'concise and faithful to the source length.')
+    if highlight:
+        instr += (f' When translating, wrap the Chinese rendering of the word '
+                  f'"{highlight}" in 【】 (keep the brackets).')
+    out = _chat(instr + ':\n' + text,
+                system=system or '你是专业英译中译者，只输出简洁忠实的中文译文，不加任何解释或补充说明。')
     _cache[key] = out
     return out
 
