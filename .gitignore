@@ -243,3 +243,7 @@ src/txt2png.h
 src/test_txt2png.c
 output/*/
 output/
+
+# Flutter/Dart 源码需要纳入版本控制（上方通用 lib/ 规则会误伤 gui/flutter/lib）
+!gui/flutter/lib/
+!gui/flutter/lib/**

@@ -70,16 +70,25 @@ UI 层**只负责展示与交互**，不重写任何学习算法；算法与数�
 
 **主框架 Yaru，Material 3 无缝降级。**
 
-- 顶层用 `YaruThemeBuilder` 全局监听 Ubuntu 系统外观：
+- 顶层用 `YaruTheme` 的 **builder 形式**全局监听 Ubuntu 系统外观
+  （注意：当前 yaru 11 已无 `YaruThemeBuilder`，等价 API 是 `YaruTheme`）：
   ```dart
-  YaruThemeBuilder(
-    builder: (context, yaruTheme, child) => MaterialApp(
-      theme: yaruTheme.theme,
-      darkTheme: yaruTheme.darkTheme,
-      themeMode: yaruTheme.themeMode,
-      home: const MainScreen(),
+  YaruTheme(
+    builder: (context, yaru, child) => MaterialApp(
+      theme: yaru.theme,          // 自动匹配系统浅色主题
+      darkTheme: yaru.darkTheme,  // 自动匹配系统深色主题
+      themeMode: ThemeMode.system, // 跟随系统切换
+      home: const StudyPage(),
     ),
   )
+  ```
+- 窗口标题栏需在启动时初始化：
+  ```dart
+  Future<void> main() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await YaruWindowTitleBar.ensureInitialized();
+    runApp(const WordCardApp());
+  }
   ```
 - **强调色 / 主题模式跟随系统**（当前采用系统色；「中国色」切换作为后续可选设置项）。
 - 当 Yaru 缺少某业务组件时，使用 Material 3 组件，但必须继承 YaruTheme 提供的 `ThemeData`，
@@ -184,7 +193,7 @@ gui/flutter/
 ├── pubspec.yaml                 # 依赖 + 字体资产声明
 ├── assets/fonts/                # MapleMono-NF-CN-{Regular,Medium,SemiBold,Bold}.ttf
 ├── lib/
-│   ├── main.dart                # YaruThemeBuilder 入口
+│   ├── main.dart                # YaruTheme 入口 + YaruWindowTitleBar.ensureInitialized
 │   ├── app.dart                 # MaterialApp + 路由
 │   ├── theme/
 │   │   ├── app_theme.dart       # Yaru 融合主题 + 中国色语义色
@@ -195,11 +204,13 @@ gui/flutter/
 │   │   └── structs.dart         # C 结构体布局
 │   ├── state/
 │   │   └── study_session.dart   # 队列 / 当前卡 / 统计
+│   ├── pages/
+│   │   ├── study_page.dart      # 主页面（YaruMasterDetailPage：复习/队列/统计/导入）
+│   │   └── import_page.dart     # 电子书导入（占位）
 │   └── widgets/
 │       ├── flash_card.dart
 │       ├── review_queue.dart
-│       ├── stats_widget.dart
-│       └── book_import.dart
+│       └── stats_widget.dart
 ├── linux/                       # flutter create 生成（GTK 运行器）
 └── snap/                        # snapcraft.yaml（分发包 .so + 字体）
 ```
@@ -217,7 +228,31 @@ gui/flutter/
 
 ---
 
-## 十、待办 / 后续
+## 十、构建 / 运行 / 桌面快捷方式
+
+依赖版本（**重要**）：`yaru: ^10.2.0`。
+yaru 11.0.0 需要 `platform 3.2.0` 的新 API，而其依赖 `platform_linux 0.1.2+1`
+仍在调用 3.2.0 已移除的 legacy `Platform.environment`，二者不兼容；
+故锁回 10.2.0，并在 `pubspec.yaml` 中 `dependency_overrides: platform: 3.1.6`。
+
+```bash
+# 构建（默认 Flutter 位于 ~/development/flutter，可 FLUTTER_HOME 覆盖）
+gui/flutter/build.sh            # 编译 C 核心 + flutter build linux --release
+
+# 运行（未构建会先自动构建）
+gui/flutter/run.sh
+```
+
+产物：`gui/flutter/build/linux/x64/release/bundle/wordcard`。
+`run.sh` 已导出 `LD_LIBRARY_PATH` 指向 `src/`、`libs/`、`voice/libs/` 以定位 C 核心库。
+
+桌面快捷方式：`~/Desktop/wordcard.desktop`（已 `chmod +x`，同时装入 `~/.local/share/applications/`），
+`Exec` 指向 `run.sh`，`Icon` 指向 `assets/icons/wordcard.png`（由 `backup.sh` 生成并缩放）。
+点击即可启动。
+
+---
+
+## 十一、待办 / 后续
 
 - [ ] 复习队列页跑通 FFI 闭环（首个里程碑）
 - [ ] 电子书导入面板（对接 `importer`）
