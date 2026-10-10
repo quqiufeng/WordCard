@@ -31,6 +31,7 @@ class StudySession extends ChangeNotifier {
   MasterySnapshot? _lastResult;
   String? _error;
   bool _loaded = false;
+  List<int>? _lastIds; // startItems 的来源，用于 restart
 
   int get total => _queue.length;
   int get done => _index;
@@ -53,6 +54,7 @@ class StudySession extends ChangeNotifier {
 
   /// 加载今日队列。
   void start({int limit = 50}) {
+    _lastIds = null;
     _queue.clear();
     _index = 0;
     _flipped = false;
@@ -70,6 +72,7 @@ class StudySession extends ChangeNotifier {
 
   /// 用指定的学习项开始（如某任务的整份词表，用于听写）。
   void startItems(List<int> itemIds, {int mode = 1}) {
+    _lastIds = List<int>.of(itemIds);
     _queue
       ..clear()
       ..addAll(itemIds.map((id) => QueueCard(id, mode)));
@@ -79,6 +82,15 @@ class StudySession extends ChangeNotifier {
     _error = null;
     _loaded = true;
     notifyListeners();
+  }
+
+  /// 重新开始（沿用上次来源：任务词表或今日队列）。
+  void restart() {
+    if (_lastIds != null) {
+      startItems(_lastIds!);
+    } else {
+      start();
+    }
   }
 
   /// 翻转卡片。

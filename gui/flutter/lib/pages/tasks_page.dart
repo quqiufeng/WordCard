@@ -9,10 +9,16 @@ import 'dictation_exam.dart';
 /// 记忆任务：每个电子书/词表导入 = 一个任务（在 items 的 tags 之上分组的一层）。
 /// 点任务 → 翻页查看其所有单词；任务可删除 / 听写整份。
 class TasksPage extends StatefulWidget {
-  const TasksPage({super.key, required this.engine, this.onSpeak});
+  const TasksPage({
+    super.key,
+    required this.engine,
+    this.onSpeak,
+    this.onStudy,
+  });
 
   final WordCardEngine engine;
   final void Function(String text)? onSpeak;
+  final void Function(List<int> itemIds, String name)? onStudy;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -66,6 +72,19 @@ class _TasksPageState extends State<TasksPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                FilledButton.icon(
+                  onPressed: widget.onStudy == null
+                      ? null
+                      : () => widget.onStudy!(
+                          widget.engine
+                              .itemsByTag(t.tag)
+                              .map((e) => e.id)
+                              .toList(),
+                          t.name),
+                  icon: const Icon(Icons.play_arrow, size: 16),
+                  label: const Text('学习'),
+                ),
+                const SizedBox(width: 8),
                 FilledButton.tonalIcon(
                   onPressed: () => _startExam(context, t.tag, t.name),
                   icon: const Icon(Icons.keyboard_alt_outlined, size: 16),
@@ -116,6 +135,13 @@ class _TasksPageState extends State<TasksPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (items.isNotEmpty && widget.onStudy != null)
+                IconButton(
+                  tooltip: '学习这组单词',
+                  icon: const Icon(Icons.play_arrow, color: ChinaColors.qinglv),
+                  onPressed: () => widget.onStudy!(
+                      items.map((e) => e.id).toList(), _nameOf(tag)),
+                ),
               if (items.isNotEmpty)
                 IconButton(
                   tooltip: '朗读当前页所有单词',
