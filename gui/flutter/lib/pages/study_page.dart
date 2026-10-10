@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:yaru/yaru.dart';
 
 import '../ffi/wordcard.dart';
 import '../state/study_session.dart';
@@ -11,7 +10,7 @@ import '../widgets/review_queue.dart';
 import '../widgets/stats_widget.dart';
 import 'import_page.dart';
 
-/// 主页面：初始化引擎与会话，承载 Yaru 主从布局。
+/// 主页面：初始化引擎与会话，承载可折叠侧栏布局。
 class StudyPage extends StatefulWidget {
   const StudyPage({super.key});
 
@@ -21,6 +20,7 @@ class StudyPage extends StatefulWidget {
 
 class _StudyPageState extends State<StudyPage> {
   static const _titles = ['复习', '队列', '统计', '导入'];
+  static const _navIds = ['review', 'queue', 'stats', 'import'];
   static const _icons = [
     Icons.school_outlined,
     Icons.list_alt_outlined,
@@ -32,10 +32,17 @@ class _StudyPageState extends State<StudyPage> {
   StudySession? _session;
   String? _error;
   int _index = 0;
+  bool _showNav = true;
 
   @override
   void initState() {
     super.initState();
+    final a = Automation.instance;
+    a.register('nav.toggle', () => setState(() => _showNav = !_showNav));
+    for (var i = 0; i < _navIds.length; i++) {
+      final idx = i;
+      a.register('nav.${_navIds[i]}', () => setState(() => _index = idx));
+    }
     _init();
   }
 
@@ -63,24 +70,70 @@ class _StudyPageState extends State<StudyPage> {
     if (session == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    return YaruMasterDetailPage(
-      length: _titles.length,
-      initialIndex: _index,
-      onSelected: (i) {
-        if (i != null) _index = i;
-      },
-      tileBuilder: (context, index, selected, width) => YaruMasterTile(
-        leading: Icon(_icons[index]),
-        title: Text(_titles[index]),
+    return Row(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: _showNav ? 220 : 0,
+          child: _showNav ? _nav(context) : const SizedBox.shrink(),
+        ),
+        if (_showNav) const VerticalDivider(width: 1),
+        Expanded(
+          child: Column(
+            children: [
+              _header(context),
+              Expanded(child: _content(session)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _nav(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: ListView(
+        primary: false,
+        children: [
+          for (var i = 0; i < _titles.length; i++)
+            ListTile(
+              selected: i == _index,
+              selectedTileColor: ChinaColors.shuangdi,
+              leading: Icon(_icons[i]),
+              title: Text(_titles[i]),
+              onTap: () => Automation.instance.invoke('nav.${_navIds[i]}'),
+            ),
+        ],
       ),
-      pageBuilder: (context, index) => switch (index) {
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: _showNav ? '隐藏侧栏 (nav.toggle)' : '显示侧栏 (nav.toggle)',
+            icon: Icon(_showNav ? Icons.menu_open : Icons.menu),
+            onPressed: () => Automation.instance.invoke('nav.toggle'),
+          ),
+          Text(_titles[_index], style: theme.textTheme.titleMedium),
+        ],
+      ),
+    );
+  }
+
+  Widget _content(StudySession session) => switch (_index) {
         0 => _ReviewPage(session: session),
         1 => _QueuePage(session: session),
         2 => _StatsPage(session: session, engine: _engine!),
         _ => ImportPage(engine: _engine!),
-      },
-    );
-  }
+      };
 
   Widget _errorView(BuildContext context) {
     final theme = Theme.of(context);
