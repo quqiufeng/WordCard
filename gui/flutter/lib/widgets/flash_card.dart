@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../state/study_session.dart';
@@ -14,6 +15,7 @@ class FlashCard extends StatelessWidget {
     required this.onFlip,
     this.onSpeak,
     this.loading = false,
+    this.speaking,
   });
 
   final ActiveCard card;
@@ -25,6 +27,9 @@ class FlashCard extends StatelessWidget {
 
   /// 是否正在生成翻译/助记（显示等待动画）。
   final bool loading;
+
+  /// 正在朗读的文本（合成期间段落按钮显示等待动画）。
+  final ValueListenable<String?>? speaking;
 
   @override
   Widget build(BuildContext context) {
@@ -262,15 +267,7 @@ class FlashCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconButton(
-            tooltip: '朗读整段',
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-            icon: const Icon(Icons.volume_up,
-                size: 18, color: ChinaColors.daiLan),
-            onPressed: onSpeak == null ? null : () => onSpeak!(text),
-          ),
+          _speakButton(theme, text),
           const SizedBox(width: 2),
           Expanded(
             child: MouseRegion(
@@ -312,6 +309,33 @@ class FlashCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// 段落朗读按钮：音频合成期间显示等待动画。
+  Widget _speakButton(ThemeData theme, String text) {
+    final button = IconButton(
+      tooltip: '朗读整段',
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+      icon: const Icon(Icons.volume_up, size: 18, color: ChinaColors.daiLan),
+      onPressed: onSpeak == null ? null : () => onSpeak!(text),
+    );
+    final speaking = this.speaking;
+    if (speaking == null) return button;
+    return ValueListenableBuilder<String?>(
+      valueListenable: speaking,
+      builder: (_, playing, __) => playing == text
+          ? const SizedBox(
+              width: 30,
+              height: 30,
+              child: Padding(
+                padding: EdgeInsets.all(7),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : button,
     );
   }
 

@@ -341,6 +341,7 @@ class _ReviewPageState extends State<_ReviewPage> {
                 onFlip: () => Automation.instance.invoke('review.flip'),
                 onSpeak: (t) => TtsService.instance.speak(t),
                 loading: _pending > 0,
+                speaking: TtsService.instance.busy,
               ),
             ),
             const SizedBox(height: 16),

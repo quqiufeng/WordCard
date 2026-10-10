@@ -83,8 +83,9 @@ def main():
             if not os.path.exists(path):
                 tts.synthesize(text, path)
                 _amplify(path, GAIN)
+            print(f'PLAY\t{text}', flush=True)  # 合成完成、即将播放
             subprocess.run([PLAY, path], check=False)
-            print(f'OK {text}', flush=True)
+            print(f'OK\t{text}', flush=True)
         except Exception as e:  # noqa: BLE001
             print(f'ERR {e}', file=sys.stderr, flush=True)
 
