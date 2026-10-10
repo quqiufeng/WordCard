@@ -43,19 +43,51 @@ def split_sentences(para):
             if len(s.strip()) >= 15]
 
 
+def _prose_score(p):
+    """正文段落评分：句末标点权重高；标题/目录/列表/过长均扣分。"""
+    words = len(re.findall(r'[A-Za-z]+', p))
+    punct = len(re.findall(r'[.!?]', p))
+    bullets = p.count('•')
+    score = min(words, 60) + punct * 15
+    if punct == 0:
+        score -= 30            # 无句末标点，疑似标题
+    if len(p) < 40:
+        score -= 15            # 过短
+    if len(p) > 500:
+        score -= 40            # 过长（整章/索引）
+    score -= bullets * 4       # 列表项（多为目录/要点）
+    return score
+
+
+def _clip(p, max_chars=360):
+    """截到不超过 max_chars，尽量落在句末（避免切出极短片段）。"""
+    if len(p) <= max_chars:
+        return p
+    cut = p[:max_chars]
+    ends = [m.end() for m in re.finditer(r'[.!?](\s|$)', cut)]
+    ends = [e for e in ends if e >= 120]
+    if ends:
+        return cut[:ends[-1]].strip()
+    return cut.rstrip() + '…'
+
+
 def find_context(text, word, max_sent=2):
-    """返回 (段落原文, [例句原文, ...])。"""
-    para_hit = ''
+    """返回 (段落原文, [例句原文, ...])。
+
+    在含该词的段落中选「正文感」最强的一段（跳过标题/目录，长度适中），
+    再从该段及后续匹配段抽取例句。
+    """
+    matches = [p for p in split_paragraphs(text) if contains_word(p, word)]
+    if not matches:
+        return '', []
+    para = _clip(max(matches, key=_prose_score))
     sents = []
-    for p in split_paragraphs(text):
-        if contains_word(p, word):
-            if not para_hit:
-                para_hit = p
-            for s in split_sentences(p):
-                if contains_word(s, word) and s not in sents:
-                    sents.append(s)
-                    if len(sents) >= max_sent:
-                        break
-        if para_hit and len(sents) >= max_sent:
+    for p in [para] + [m for m in matches if m != para]:
+        for s in split_sentences(p):
+            if contains_word(s, word) and s not in sents:
+                sents.append(s)
+                if len(sents) >= max_sent:
+                    break
+        if len(sents) >= max_sent:
             break
-    return para_hit, sents
+    return para, sents
