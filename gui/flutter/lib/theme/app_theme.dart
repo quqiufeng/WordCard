@@ -2,6 +2,19 @@ import 'package:flutter/material.dart';
 
 import 'fonts.dart';
 
+/// Kami 设计规范配色（暖米纸感 · 油墨蓝单一强调色）。
+/// 参考 https://github.com/tw93/Kami
+abstract final class Kami {
+  static const parchment = Color(0xFFF5F4ED); // 底：暖米（不用纯白）
+  static const surface = Color(0xFFFBFAF4); // 卡片面
+  static const inkBlue = Color(0xFF1B365D); // 强调（唯一）
+  static const ink = Color(0xFF2B2A26); // 正文（暖黑）
+  static const muted = Color(0xFF6B665C); // 次要文字（暖灰）
+  static const faint = Color(0xFF9A948A); // 更弱
+  static const hairline = Color(0xFFE4DFD3); // 细线
+  static const tint = Color(0xFFF1EFE6); // 浅暖底
+}
+
 /// 中国传统色（**仅作语义数据色**，不覆盖 Yaru / 系统主色）。
 ///
 /// 取自 `src/dotui.h` 与 `vocab_card.py` 的「中国色·霜地」浅色板。

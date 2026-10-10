@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 
 import '../state/study_session.dart';
 import '../theme/app_theme.dart';
+import '../theme/fonts.dart';
 
-/// 闪卡：正面显示单词/问题，背面显示释义与解析。
+/// 闪卡：正面单词，背面释义 + 段落/例句 + 用法。
 ///
-/// 点击卡片任意处翻转；不硬编码尺寸，随窗口自适应。
+/// 排版遵循 Kami 规范：暖米纸感底、单一油墨蓝强调、衬线（霞鹜文楷）、
+/// 大量留白、细线分隔、无渐变与阴影。
 class FlashCard extends StatelessWidget {
   const FlashCard({
     super.key,
@@ -21,24 +23,16 @@ class FlashCard extends StatelessWidget {
   final ActiveCard card;
   final bool flipped;
   final VoidCallback onFlip;
-
-  /// 点击英文段落/例句时回调（朗读）。
   final void Function(String text)? onSpeak;
-
-  /// 是否正在生成翻译/助记（显示等待动画）。
   final bool loading;
-
-  /// 正在朗读的文本（合成期间段落按钮显示等待动画）。
   final ValueListenable<String?>? speaking;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final panel = AnimatedSwitcher(
-      duration: const Duration(milliseconds: 180),
-      child: _panel(context, theme),
+      duration: const Duration(milliseconds: 200),
+      child: _panel(context),
     );
-    // 仅在正面绑定「点击翻转」；背面保留朗读图标/例句的可点击性。
     if (flipped) return panel;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -46,68 +40,69 @@ class FlashCard extends StatelessWidget {
     );
   }
 
-  Widget _panel(BuildContext context, ThemeData theme) {
-    return DecoratedBox(
+  Widget _panel(BuildContext context) {
+    return Container(
       key: ValueKey(flipped),
+      constraints: const BoxConstraints(minHeight: 240),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [ChinaColors.nenjulv, ChinaColors.cardBottom],
-        ),
+        color: Kami.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ChinaColors.qiuxiang, width: 2),
+        border: Border.all(color: Kami.hairline),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 220),
-          child: Center(
-            child: SingleChildScrollView(
-              child: flipped
-                  ? _back(context, theme)
-                  : _front(context, theme),
-            ),
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
+      child: Center(
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: flipped ? _back(context) : _front(context),
           ),
         ),
       ),
     );
   }
 
-  Widget _front(BuildContext context, ThemeData theme) {
+  TextStyle _serif(double size, FontWeight w, Color c) => TextStyle(
+      fontFamily: AppFonts.wenKai,
+      fontSize: size,
+      fontWeight: w,
+      color: c,
+      height: 1.6);
+
+  Widget _front(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _modeBadge(theme),
-        const SizedBox(height: 20),
+        Text(
+          card.modeName,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: Kami.muted,
+            letterSpacing: 2,
+          ),
+        ),
+        const SizedBox(height: 28),
         Text(
           card.question,
           textAlign: TextAlign.center,
-          style: theme.textTheme.displaySmall?.copyWith(
-            color: ChinaColors.ink,
-            fontWeight: FontWeight.w600,
-          ),
+          style: _serif(46, FontWeight.w600, Kami.ink),
         ),
         if (card.hint.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             card.hint,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: ChinaColors.muted,
-            ),
+            style: _serif(16, FontWeight.w400, Kami.muted),
           ),
         ],
-        const SizedBox(height: 24),
-        Text(
-          '点击卡片查看释义',
-          style: theme.textTheme.bodySmall?.copyWith(color: ChinaColors.dim),
-        ),
+        const SizedBox(height: 40),
+        Text('点击卡片查看释义',
+            style: theme.textTheme.labelSmall?.copyWith(color: Kami.faint)),
       ],
     );
   }
 
-  Widget _back(BuildContext context, ThemeData theme) {
+  Widget _back(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -115,41 +110,33 @@ class FlashCard extends StatelessWidget {
         Text(
           card.question,
           textAlign: TextAlign.center,
-          style: theme.textTheme.titleLarge?.copyWith(
-            color: ChinaColors.ink,
-            fontWeight: FontWeight.w600,
-          ),
+          style: _serif(26, FontWeight.w600, Kami.inkBlue),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         Text(
           card.answer,
           textAlign: TextAlign.center,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            color: ChinaColors.daiLan,
-          ),
+          style: _serif(24, FontWeight.w500, Kami.ink),
         ),
         if (card.explanation.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          const Divider(color: Kami.hairline, height: 1),
           const SizedBox(height: 20),
-          const Divider(color: ChinaColors.border),
-          const SizedBox(height: 8),
           ..._explanationLines(theme),
         ],
       ],
     );
   }
 
-  /// 把 explanation 按行拆开：
-  /// 【用法】高亮；【段落】整段一个朗读图标；例句行直接点读（无图标）；中文行作对照。
-  /// 无标记（旧卡片）时，把连续的英文行合并为一段朗读。
   List<Widget> _explanationLines(ThemeData theme) {
     final cjk = RegExp(r'[\u4e00-\u9fff]');
     final latin = RegExp(r'[A-Za-z]');
+    bool isEn(String s) => latin.hasMatch(s) && !cjk.hasMatch(s);
     final lines = card.explanation
         .split('\n')
         .map((l) => l.trim())
         .where((l) => l.isNotEmpty)
         .toList();
-    bool isEn(String s) => latin.hasMatch(s) && !cjk.hasMatch(s);
     final hasMarkers = card.explanation.contains('【段落】') ||
         card.explanation.contains('【例句】');
     final out = <Widget>[];
@@ -158,14 +145,14 @@ class FlashCard extends StatelessWidget {
       final buf = <String>[];
       void flush() {
         if (buf.isEmpty) return;
-        out.add(_speakBlock(theme, buf.join(' ')));
+        out.add(_paragraph(theme, buf.join(' ')));
         buf.clear();
       }
 
       for (final line in lines) {
         if (line.startsWith('【用法】')) {
           flush();
-          out.add(_usageBox(theme, line.substring('【用法】'.length).trim()));
+          out.add(_usage(theme, line.substring('【用法】'.length).trim()));
         } else if (onSpeak != null && isEn(line)) {
           buf.add(line);
         } else {
@@ -181,25 +168,25 @@ class FlashCard extends StatelessWidget {
     var seenPara = false;
     for (final line in lines) {
       if (line.startsWith('【用法】')) {
-        out.add(_usageBox(theme, line.substring('【用法】'.length).trim()));
+        out.add(_usage(theme, line.substring('【用法】'.length).trim()));
       } else if (line.startsWith('【段落】')) {
         seenPara = true;
-        out.add(_speakBlock(theme, line.substring('【段落】'.length).trim()));
+        out.add(_paragraph(theme, line.substring('【段落】'.length).trim()));
       } else if (line.startsWith('【例句】')) {
         out.add(Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 2),
+          padding: const EdgeInsets.only(top: 22, bottom: 6),
           child: Text('例句',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: ChinaColors.dim,
-                letterSpacing: 1,
+                color: Kami.faint,
+                letterSpacing: 3,
               )),
         ));
       } else if (isEn(line) && onSpeak != null) {
         if (!seenPara) {
           seenPara = true;
-          out.add(_speakBlock(theme, line));
+          out.add(_paragraph(theme, line));
         } else {
-          out.add(_speakLine(theme, line));
+          out.add(_sentence(theme, line));
         }
       } else {
         out.add(_zhLine(theme, line));
@@ -209,81 +196,23 @@ class FlashCard extends StatelessWidget {
     return out;
   }
 
-  /// 翻译/助记生成中的等待动画。
-  Widget _loadingRow(ThemeData theme) {
+  /// 段落：段首一个朗读图标；目标词以油墨蓝强调。
+  Widget _paragraph(ThemeData theme, String text) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Row(
-        children: [
-          const SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 8),
-          Text('翻译中…',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: ChinaColors.muted,
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _usageBox(ThemeData theme, String text) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: ChinaColors.shuangdi,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ChinaColors.border),
-      ),
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lightbulb_outline,
-              size: 16, color: ChinaColors.daiLan),
+          _speakButton(text),
           const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: ChinaColors.daiLan,
-                height: 1.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 段落：整段一个朗读图标（点图标或整段文字都朗读整段）。
-  Widget _speakBlock(ThemeData theme, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _speakButton(theme, text),
-          const SizedBox(width: 2),
           Expanded(
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: onSpeak == null ? null : () => onSpeak!(text),
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: RichText(
-                    text: _enSpan(
-                        text,
-                        theme.textTheme.bodyLarge?.copyWith(
-                          color: ChinaColors.ink,
-                          height: 1.6,
-                        )),
-                  ),
+                  padding: const EdgeInsets.only(top: 6),
+                  child: RichText(text: _enSpan(text)),
                 ),
               ),
             ),
@@ -293,35 +222,61 @@ class FlashCard extends StatelessWidget {
     );
   }
 
-  /// 例句：直接点读，不带图标。
-  Widget _speakLine(ThemeData theme, String text) {
+  /// 例句：直接点读，无图标。
+  Widget _sentence(ThemeData theme, String text) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => onSpeak!(text),
+        onTap: onSpeak == null ? null : () => onSpeak!(text),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: RichText(
-            text: _enSpan(
-                text,
-                theme.textTheme.bodyLarge?.copyWith(
-                  color: ChinaColors.ink,
-                  height: 1.6,
-                )),
-          ),
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: RichText(text: _enSpan(text)),
         ),
       ),
     );
   }
 
-  /// 段落朗读按钮：音频合成期间显示等待动画。
-  Widget _speakButton(ThemeData theme, String text) {
+  Widget _zhLine(ThemeData theme, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: RichText(text: _zhSpan(text)),
+    );
+  }
+
+  Widget _usage(ThemeData theme, String text) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: const BoxDecoration(
+        color: Kami.tint,
+        border: Border(left: BorderSide(color: Kami.inkBlue, width: 3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('用法  ',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: Kami.inkBlue,
+                letterSpacing: 2,
+              )),
+          Expanded(
+            child: Text(
+              text,
+              style: _serif(15, FontWeight.w400, Kami.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _speakButton(String text) {
     final button = IconButton(
       tooltip: '朗读整段',
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-      icon: const Icon(Icons.volume_up, size: 18, color: ChinaColors.daiLan),
+      icon: const Icon(Icons.volume_up, size: 18, color: Kami.inkBlue),
       onPressed: onSpeak == null ? null : () => onSpeak!(text),
     );
     final speaking = this.speaking;
@@ -341,8 +296,29 @@ class FlashCard extends StatelessWidget {
     );
   }
 
-  /// 英文文本：把目标词（含简单变形）标红。
-  TextSpan _enSpan(String text, TextStyle? base) {
+  Widget _loadingRow(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 8),
+          Text('翻译中…',
+              style: theme.textTheme.bodySmall?.copyWith(color: Kami.muted)),
+        ],
+      ),
+    );
+  }
+
+  /// 英文文本：目标词（含简单变形）用油墨蓝强调。
+  TextSpan _enSpan(String text) {
+    const base = TextStyle(
+        fontFamily: AppFonts.wenKai, fontSize: 17, color: Kami.ink,
+        height: 1.8);
     final word = card.question.trim();
     if (word.isEmpty) return TextSpan(text: text, style: base);
     final re =
@@ -356,7 +332,7 @@ class FlashCard extends StatelessWidget {
       children.add(TextSpan(
         text: m.group(0),
         style: const TextStyle(
-            color: ChinaColors.zhusha, fontWeight: FontWeight.bold),
+            color: Kami.inkBlue, fontWeight: FontWeight.w600),
       ));
       last = m.end;
     }
@@ -366,8 +342,11 @@ class FlashCard extends StatelessWidget {
     return TextSpan(style: base, children: children);
   }
 
-  /// 中文文本：把该词中文释义里的词在译文中标红（命中即红），并去掉多余的【】。
-  TextSpan _zhSpan(String text, TextStyle? base) {
+  /// 中文文本：释义词命中处用油墨蓝强调。
+  TextSpan _zhSpan(String text) {
+    const base = TextStyle(
+        fontFamily: AppFonts.wenKai, fontSize: 15, color: Kami.muted,
+        height: 1.7);
     text = text.replaceAll('【', '').replaceAll('】', '');
     final terms = _glossTerms();
     if (terms.isEmpty) return TextSpan(text: text, style: base);
@@ -380,8 +359,7 @@ class FlashCard extends StatelessWidget {
       }
       children.add(TextSpan(
         text: m.group(0),
-        style: const TextStyle(
-            color: ChinaColors.zhusha, fontWeight: FontWeight.bold),
+        style: const TextStyle(color: Kami.inkBlue, fontWeight: FontWeight.w600),
       ));
       last = m.end;
     }
@@ -391,7 +369,6 @@ class FlashCard extends StatelessWidget {
     return TextSpan(style: base, children: children);
   }
 
-  /// 从释义中拆出中文词条（去掉词性/英文/标点）。
   List<String> _glossTerms() {
     final a = card.answer
         .replaceAll(RegExp(r'[A-Za-z\.\[\]\(\)]'), ' ')
@@ -402,41 +379,7 @@ class FlashCard extends StatelessWidget {
       final s = t.trim();
       if (s.length >= 2 && !terms.contains(s)) terms.add(s);
     }
-    // 长的词优先，避免短词误命中过多
     terms.sort((x, y) => y.length.compareTo(x.length));
     return terms;
-  }
-
-  Widget _zhLine(ThemeData theme, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: RichText(
-        text: _zhSpan(
-            text,
-            theme.textTheme.bodyMedium?.copyWith(
-              color: ChinaColors.muted,
-              height: 1.6,
-            )),
-      ),
-    );
-  }
-
-  Widget _modeBadge(ThemeData theme) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: ChinaColors.shuangdi,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: ChinaColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Text(
-          card.modeName,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: ChinaColors.muted,
-          ),
-        ),
-      ),
-    );
   }
 }

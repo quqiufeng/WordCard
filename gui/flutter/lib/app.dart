@@ -17,13 +17,14 @@ class WordCardApp extends StatelessWidget {
         title: 'WordCard',
         debugShowCheckedModeBanner: false,
         navigatorKey: appNavigatorKey,
-        theme: AppTheme.apply(yaru.theme), // 自动匹配系统浅色主题
-        darkTheme: AppTheme.apply(yaru.darkTheme), // 自动匹配系统深色主题
-        themeMode: ThemeMode.system, // 跟随系统切换
+        theme: AppTheme.apply(yaru.theme),
+        darkTheme: AppTheme.apply(yaru.darkTheme),
+        themeMode: ThemeMode.system,
         // 全局窗口标题栏（含 Ubuntu 窗口控制按钮），置于路由之外。
         builder: (context, child) => Scaffold(
+          backgroundColor: Kami.parchment,
           appBar: const YaruWindowTitleBar(
-            // 关闭 → 最小化到任务栏（不销毁窗口，避免崩溃/自动重启）
+            // 关闭 → 最小化到任务栏/托盘（不销毁窗口，避免崩溃/自动重启）
             onClose: YaruWindow.minimize,
             title: Text('WordCard · 读前预习词汇'),
           ),
