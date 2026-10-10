@@ -743,6 +743,22 @@ item_entry_t* wc_find_item_by_id(wordcard_db_t *db, uint32_t item_id) {
     return NULL;
 }
 
+size_t wc_item_count(wordcard_db_t *db) {
+    if (!db) return 0;
+    LOCK();
+    size_t n = db->item_count;
+    UNLOCK();
+    return n;
+}
+
+uint32_t wc_item_id_at(wordcard_db_t *db, size_t index) {
+    if (!db) return 0;
+    LOCK();
+    uint32_t id = (index < db->item_count) ? db->items[index].id : 0;
+    UNLOCK();
+    return id;
+}
+
 int wc_update_item_answer(wordcard_db_t *db, uint32_t item_id, const char *answer) {
     if (!db || !answer) return WC_ERR_INVALID;
     LOCK();

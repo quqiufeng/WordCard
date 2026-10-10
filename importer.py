@@ -490,15 +490,30 @@ def import_book(book_path, db_path='data/wordcard.db', user_id=1, max_words=200)
     words = extract_words(text, max_words)
     print(f'  Found {len(words)} unique words')
 
+    # 释义优先查 ECDICT（离线），空缺则留待后续 LLM
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        'tools'))
+        import bilingual
+        defs = bilingual.lookup_many([w for w, _ in words])
+    except Exception:
+        defs = {}
+
     db = engine.WordCardDB.open(db_path)
     try:
         src_id = 0
         added = 0
         for word, context in words:
+            d = defs.get(word.lower())
+            answer = hint = ''
+            if d:
+                hint, pos, zh, _en = d
+                answer = f'{pos} {zh}'.strip() if zh else ''
             item_id = db.add_item(
                 question=word,
-                answer='',
+                answer=answer,
                 explanation=context,
+                hint=hint,
                 source_id=src_id,
                 tags=f'book:{title}',
             )

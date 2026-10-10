@@ -187,6 +187,25 @@ class WordCardDB:
         return self._lib.wc_update_item_explanation(self._handle, item_id,
                                                     explanation.encode('utf-8'))
 
+    def item_count(self):
+        self._lib.wc_item_count.argtypes = [c_void_p]
+        self._lib.wc_item_count.restype = c_size_t
+        return self._lib.wc_item_count(self._handle)
+
+    def item_id_at(self, index):
+        self._lib.wc_item_id_at.argtypes = [c_void_p, c_size_t]
+        self._lib.wc_item_id_at.restype = c_uint32
+        return self._lib.wc_item_id_at(self._handle, index)
+
+    def all_items(self):
+        """遍历所有学习项，返回 ItemEntry 列表。"""
+        out = []
+        for i in range(self.item_count()):
+            it = self.find_item(item_id=self.item_id_at(i))
+            if it:
+                out.append(it)
+        return out
+
     def find_item(self, question=None, item_id=None):
         if question:
             self._lib.wc_find_item_by_question.argtypes = [c_void_p, c_char_p]
