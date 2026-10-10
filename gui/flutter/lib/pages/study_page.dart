@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,6 +8,7 @@ import '../state/study_session.dart';
 import '../theme/app_theme.dart';
 import '../automation/automation.dart';
 import '../tts.dart';
+import '../memo_service.dart';
 import '../widgets/flash_card.dart';
 import '../widgets/review_queue.dart';
 import '../widgets/stats_widget.dart';
@@ -174,6 +177,13 @@ class _ReviewPage extends StatefulWidget {
 
 class _ReviewPageState extends State<_ReviewPage> {
   StudySession get s => widget.session;
+  final Set<String> _memoRequested = {};
+
+  static String _truncUtf8(String s, int maxBytes) {
+    final b = utf8.encode(s);
+    if (b.length <= maxBytes) return s;
+    return utf8.decode(b.sublist(0, maxBytes), allowMalformed: true);
+  }
 
   @override
   void initState() {
@@ -206,6 +216,29 @@ class _ReviewPageState extends State<_ReviewPage> {
     s.grade(1);
   }
 
+  /// 当前卡片若无「用法」助记，则按需向常驻服务请求并回填。
+  void _ensureMemo() {
+    if (!mounted) return;
+    final card = s.current;
+    if (card == null) return;
+    if (card.explanation.startsWith('【用法】')) return;
+    final word = card.question;
+    if (word.isEmpty || _memoRequested.contains(word)) return;
+    _memoRequested.add(word);
+    final ctx = card.explanation.split('\n').first;
+    MemoService.instance.request(word, ctx, (memo) {
+      if (!mounted || memo.isEmpty) return;
+      final id = s.engine.itemIdByQuestion(word);
+      if (id == null) return;
+      final cur = s.engine.itemById(id);
+      final old = cur?.explanationText ?? '';
+      if (old.startsWith('【用法】')) return;
+      s.engine.updateItemExplanation(id, _truncUtf8('【用法】$memo\n$old', 1000));
+      s.engine.save();
+      if (mounted) setState(() {});
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -221,6 +254,7 @@ class _ReviewPageState extends State<_ReviewPage> {
           'mode': s.current?.modeName,
           'lastOverall': s.lastResult?.overall,
         });
+        WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMemo());
         return CallbackShortcuts(
           bindings: {
             // 空格 = 不会；方向右键 = 记得并下一张
