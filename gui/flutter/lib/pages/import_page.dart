@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../ebook_import.dart';
 import '../ffi/wordcard.dart';
 import '../theme/app_theme.dart';
 import '../wordlist.dart';
@@ -27,6 +28,42 @@ class _ImportPageState extends State<ImportPage> {
   int _done = 0;
   int _total = 0;
   String? _error;
+
+  String? _ebookStage;
+  String? _ebookMsg;
+
+  Future<void> _importEbook() async {
+    final importer = EbookImporter(widget.engine);
+    final path = await importer.pickFile();
+    if (path == null || !mounted) return;
+    setState(() {
+      _ebookStage = '解析中';
+      _ebookMsg = null;
+      _error = null;
+    });
+    try {
+      final extract = await importer.extract(path);
+      if (!mounted) return;
+      setState(() => _ebookStage = '导入中');
+      final added = await importer.importWords(
+        extract,
+        onProgress: (d, t) {
+          if (mounted) setState(() => _ebookMsg = '$d/$t');
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _ebookStage = null;
+        _ebookMsg = '《${extract.title}》新增 $added 词（共 ${extract.words.length}）';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _ebookStage = null;
+        _error = e.toString();
+      });
+    }
+  }
 
   Future<void> _import(WordlistInfo info) async {
     setState(() {
@@ -105,10 +142,20 @@ class _ImportPageState extends State<ImportPage> {
           leading: const Icon(Icons.menu_book_outlined),
           title: const Text('PDF / MOBI / AZW3 / EPUB / MD'),
           subtitle: Text(
-            '命令行: python3 cli.py import <book>',
+            _ebookStage != null
+                ? '$_ebookStage ${_ebookMsg ?? ''}'
+                : _ebookMsg ?? '解析复用 importer，词条并入同一复习队列',
             style: theme.textTheme.bodySmall,
           ),
-          trailing: const Icon(Icons.chevron_right, color: ChinaColors.dim),
+          trailing: _ebookStage != null
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : FilledButton.tonal(
+                  onPressed: _busy == null ? _importEbook : null,
+                  child: const Text('选择电子书…'),
+                ),
         ),
       ],
     );

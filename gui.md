@@ -79,6 +79,9 @@ UI 层**只负责展示与交互**，不重写任何学习算法；算法与数�
 
 - 两种导入都调用 `wc_add_item`，写入**同一张 items 表**，仅 `tags` 不同
   （`dict:cet4` / `book:<title>`）以标记来源。
+- **电子书解析不在 Flutter 重写**：App 调用 `tools/ebook_extract.py`
+  （内部复用 `importer.extract` + `extract_words` + `wordpick`）拿到词条 JSON，
+  再经 FFI 写入 DB；解析逻辑完全复用 Python 管道。
 - 复习端 `StudySession` 只按 `wc_generate_daily_queue` 取队列，**不区分来源**；
   因此无需为词典/电子书各写一套复习逻辑。
 - 若需「只复习 CET4」这类过滤，用 `tags` 之上再加一层筛选即可，属增量功能。
