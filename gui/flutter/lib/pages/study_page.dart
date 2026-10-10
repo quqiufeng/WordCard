@@ -207,6 +207,21 @@ class _ReviewPageState extends State<_ReviewPage> {
     a.register('review.know', _know);
     a.register('review.dontKnow', _dontKnow);
     a.register('review.restart', () => s.start());
+    a.register('review.speakParagraph', () {
+      final c = s.current;
+      if (c == null) return;
+      final cjk = RegExp(r'[\u4e00-\u9fff]');
+      final latin = RegExp(r'[A-Za-z]');
+      final buf = <String>[];
+      for (final l in c.explanation.split('\n')) {
+        final t = l.trim();
+        if (t.isEmpty || t.startsWith('【')) continue;
+        if (latin.hasMatch(t) && !cjk.hasMatch(t)) buf.add(t);
+      }
+      if (buf.isNotEmpty) {
+        TtsService.instance.speak(buf.join(' '));
+      }
+    });
     TtsService.instance.start(); // 预加载 TTS 模型
   }
 
