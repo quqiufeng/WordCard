@@ -22,6 +22,7 @@ final class BookWord {
   final List<String> sents; // 含该词的例句（英文）
   String paraZh = '';
   List<String> sentsZh = [];
+  String memo = ''; // 一句话用法/场景描述（助记）
 }
 
 /// 电子书解析结果。
@@ -151,6 +152,7 @@ final class EbookImporter {
   /// 组装 explanation：段落原/译 + 例句原/译（有译文则成对）。
   String _explanation(BookWord w) {
     final parts = <String>[];
+    if (w.memo.isNotEmpty) parts.add('【用法】${w.memo}');
     if (w.para.isNotEmpty) {
       parts.add(w.para);
       if (w.paraZh.isNotEmpty) parts.add(w.paraZh);
@@ -224,6 +226,7 @@ final class EbookImporter {
           if (w == null) continue;
           w.paraZh = '${d['para_zh'] ?? ''}';
           w.sentsZh = (d['sents_zh'] as List? ?? []).map((s) => '$s').toList();
+          w.memo = '${d['memo'] ?? ''}';
           final id = engine.itemIdByQuestion(w.word);
           if (id != null && engine.updateItemExplanation(id, _explanation(w))) {
             updated++;

@@ -68,8 +68,10 @@ def translate(text, system=None):
     if not text.strip():
         return ''
     out = _chat('/no_think Translate the following English into natural, fluent Chinese. '
-                'Output ONLY the Chinese translation, no explanation:\n' + text,
-                system=system or '你是专业英译中译者，只输出中文译文。')
+                'Output ONLY the Chinese translation. Do NOT add explanations, '
+                'parentheses, notes, alternatives, or any extra content; keep it '
+                'concise and faithful to the source length:\n' + text,
+                system=system or '你是专业英译中译者，只输出简洁忠实的中文译文，不加任何解释、括号或补充说明。')
     _cache[key] = out
     return out
 
@@ -102,3 +104,30 @@ if __name__ == '__main__':
         print('LLM server unavailable', file=sys.stderr); sys.exit(1)
     txt = sys.argv[1] if len(sys.argv) > 1 else 'The animals staged a rebellion.'
     print('译文:', translate(txt))
+
+
+def memo(word, context=None):
+    """用一句简洁中文说明该词的含义、常见使用场景（助记描述）。"""
+    import re
+    key = ('m', word)
+    if key in _cache:
+        return _cache[key]
+    prompt = (f'/no_think 用一句不超过30字的中文说明英语单词 "{word}" 的意思和常见'
+              f'使用场景，帮助记忆。要求：只输出这一句中文，不要英文，不要编号或标题，'
+              f'不要换行：')
+    if context:
+        prompt += f'\n参考场景：{context}'
+    out = ''
+    try:
+        out = _chat(prompt, max_tokens=120).strip()
+    except Exception:
+        out = ''
+    out = out.replace('**', '').strip()
+    out = re.sub(r'^(记忆提示|说明|提示|解释|用法)[:：]\s*', '', out)
+    out = out.split('\n')[0].strip()
+    if out:
+        out = re.split(r'(?<=[。！？])', out)[0].strip()
+    out = re.sub(r"[A-Za-z][A-Za-z'’.\-]*", '', out)
+    out = re.sub(r'\s+', ' ', out).strip(' “”"：:,')
+    _cache[key] = out
+    return out

@@ -140,7 +140,35 @@ class FlashCard extends StatelessWidget {
         .toList();
     return [
       for (final line in lines)
-        if (latin.hasMatch(line) && !cjk.hasMatch(line) && onSpeak != null)
+        if (line.startsWith('【用法】'))
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: ChinaColors.shuangdi,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: ChinaColors.border),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.lightbulb_outline,
+                    size: 16, color: ChinaColors.daiLan),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    line.substring('【用法】'.length).trim(),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: ChinaColors.daiLan,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (latin.hasMatch(line) && !cjk.hasMatch(line) && onSpeak != null)
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
