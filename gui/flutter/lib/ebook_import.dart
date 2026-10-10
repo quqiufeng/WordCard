@@ -5,11 +5,11 @@ import 'ffi/wordcard.dart';
 
 /// 电子书解析结果中的一个词条。
 final class BookWord {
-  const BookWord(this.word, this.context, this.definition, this.pos);
+  BookWord(this.word, this.context, this.definition, this.pos);
   final String word;
   final String context;
-  final String definition; // 中文释义（LLM 生成，可能为空）
-  final String pos; // 词性
+  String definition; // 中文释义（LLM 异步回填，可能为空）
+  String pos;
 }
 
 /// 电子书解析结果。
@@ -26,7 +26,8 @@ final class BookExtract {
 }
 
 /// 电子书导入：解析**复用**现有 Python 管道（`tools/ebook_extract.py`），
-/// Flutter 端只负责选文件、调脚本、把词条经 FFI 写入同一 DB。
+/// 释义**异步复用**本地 LLM（`tools/ebook_define.py`），
+/// Flutter 端只负责选文件、调脚本、把结果经 FFI 写入同一 DB。
 final class EbookImporter {
   EbookImporter(this.engine);
 
@@ -53,47 +54,25 @@ final class EbookImporter {
     return path.isEmpty ? null : path;
   }
 
-  /// 调用 Python 解析电子书（可选 LLM 释义），返回词条（不含 DB 写入）。
-  /// [onStage] 回调解析/释义阶段文本。
+  /// 仅解析电子书（快速，不含 LLM 释义）。[onStage] 回调阶段文本。
   Future<BookExtract> extract(
     String bookPath, {
     int max = 200,
-    bool define = true,
     void Function(String stage)? onStage,
   }) async {
     final root = _root();
     if (root == null) throw StateError('未找到 tools/ebook_extract.py');
-    final tmp = File('${Directory.systemTemp.path}/wordcard_extract_'
-        '${DateTime.now().microsecondsSinceEpoch}.json');
+    onStage?.call('解析中');
+    final tmp = _tmp('json');
     try {
-      final proc = await Process.start(
+      final r = await Process.run(
         'python3',
-        [
-          '$root/tools/ebook_extract.py',
-          bookPath,
-          '--max', '$max',
-          '--out', tmp.path,
-          if (define) '--define',
-        ],
+        ['$root/tools/ebook_extract.py', bookPath, '--max', '$max',
+         '--out', tmp.path],
         workingDirectory: root,
       );
-      final errors = <String>[];
-      proc.stderr
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) {
-        if (line.startsWith('DEFINE ')) {
-          onStage?.call('生成释义 ${line.substring(7)}');
-        } else if (line.startsWith('STAGE ')) {
-          onStage?.call(line.substring(6));
-        } else if (line.trim().isNotEmpty) {
-          errors.add(line);
-        }
-      });
-      proc.stdout.drain<void>();
-      final code = await proc.exitCode;
-      if (code != 0 || !tmp.existsSync()) {
-        throw StateError('解析失败: ${errors.join('\n')}');
+      if (r.exitCode != 0 || !tmp.existsSync()) {
+        throw StateError('解析失败: ${(r.stderr as String).trim()}');
       }
       final data = json.decode(tmp.readAsStringSync()) as Map<String, dynamic>;
       final words = (data['words'] as List)
@@ -103,7 +82,7 @@ final class EbookImporter {
                 '${e['d'] ?? ''}',
                 '${e['p'] ?? ''}',
               ))
-          .toList(growable: false);
+          .toList(growable: true);
       return BookExtract(
         title: '${data['title'] ?? ''}',
         author: '${data['author'] ?? ''}',
@@ -125,12 +104,8 @@ final class EbookImporter {
     for (final w in extract.words) {
       done++;
       if (engine.hasItem(w.word)) continue;
-      final answer = w.definition.isEmpty
-          ? ''
-          : (w.pos.isEmpty ? w.definition : '${w.pos} ${w.definition}');
       final id = engine.addItem(
         question: w.word,
-        answer: answer,
         explanation: w.context,
         category: 1,
         tags: 'book:${extract.title}',
@@ -145,4 +120,59 @@ final class EbookImporter {
     onProgress?.call(total, total);
     return added;
   }
+
+  /// 异步生成中文释义：逐条从 `ebook_define.py` 读取结果并**动态回填** DB。
+  /// 返回成功回填的条数。
+  Future<int> defineAll(
+    BookExtract extract, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final root = _root();
+    if (root == null || extract.words.isEmpty) return 0;
+    final wordsFile = _tmp('words');
+    wordsFile.writeAsStringSync(
+      extract.words.map((w) => w.word).join('\n'),
+    );
+    var updated = 0;
+    var done = 0;
+    try {
+      final proc = await Process.start(
+        'python3',
+        ['$root/tools/ebook_define.py', '--words', wordsFile.path],
+        workingDirectory: root,
+      );
+      // stderr: 进度（丢弃内容，仅用于不阻塞管道）
+      proc.stderr.drain<void>();
+      final lines = proc.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+      await for (final line in lines) {
+        if (line.trim().isEmpty) continue;
+        done++;
+        try {
+          final d = json.decode(line) as Map<String, dynamic>;
+          final word = '${d['w']}';
+          final def = '${d['d'] ?? ''}';
+          final pos = '${d['p'] ?? ''}';
+          final id = engine.itemIdByQuestion(word);
+          if (id != null && def.isNotEmpty) {
+            final answer = pos.isEmpty ? def : '$pos $def';
+            if (engine.updateItemAnswer(id, answer)) updated++;
+          }
+        } catch (_) {
+          // 跳过无法解析的行
+        }
+        onProgress?.call(done, extract.words.length);
+      }
+      await proc.exitCode;
+      engine.save();
+    } finally {
+      if (wordsFile.existsSync()) wordsFile.deleteSync();
+    }
+    return updated;
+  }
+
+  static File _tmp(String tag) => File(
+      '${Directory.systemTemp.path}/wordcard_${tag}_'
+      '${DateTime.now().microsecondsSinceEpoch}');
 }

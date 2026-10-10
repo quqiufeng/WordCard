@@ -1,13 +1,18 @@
 CC = g++
+CC_C = gcc
 CFLAGS = -shared -fPIC -std=c++17 -O2 -Wall -Wextra
 
 PKGS := opencv4
 CFLAGS += $(shell pkg-config --cflags $(PKGS))
 LDLIBS := $(shell pkg-config --libs $(PKGS)) -lpthread
 
-.PHONY: all dotui wordpick txt2png clean
+.PHONY: all dotui wordcard wordpick txt2png clean
 
-all: dotui wordpick
+all: dotui wordpick wordcard
+
+wordcard:
+	$(CC_C) -shared -fPIC -O2 -Wall -Wextra wordcard.c modes.c -o libwordcard.so -lpthread
+	@echo "  -> libwordcard.so"
 
 dotui:
 	$(CC) $(CFLAGS) dotui_bridge.cpp -o libdotui.so $(LDLIBS)
@@ -22,4 +27,4 @@ wordpick:
 	@echo "  -> libwordpick.so"
 
 clean:
-	rm -f libdotui.so libtxt2png.so libwordpick.so
+	rm -f libdotui.so libtxt2png.so libwordpick.so libwordcard.so *.o

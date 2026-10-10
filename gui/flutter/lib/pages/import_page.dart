@@ -42,13 +42,9 @@ class _ImportPageState extends State<ImportPage> {
       _error = null;
     });
     try {
-      final extract = await importer.extract(
-        path,
-        define: true,
-        onStage: (s) {
-          if (mounted) setState(() => _ebookStage = s);
-        },
-      );
+      final extract = await importer.extract(path, onStage: (s) {
+        if (mounted) setState(() => _ebookStage = s);
+      });
       if (!mounted) return;
       setState(() => _ebookStage = '导入中');
       final added = await importer.importWords(
@@ -58,9 +54,22 @@ class _ImportPageState extends State<ImportPage> {
         },
       );
       if (!mounted) return;
+      // 词条已入库，释义异步生成、逐条回填
+      final total = extract.words.length;
+      setState(() {
+        _ebookStage = '生成释义 0/$total';
+        _ebookMsg = null;
+      });
+      final defined = await importer.defineAll(
+        extract,
+        onProgress: (d, t) {
+          if (mounted) setState(() => _ebookStage = '生成释义 $d/$t');
+        },
+      );
+      if (!mounted) return;
       setState(() {
         _ebookStage = null;
-        _ebookMsg = '《${extract.title}》新增 $added 词（共 ${extract.words.length}）';
+        _ebookMsg = '《${extract.title}》新增 $added 词，释义 $defined 条';
       });
     } catch (e) {
       if (!mounted) return;

@@ -173,6 +173,13 @@ class WordCardDB:
         self._lib.wc_add_item.restype = c_uint32
         return self._lib.wc_add_item(self._handle, byref(item))
 
+    def update_item_answer(self, item_id, answer):
+        """更新已存在学习项的 answer（异步回填 LLM 释义）。"""
+        self._lib.wc_update_item_answer.argtypes = [c_void_p, c_uint32, c_char_p]
+        self._lib.wc_update_item_answer.restype = c_int
+        return self._lib.wc_update_item_answer(self._handle, item_id,
+                                               answer.encode('utf-8'))
+
     def find_item(self, question=None, item_id=None):
         if question:
             self._lib.wc_find_item_by_question.argtypes = [c_void_p, c_char_p]

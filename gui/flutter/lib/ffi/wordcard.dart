@@ -136,6 +136,10 @@ final class WordCardEngine {
         Pointer<ItemEntry> Function(Pointer<Void>, Pointer<Utf8>),
         Pointer<ItemEntry> Function(
             Pointer<Void>, Pointer<Utf8>)>('wc_find_item_by_question');
+    _updateItemAnswer = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Uint32, Pointer<Utf8>),
+        int Function(Pointer<Void>, int, Pointer<Utf8>)>(
+        'wc_update_item_answer');
   }
 
   final Pointer<Void> _db;
@@ -163,6 +167,7 @@ final class WordCardEngine {
   late final int Function(Pointer<Void>, Pointer<ItemEntry>) _addItem;
   late final Pointer<ItemEntry> Function(Pointer<Void>, Pointer<Utf8>)
       _findItemByQuestion;
+  late final int Function(Pointer<Void>, int, Pointer<Utf8>) _updateItemAnswer;
 
   String get version => _version().toDartString();
 
@@ -267,6 +272,27 @@ final class WordCardEngine {
       return _findItemByQuestion(_db, q) != nullptr;
     } finally {
       malloc.free(q);
+    }
+  }
+
+  /// 按 question 查 item_id；不存在返回 null。
+  int? itemIdByQuestion(String question) {
+    final q = question.toNativeUtf8();
+    try {
+      final p = _findItemByQuestion(_db, q);
+      return p == nullptr ? null : p.ref.id;
+    } finally {
+      malloc.free(q);
+    }
+  }
+
+  /// 更新已存在学习项的释义（用于异步回填 LLM 释义）。
+  bool updateItemAnswer(int itemId, String answer) {
+    final a = answer.toNativeUtf8();
+    try {
+      return _updateItemAnswer(_db, itemId, a) == 0;
+    } finally {
+      malloc.free(a);
     }
   }
 

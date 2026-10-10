@@ -743,6 +743,22 @@ item_entry_t* wc_find_item_by_id(wordcard_db_t *db, uint32_t item_id) {
     return NULL;
 }
 
+int wc_update_item_answer(wordcard_db_t *db, uint32_t item_id, const char *answer) {
+    if (!db || !answer) return WC_ERR_INVALID;
+    LOCK();
+    int idx;
+    if (!int_hash_get((int_hash_t*)db->id_hash, item_id, &idx)) {
+        UNLOCK();
+        return WC_ERR_NOT_FOUND;
+    }
+    item_entry_t *v = &db->items[idx];
+    strncpy(v->answer, answer, sizeof(v->answer) - 1);
+    v->answer[sizeof(v->answer) - 1] = '\0';
+    wc_mark_dirty(db);
+    UNLOCK();
+    return WC_OK;
+}
+
 /* ========================================================================
  * 载体/内容源操作
  * ======================================================================== */
