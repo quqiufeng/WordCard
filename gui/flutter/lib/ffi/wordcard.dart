@@ -140,6 +140,10 @@ final class WordCardEngine {
         Int32 Function(Pointer<Void>, Uint32, Pointer<Utf8>),
         int Function(Pointer<Void>, int, Pointer<Utf8>)>(
         'wc_update_item_answer');
+    _updateItemExplanation = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Uint32, Pointer<Utf8>),
+        int Function(Pointer<Void>, int, Pointer<Utf8>)>(
+        'wc_update_item_explanation');
   }
 
   final Pointer<Void> _db;
@@ -168,6 +172,8 @@ final class WordCardEngine {
   late final Pointer<ItemEntry> Function(Pointer<Void>, Pointer<Utf8>)
       _findItemByQuestion;
   late final int Function(Pointer<Void>, int, Pointer<Utf8>) _updateItemAnswer;
+  late final int Function(Pointer<Void>, int, Pointer<Utf8>)
+      _updateItemExplanation;
 
   String get version => _version().toDartString();
 
@@ -293,6 +299,16 @@ final class WordCardEngine {
       return _updateItemAnswer(_db, itemId, a) == 0;
     } finally {
       malloc.free(a);
+    }
+  }
+
+  /// 更新已存在学习项的上下文（用于异步回填段落/例句译文）。
+  bool updateItemExplanation(int itemId, String explanation) {
+    final e = explanation.toNativeUtf8();
+    try {
+      return _updateItemExplanation(_db, itemId, e) == 0;
+    } finally {
+      malloc.free(e);
     }
   }
 

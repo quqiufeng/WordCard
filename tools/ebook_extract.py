@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
-"""ebook_extract.py — 复用 importer 解析电子书，输出中英文对照词条 JSON。
+"""ebook_extract.py — 复用 importer 解析电子书，输出**含段落/例句**的中英文对照词条。
 
-解析复用现有 Python 管道（importer.extract + extract_words + wordpick）；
-释义**优先离线查 ECDICT**（秒级、含音标/词性/中文），未收录的词留给 App 端
-异步 LLM 回填（tools/ebook_define.py）。生成「中英文对照文件」供后续直接加载。
+策略（已定）：
+  · 单词释义 → 本地 ECDICT 词典（离线、秒级，含音标/词性/中英释义）
+  · 段落与例句 → 原文直接带出，中文译文由 App 端异步调 LLM 翻译并回填
+
+解析复用 Python 管道（importer + wordpick + context）。并写出对照物料：
+  --bilingual data/books/<slug>.tsv   (词级速查: word/phonetic/pos/zh/context)
+  --material  data/books/<slug>.jsonl (含段落/例句，供加载与翻译)
 
 用法:
-    python3 tools/ebook_extract.py <book> [--max 200] [--bilingual out.tsv] [--llm]
-
-输出（--out 或 stdout，UTF-8 JSON）:
-    {"title": "...", "author": "...", "count": 123,
-     "words": [{"w": "abandon", "ph": "ә'bændәn", "p": "vt.", "d": "放弃", "ctx": "..."}]}
-
-进度（stderr）: STAGE <msg>
+    python3 tools/ebook_extract.py <book> [--max 200] [--bilingual f.tsv] [--material f.jsonl] [--out f.json]
 """
 
 import argparse
 import json
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,26 +24,36 @@ sys.path.insert(0, ROOT)
 
 import importer  # noqa: E402
 import bilingual  # noqa: E402
+import context as ctx  # noqa: E402
 
 
 def _stage(msg):
     print(f'STAGE {msg}', file=sys.stderr, flush=True)
 
 
+def _clean(text):
+    """去 HTML/链接残留，保留段落换行。"""
+    text = importer.clean_text(text)
+    text = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', text)  # markdown 链接
+    text = re.sub(r'\[\]\([^)]*\)', '', text)             # 空链接
+    return text
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('book')
     ap.add_argument('--max', type=int, default=200)
-    ap.add_argument('--bilingual', help='把中英文对照写入该 TSV 文件')
-    ap.add_argument('--llm', action='store_true',
-                    help='对 ECDICT 未收录的词用本地 LLM 生成释义')
-    ap.add_argument('--out', help='写入 JSON 文件（避免 stdout 噪声污染）')
+    ap.add_argument('--max-sent', type=int, default=2)
+    ap.add_argument('--bilingual', help='词级中英文对照 TSV')
+    ap.add_argument('--material', help='含段落/例句的 JSONL 物料')
+    ap.add_argument('--llm', action='store_true', help='ECDICT 未收录词用 LLM 补释义')
+    ap.add_argument('--out', help='词条 JSON 文件（App 消费）')
     args = ap.parse_args()
 
     _stage('解析中')
     info = importer.extract(args.book)
-    words = importer.extract_words(info['text'], max_words=args.max * 2)
-    # 过滤所有格/缩写等噪声（如 book's / don't），并截断到 max
+    text = _clean(info['text'])
+    words = importer.extract_words(text, max_words=args.max * 2)
     words = [(w, c) for (w, c) in words if "'" not in w and '’' not in w]
     words = words[:args.max]
 
@@ -53,22 +62,33 @@ def main():
     cache = bilingual.load_cache()
 
     out_words = []
-    rows = []
+    material_lines = []
+    tsv_rows = []
     missing = []
-    for w, ctx in words:
+    for ranked, (w, sent_ctx) in enumerate(words, 1):
         wl = w.lower()
-        ph = pos = tr = ''
+        ph = pos = zh = en = ''
         if wl in ecd:
-            ph, pos, tr = ecd[wl]
+            ph, pos, zh, en = ecd[wl]
         elif wl in cache:
-            pos, tr = cache[wl]
+            pos, zh = cache[wl]
         else:
             missing.append(w)
-        out_words.append({'w': w, 'ctx': ctx, 'ph': ph, 'p': pos, 'd': tr})
-        rows.append((w, ph, pos, tr, ctx))
+        para, sents = ctx.find_context(text, w, args.max_sent)
+        # 无段落时退回 wordpick 给的上下文句
+        if not para and sent_ctx:
+            para = sent_ctx
+        item = {
+            'w': w, 'rank': ranked, 'ph': ph, 'p': pos, 'd': zh, 'e': en,
+            'para': para, 'sents': sents,
+            'para_zh': '', 'sents_zh': [],
+        }
+        out_words.append(item)
+        material_lines.append(item)
+        tsv_rows.append((w, ph, pos, zh, para or sent_ctx))
 
     if args.llm and missing:
-        _stage(f'LLM 释义（{len(missing)} 个未收录词）')
+        _stage(f'LLM 补释义（{len(missing)} 个）')
         try:
             import translate
             ok = translate.available()
@@ -76,30 +96,33 @@ def main():
             ok = False
             _stage(f'LLM 初始化失败: {e}')
         if ok:
-            total = len(missing)
-            done = 0
+            total, done = len(missing), 0
             for w in missing:
                 try:
-                    _en, zh, pos = translate.define(w)
+                    _e, _z, _p = translate.define(w)
                 except Exception:  # noqa: BLE001
-                    zh, pos = '', ''
-                if zh:
-                    bilingual.append_cache(w, pos, zh)
-                    for i, ow in enumerate(out_words):
-                        if ow['w'] == w:
-                            ow['d'], ow['p'] = zh, pos
-                            rows[i] = (rows[i][0], rows[i][1], pos, zh, rows[i][4])
+                    _z, _p = '', ''
+                if _z:
+                    bilingual.append_cache(w, _p, _z)
+                    for it in out_words:
+                        if it['w'] == w:
+                            it['d'], it['p'] = _z, _p
                             break
                 done += 1
                 print(f'DEFINE {done}/{total}', file=sys.stderr, flush=True)
 
     if args.bilingual:
-        bilingual.write_bilingual(args.bilingual, rows)
+        bilingual.write_bilingual(args.bilingual, tsv_rows)
+    if args.material:
+        os.makedirs(os.path.dirname(args.material) or '.', exist_ok=True)
+        with open(args.material, 'w', encoding='utf-8') as f:
+            for it in material_lines:
+                f.write(json.dumps(it, ensure_ascii=False) + '\n')
 
     out = {
         'title': info.get('title') or os.path.splitext(os.path.basename(args.book))[0],
         'author': info.get('author', ''),
-        'count': len(words),
+        'count': len(out_words),
         'words': out_words,
     }
     if args.out:

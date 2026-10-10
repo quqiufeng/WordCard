@@ -305,6 +305,9 @@ item_entry_t* wc_find_item_by_id(wordcard_db_t *db, uint32_t item_id);
 /* 更新已存在学习项的 answer（用于异步回填 LLM 释义）。成功返回 WC_OK，未找到返回 WC_ERR_NOT_FOUND */
 int wc_update_item_answer(wordcard_db_t *db, uint32_t item_id, const char *answer);
 
+/* 更新已存在学习项的 explanation（用于异步回填段落/例句译文） */
+int wc_update_item_explanation(wordcard_db_t *db, uint32_t item_id, const char *explanation);
+
 /* -------- 载体/内容源操作 -------- */
 
 uint32_t wc_add_source(wordcard_db_t *db, const content_source_t *source);

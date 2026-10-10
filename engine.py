@@ -180,6 +180,13 @@ class WordCardDB:
         return self._lib.wc_update_item_answer(self._handle, item_id,
                                                answer.encode('utf-8'))
 
+    def update_item_explanation(self, item_id, explanation):
+        """更新已存在学习项的 explanation（异步回填段落/例句译文）。"""
+        self._lib.wc_update_item_explanation.argtypes = [c_void_p, c_uint32, c_char_p]
+        self._lib.wc_update_item_explanation.restype = c_int
+        return self._lib.wc_update_item_explanation(self._handle, item_id,
+                                                    explanation.encode('utf-8'))
+
     def find_item(self, question=None, item_id=None):
         if question:
             self._lib.wc_find_item_by_question.argtypes = [c_void_p, c_char_p]
