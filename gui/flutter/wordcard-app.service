@@ -1,0 +1,15 @@
+[Unit]
+Description=WordCard desktop app
+After=graphical-session.target
+
+[Service]
+Type=simple
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=LD_LIBRARY_PATH=/opt/WordCard/src:/opt/WordCard/libs:/opt/WordCard/voice/libs
+ExecStart=/opt/WordCard/gui/flutter/run.sh
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

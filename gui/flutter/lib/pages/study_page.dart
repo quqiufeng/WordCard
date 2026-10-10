@@ -262,31 +262,35 @@ class _ReviewPageState extends State<_ReviewPage> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('点击卡片看释义，然后自评', style: theme.textTheme.bodySmall),
+        Text('点击卡片看释义，然后自评 · 空格=不会 · →=记得',
+            style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                style:
-                    FilledButton.styleFrom(backgroundColor: ChinaColors.orange),
-                onPressed: () =>
-                    Automation.instance.invoke('review.dontKnow'),
-                icon: const Icon(Icons.close),
-                label: const Text('不会（空格）'),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: ChinaColors.orange),
+                  onPressed: () =>
+                      Automation.instance.invoke('review.dontKnow'),
+                  icon: const Icon(Icons.close),
+                  label: const Text('不会'),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton.icon(
-                style:
-                    FilledButton.styleFrom(backgroundColor: ChinaColors.qinglv),
-                onPressed: () => Automation.instance.invoke('review.know'),
-                icon: const Icon(Icons.check),
-                label: const Text('记得（→）'),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: ChinaColors.qinglv),
+                  onPressed: () => Automation.instance.invoke('review.know'),
+                  icon: const Icon(Icons.check),
+                  label: const Text('记得'),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
