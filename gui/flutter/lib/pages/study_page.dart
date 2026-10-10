@@ -253,6 +253,7 @@ class _ReviewPageState extends State<_ReviewPage> {
                 card: card,
                 flipped: s.flipped,
                 onFlip: () => Automation.instance.invoke('review.flip'),
+                onSpeak: (t) => TtsService.instance.speak(t),
               ),
             ),
             const SizedBox(height: 16),

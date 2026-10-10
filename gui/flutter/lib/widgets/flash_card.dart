@@ -12,11 +12,15 @@ class FlashCard extends StatelessWidget {
     required this.card,
     required this.flipped,
     required this.onFlip,
+    this.onSpeak,
   });
 
   final ActiveCard card;
   final bool flipped;
   final VoidCallback onFlip;
+
+  /// 点击英文段落/例句时回调（朗读）。
+  final void Function(String text)? onSpeak;
 
   @override
   Widget build(BuildContext context) {
@@ -119,16 +123,64 @@ class FlashCard extends StatelessWidget {
           const SizedBox(height: 20),
           const Divider(color: ChinaColors.border),
           const SizedBox(height: 8),
-          Text(
-            card.explanation,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: ChinaColors.ink,
-              height: 1.6,
-            ),
-          ),
+          ..._explanationLines(theme),
         ],
       ],
     );
+  }
+
+  /// 把 explanation 按行拆开：英文行可点朗读，中文行作对照。
+  List<Widget> _explanationLines(ThemeData theme) {
+    final cjk = RegExp(r'[\u4e00-\u9fff]');
+    final latin = RegExp(r'[A-Za-z]');
+    final lines = card.explanation
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    return [
+      for (final line in lines)
+        if (latin.hasMatch(line) && !cjk.hasMatch(line) && onSpeak != null)
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => onSpeak!(line),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4, right: 6),
+                      child: Icon(Icons.volume_up_outlined,
+                          size: 16, color: ChinaColors.dim),
+                    ),
+                    Expanded(
+                      child: Text(
+                        line,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: ChinaColors.ink,
+                          height: 1.6,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              line,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: ChinaColors.muted,
+                height: 1.6,
+              ),
+            ),
+          ),
+    ];
   }
 
   Widget _modeBadge(ThemeData theme) {
