@@ -9,10 +9,12 @@
 环境变量: WC_TTS_SID（音色，默认 0）、WC_APLAY（播放器，默认 aplay）
 """
 
+import array
 import hashlib
 import os
 import subprocess
 import sys
+import wave
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -20,6 +22,7 @@ sys.path.insert(0, ROOT)
 import voice  # noqa: E402
 
 CACHE = os.path.join(ROOT, 'data', 'tts_cache')
+GAIN = float(os.environ.get('WC_TTS_VOLUME', '2.5'))
 
 
 def _player():
@@ -41,6 +44,27 @@ def _cache_path(text):
     return os.path.join(CACHE, h + '.wav')
 
 
+def _amplify(path, gain):
+    """16-bit PCM 音量放大（带限幅），原地覆盖。"""
+    if gain <= 1.0:
+        return
+    try:
+        with wave.open(path, 'rb') as w:
+            params = w.getparams()
+            if params.sampwidth != 2:
+                return
+            a = array.array('h')
+            a.frombytes(w.readframes(w.getnframes()))
+        for i in range(len(a)):
+            x = int(a[i] * gain)
+            a[i] = 32767 if x > 32767 else (-32768 if x < -32768 else x)
+        with wave.open(path, 'wb') as w:
+            w.setparams(params)
+            w.writeframes(a.tobytes())
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def main():
     try:
         tts = voice.Tts(sid=int(os.environ.get('WC_TTS_SID', '0')))
@@ -58,6 +82,7 @@ def main():
             path = _cache_path(text)
             if not os.path.exists(path):
                 tts.synthesize(text, path)
+                _amplify(path, GAIN)
             subprocess.run([PLAY, path], check=False)
             print(f'OK {text}', flush=True)
         except Exception as e:  # noqa: BLE001
