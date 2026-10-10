@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""context.py — 定位含某词的段落与例句（供对照物料生成）。"""
+"""context.py — 定位含某词的段落与例句（供对照物料生成）。
+
+优化点：
+  · 整词匹配（\bword\b）优先，词干前缀仅作兜底；
+  · 段落评分：句末标点↑、整词命中↑；标题/目录/列表/URL/超长↓；
+  · 例句按质量排序：整词命中 + 像完整句子（首字母大写、句末标点、长度适中、
+    非 URL），跨全篇候选里取最优，而非只取首段。
+"""
 
 import html
 import re
@@ -9,19 +16,25 @@ def _stem(word):
     return word[:-1] if word.endswith('e') and len(word) > 3 else word
 
 
+def _exact_re(word):
+    return re.compile(r'\b' + re.escape(word) + r'\b', re.I)
+
+
+def exact_count(text, word):
+    return len(_exact_re(word).findall(text))
+
+
 def contains_word(text, word):
-    wl = word.lower()
-    stem = _stem(wl)
-    for tok in re.findall(r"[A-Za-z]+", text.lower()):
-        if tok == wl:
-            return True
-        if len(stem) >= 4 and tok.startswith(stem):
-            return True
+    """整词命中，或词干前缀兜底（如 thinks→think）。"""
+    if _exact_re(word).search(text):
+        return True
+    stem = _stem(word.lower())
+    if len(stem) >= 4:
+        return bool(re.search(r'\b' + re.escape(stem) + r'\w{0,4}\b', text, re.I))
     return False
 
 
 def _is_toc(p):
-    # 目录/索引行：点线引导或数字占比高
     if len(re.findall(r'\.\s*\.', p)) >= 3:
         return True
     digits = sum(c.isdigit() for c in p)
@@ -43,19 +56,20 @@ def split_sentences(para):
             if len(s.strip()) >= 15]
 
 
-def _prose_score(p):
-    """正文段落评分：句末标点权重高；标题/目录/列表/过长均扣分。"""
+def _prose_score(p, word):
     words = len(re.findall(r'[A-Za-z]+', p))
     punct = len(re.findall(r'[.!?]', p))
     bullets = p.count('•')
-    score = min(words, 60) + punct * 15
+    urls = len(re.findall(r'https?://|www\.', p))
+    score = min(words, 60) + punct * 15 + exact_count(p, word) * 8
     if punct == 0:
-        score -= 30            # 无句末标点，疑似标题
+        score -= 30
     if len(p) < 40:
-        score -= 15            # 过短
+        score -= 15
     if len(p) > 500:
-        score -= 40            # 过长（整章/索引）
-    score -= bullets * 4       # 列表项（多为目录/要点）
+        score -= 40
+    score -= bullets * 6
+    score -= urls * 20
     return score
 
 
@@ -71,23 +85,46 @@ def _clip(p, max_chars=360):
     return cut.rstrip() + '…'
 
 
-def find_context(text, word, max_sent=2):
-    """返回 (段落原文, [例句原文, ...])。
+def _is_sentence(s):
+    return (bool(s) and s[0].isupper() and s[-1] in '.!?'
+            and 30 <= len(s) <= 240 and 'http' not in s and '@' not in s)
 
-    在含该词的段落中选「正文感」最强的一段（跳过标题/目录，长度适中），
-    再从该段及后续匹配段抽取例句。
-    """
+
+def _is_index_like(s):
+    """索引/术语表行：数字或逗号-页码密集。"""
+    if not s:
+        return False
+    digits = sum(c.isdigit() for c in s)
+    commas = s.count(',')
+    return (digits / len(s) > 0.12
+            or (commas > 8 and digits > 15)
+            or bool(re.search(r',\s*\d{2,3}\b.*,\s*\d{2,3}\b', s)))
+
+
+def _sent_score(s, word):
+    score = min(exact_count(s, word), 3) * 10
+    if _is_sentence(s):
+        score += 12
+    if len(s) > 240:
+        score -= 10
+    if 'http' in s or 'www.' in s:
+        score -= 40
+    if s.count('•') or s.count('.') >= 3:
+        score -= 10
+    return score
+
+
+def find_context(text, word, max_sent=2):
+    """返回 (段落原文, [例句原文, ...])。"""
     matches = [p for p in split_paragraphs(text) if contains_word(p, word)]
     if not matches:
         return '', []
-    para = _clip(max(matches, key=_prose_score))
-    sents = []
-    for p in [para] + [m for m in matches if m != para]:
+    para = _clip(max(matches, key=lambda p: _prose_score(p, word)))
+    cands = []
+    for p in matches:
         for s in split_sentences(p):
-            if contains_word(s, word) and s not in sents:
-                sents.append(s)
-                if len(sents) >= max_sent:
-                    break
-        if len(sents) >= max_sent:
-            break
-    return para, sents
+            if (contains_word(s, word) and not _is_index_like(s)
+                    and s not in cands):
+                cands.append(s)
+    cands.sort(key=lambda s: _sent_score(s, word), reverse=True)
+    return para, cands[:max_sent]
