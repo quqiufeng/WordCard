@@ -250,6 +250,37 @@ gui/flutter/run.sh
 `Exec` 指向 `run.sh`，`Icon` 指向 `assets/icons/wordcard.png`（由 `backup.sh` 生成并缩放）。
 点击即可启动。
 
+### 应用图标生成（backup.sh）
+
+图标由 `/opt/static_comfyui/cpp/sd/backup.sh`（SDXL / Qwen3，HiRes 两阶段）出图，
+1024×1024，再用 ImageMagick 缩放为多尺寸：
+
+```bash
+cd /opt/static_comfyui/cpp/sd
+
+NEGATIVE_PROMPT="person, people, human, face, portrait, woman, man, girl, boy, body, hands, \
+text, letters, words, chinese characters, watermark, signature, logo, brand, photo, \
+photorealistic, 3d render, blurry, low quality, jpeg artifacts, noise, frame distortion, border artifacts" \
+SKIP_QUALITY_PREFIX=1 \
+./backup.sh \
+  "flat minimal app icon, rounded square emblem, an open book with a floating vocabulary flashcard above it, sage green cream and vermilion red palette, traditional Chinese minimal ornamental style, centered, solid soft light green background, clean vector illustration" \
+  /tmp/opencode/wordcard_icon.png 1024 1024
+# 注: backup.sh 会给输出文件名追加时间戳 → /tmp/opencode/wordcard_icon_YYYYmmdd_HHMMSS.png
+
+# 缩放并安装（在仓库根 /opt/WordCard 下执行）
+SRC=$(ls -t /tmp/opencode/wordcard_icon_*.png | head -1)
+convert "$SRC" -resize 512x512 gui/flutter/assets/icons/wordcard-512.png
+convert "$SRC" -resize 256x256 gui/flutter/assets/icons/wordcard.png
+cp "$SRC" gui/flutter/assets/icons/wordcard-1024.png
+mkdir -p ~/.local/share/icons/hicolor/256x256/apps
+cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/apps/wordcard.png
+```
+
+要点：
+- `backup.sh` 默认是「人像档」，故用 `NEGATIVE_PROMPT` 强负面排除 人/脸/文字/水印/logo；
+  `SKIP_QUALITY_PREFIX=1` 去掉脚本层质量前缀（宽画幅易诱导主体复制）。
+- 出图约 50s（RTX 3080）；`.desktop` 的 `Icon` 用绝对路径指向 256px 版本。
+
 ---
 
 ## 十一、待办 / 后续
