@@ -4,19 +4,22 @@ import 'package:flutter/material.dart';
 
 import '../ffi/wordcard.dart';
 import '../theme/app_theme.dart';
+import '../widgets/memory_curve.dart';
 import 'dictation_exam.dart';
 
 /// 记忆任务：每个电子书/词表导入 = 一个任务（在 items 的 tags 之上分组的一层）。
-/// 点任务 → 翻页查看其所有单词；任务可删除 / 听写整份。
+/// 点任务 → 翻页查看其所有单词；任务可删除 / 听写整份 / 学习。
 class TasksPage extends StatefulWidget {
   const TasksPage({
     super.key,
     required this.engine,
+    required this.userId,
     this.onSpeak,
     this.onStudy,
   });
 
   final WordCardEngine engine;
+  final int userId;
   final void Function(String text)? onSpeak;
   final void Function(List<int> itemIds, String name)? onStudy;
 
@@ -162,6 +165,19 @@ class _TasksPageState extends State<TasksPage> {
           ),
         ),
         const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('记忆曲线 · 未来 14 天复习安排',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: ChinaColors.muted)),
+              const SizedBox(height: 4),
+              MemoryCurve(values: _dueCurve(items, 14), height: 64),
+            ],
+          ),
+        ),
         Expanded(
           child: ListView.builder(
             primary: false,
@@ -206,6 +222,20 @@ class _TasksPageState extends State<TasksPage> {
         ),
       ],
     );
+  }
+
+  List<int> _dueCurve(List<ItemEntry> items, int days) {
+    final now = widget.engine.now();
+    final v = List<int>.filled(days, 0);
+    for (final it in items) {
+      final m = widget.engine.mastery(userId: widget.userId, itemId: it.id);
+      final nr = m?.nextReview ?? 0;
+      final d = (nr == 0 || nr <= now)
+          ? 0
+          : ((nr - now) / 86400).ceil().clamp(0, days - 1);
+      v[d]++;
+    }
+    return v;
   }
 
   void _startExam(BuildContext context, String tag, String name) {

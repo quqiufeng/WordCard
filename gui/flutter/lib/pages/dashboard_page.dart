@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../ffi/wordcard.dart';
 import '../theme/app_theme.dart';
+import '../widgets/memory_curve.dart';
 
 /// 首页：记忆数据面板（总览 + 任务进度 + 开始今日记忆）。
 class DashboardPage extends StatelessWidget {
@@ -132,12 +133,32 @@ class DashboardPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text('掌握 $done / ${items.length}',
+          Text('掌握 $done / ${items.length} · 记忆曲线（未来10天）',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: ChinaColors.muted)),
+          const SizedBox(height: 2),
+          MemoryCurve(values: _dueCurve(items, 10), height: 38),
         ],
       ),
       onTap: () => onOpenTask(t),
     );
+  }
+
+  /// 未来 N 天的复习量（用于记忆曲线）。
+  List<int> _dueCurve(List<ItemEntry> items, int days) {
+    final now = engine.now();
+    final v = List<int>.filled(days, 0);
+    for (final it in items) {
+      final m = engine.mastery(userId: userId, itemId: it.id);
+      final nr = m?.nextReview ?? 0;
+      int d;
+      if (nr == 0 || nr <= now) {
+        d = 0;
+      } else {
+        d = ((nr - now) / 86400).ceil().clamp(0, days - 1);
+      }
+      v[d]++;
+    }
+    return v;
   }
 }

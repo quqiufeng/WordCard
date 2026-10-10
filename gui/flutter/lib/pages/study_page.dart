@@ -149,6 +149,7 @@ class _StudyPageState extends State<StudyPage> {
           ),
         1 => TasksPage(
             engine: _engine!,
+            userId: _userId!,
             onSpeak: (t) => TtsService.instance.speak(t),
             onStudy: (ids, name) => _pushReview(ids, '记忆 · $name'),
           ),
