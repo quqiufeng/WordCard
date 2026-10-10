@@ -15,7 +15,7 @@ automation:
 	@echo "  -> libwordcard_ctl.so"
 
 wordcard:
-	$(CC_C) -shared -fPIC -O2 -D_GNU_SOURCE -Wall -Wextra -I. wordcard.c modes.c store.c cache/*.c mmap.c metrics.c crc32.c -o libwordcard.so -lpthread -lm
+	$(CC_C) -shared -fPIC -O2 -Wall -Wextra wordcard.c modes.c -o libwordcard.so -lpthread
 	@echo "  -> libwordcard.so"
 
 dotui:
