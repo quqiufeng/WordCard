@@ -68,6 +68,19 @@ class StudySession extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 用指定的学习项开始（如某任务的整份词表，用于听写）。
+  void startItems(List<int> itemIds, {int mode = 1}) {
+    _queue
+      ..clear()
+      ..addAll(itemIds.map((id) => QueueCard(id, mode)));
+    _index = 0;
+    _flipped = false;
+    _lastResult = null;
+    _error = null;
+    _loaded = true;
+    notifyListeners();
+  }
+
   /// 翻转卡片。
   void flip() {
     _flipped = !_flipped;

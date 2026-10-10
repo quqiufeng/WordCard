@@ -37,6 +37,7 @@ class _StudyPageState extends State<StudyPage> {
   String? _error;
   int _index = 0;
   bool _showNav = true;
+  bool _dictationFlag = false;
 
   @override
   void initState() {
@@ -133,14 +134,30 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _content(StudySession session) => switch (_index) {
-        0 => _ReviewPage(session: session),
+        0 => _ReviewPage(
+            session: session,
+            startDictation: _dictationFlag,
+            onDictationConsumed: () =>
+                setState(() => _dictationFlag = false),
+          ),
         1 => TasksPage(
             engine: _engine!,
             onSpeak: (t) => TtsService.instance.speak(t),
+            onDictate: _startTaskDictation,
           ),
         2 => _StatsPage(session: session, engine: _engine!),
         _ => ImportPage(engine: _engine!),
       };
+
+  /// 用某任务的整份词表开始听写。
+  void _startTaskDictation(List<int> ids) {
+    if (ids.isEmpty) return;
+    _session?.startItems(ids);
+    setState(() {
+      _index = 0;
+      _dictationFlag = true;
+    });
+  }
 
   Widget _errorView(BuildContext context) {
     final theme = Theme.of(context);
@@ -170,9 +187,15 @@ class _StudyPageState extends State<StudyPage> {
 // ────────────────────────────── 复习 ──────────────────────────────
 
 class _ReviewPage extends StatefulWidget {
-  const _ReviewPage({required this.session});
+  const _ReviewPage({
+    required this.session,
+    this.startDictation = false,
+    this.onDictationConsumed,
+  });
 
   final StudySession session;
+  final bool startDictation;
+  final VoidCallback? onDictationConsumed;
 
   @override
   State<_ReviewPage> createState() => _ReviewPageState();
@@ -207,6 +230,13 @@ class _ReviewPageState extends State<_ReviewPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.startDictation) {
+      _dictation = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        TtsService.instance.speak(s.current?.question ?? '');
+        widget.onDictationConsumed?.call();
+      });
+    }
     final a = Automation.instance;
     a.register('review.flip', () {
       s.flip();
@@ -248,6 +278,18 @@ class _ReviewPageState extends State<_ReviewPage> {
   void dispose() {
     _input.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReviewPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.startDictation && !oldWidget.startDictation && !_dictation) {
+      setState(() => _dictation = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        TtsService.instance.speak(s.current?.question ?? '');
+        widget.onDictationConsumed?.call();
+      });
+    }
   }
 
   /// 听写判分：忽略大小写/空格/标点。
