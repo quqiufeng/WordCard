@@ -25,6 +25,10 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
+  // 关闭原生窗口装饰（标题栏/最小化/最大化/关闭），改由内容区的
+  // YaruWindowTitleBar 提供，避免出现两套窗口按钮。
+  gtk_window_set_decorated(window, FALSE);
+
   // 窗口/任务栏图标（按图标主题名查找，匹配 ~/.local/share/icons 下的 wordcard.png）
   gtk_window_set_default_icon_name("wordcard");
   gtk_window_set_icon_name(window, "wordcard");
