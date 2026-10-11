@@ -100,6 +100,9 @@ function M:importEbook(path)
 end
 function M:goto(page) return self:call('nav.goto', ('{"page":%d}'):format(page or 0)) end
 function M:startDaily() return self:call('review.startDaily') end
+function M:activate() return self:call('window.activate') end
+function M:center() return self:call('window.center') end
+function M:quit() return self:call('app.quit') end
 
 -- 解析 list 响应，返回动作 id 数组
 function M:actions()

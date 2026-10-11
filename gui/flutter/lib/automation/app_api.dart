@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import '../ebook_import.dart';
 import '../ffi/wordcard.dart';
 import '../ocr_import.dart';
@@ -125,6 +127,43 @@ final class AppApi {
       pushReview(<int>[], '今日记忆');
       return true;
     });
+
+    // —— 窗口 ——
+    a.registerFn('window.activate', (_) async {
+      await _wmctl('WID=\$(xdotool search --name "\$W" | head -1); '
+          '[ -n "\$WID" ] && xdotool windowactivate --sync "\$WID" && '
+          'xdotool windowraise "\$WID"; echo ok');
+      return true;
+    });
+    a.registerFn('window.center', (_) async {
+      final r = await _wmctl('''
+read SW SH < <(xdotool getdisplaygeometry)
+read X Y WW HH < <(wmctrl -lG | grep -i "\$W" | awk '{print \$3,\$4,\$5,\$6}')
+TX=\$(( (SW-WW)/2 )); TY=\$(( (SH-HH)/2 ))
+wmctrl -r "\$W" -e "0,\$TX,\$TY,\$WW,\$HH"
+echo "\$TX \$TY \$WW \$HH"
+''');
+      return r;
+    });
+    a.registerFn('window.move', (args) async {
+      final x = (args['x'] as num?)?.toInt() ?? 0;
+      final y = (args['y'] as num?)?.toInt() ?? 0;
+      final r = await _wmctl(
+          'read X Y WW HH < <(wmctrl -lG | grep -i "\$W" | awk \'{print \$3,\$4,\$5,\$6}\'); '
+          'wmctrl -r "\$W" -e "0,$x,$y,\$WW,\$HH"; echo ok');
+      return r;
+    });
+    a.registerFn('app.quit', (_) {
+      Future<void>.delayed(const Duration(milliseconds: 100), () => exit(0));
+      return true;
+    });
+  }
+
+  /// 在会话内调用 wmctrl/xdotool 操作本窗口（$W = 窗口标题）。
+  Future<String> _wmctl(String body) async {
+    final script = 'W=\${WC_WINDOW_TITLE:-WordCard}\n$body';
+    final r = await Process.run('bash', ['-lc', script]);
+    return (r.stdout as String).trim();
   }
 
   Map<String, dynamic> _stats() {
