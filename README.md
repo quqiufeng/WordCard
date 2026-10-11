@@ -196,6 +196,7 @@ WordCard/
 │
 ├── gui/                         # 桌面应用（Flutter + Yaru）
 ├── gui.md                       # UI 层技术架构
+├── automation.md                # 全自动化开发模式（Fully-Automated Mode）
 ├── design.md                    # 架构文档
 ├── README.md                    # 本文档
 └── todolist.md                    # 应用方向

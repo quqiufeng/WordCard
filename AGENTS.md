@@ -11,6 +11,7 @@
 - **Python 管道**：解析 / 选词(ECDICT) / LLM 翻译 / OCR / TTS（`tools/`、`importer.py`、`translate.py`…）。
 - **桌面 UI**：`gui/flutter/`（Flutter + Yaru，`dart:ffi` 直连 `libwordcard.so`）。
 - **UI 架构文档**：`gui.md`；**总览**：`README.md`；**引擎设计**：`design.md`。
+- **全自动化开发模式（Fully-Automated Mode）**：`automation.md`——Agent 能看见并使用自己做的软件，在使用中迭代验证。
 
 ---
 
