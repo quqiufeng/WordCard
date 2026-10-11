@@ -94,7 +94,7 @@ WORDCARD_ROOT=/opt/WordCard luajit -e 'package.path="gui/flutter/automation/?.lu
 **对外 API（供 my-agent 语音/微信等驱动）**：除 `click` 外支持带参数命令
 `{"cmd":"call","fn":"<fn>","args":{...}}`。已暴露函数：
 `state` `stats` `nav.goto` `task.list` `task.words` `task.study` `task.dictate`
-`task.delete` `task.create` `import.wordlist` `import.ebook` `import.image` `review.startDaily`。
+`task.delete` `task.create` `import.wordlist` `import.ebook` `import.image` `review.startDaily` `window.activate` `window.center` `window.move` `app.quit`。
 Lua 封装 `automation/wordcard.lua` 提供 `call(fn,args_json)` 及便捷方法
 `stats()/tasks()/words()/study(tag)/dictate(tag)/createTask(name,text)/importWordlist/importEbook/goto/startDaily`。
 

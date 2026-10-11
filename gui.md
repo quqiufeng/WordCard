@@ -257,6 +257,10 @@ UI 按钮与 API 走同一入口：按钮点击 = `invoke(id)`；外部调用 = 
 | `import.ebook` | `{path}` | 导入电子书（解析 + 释义 + 翻译） |
 | `import.image` | `{paths:[..],name}` | 图片 OCR 建任务 |
 | `review.startDaily` | — | 打开今日记忆 |
+| `window.activate` | — | 激活/置顶窗口 |
+| `window.center` | — | 窗口移到屏幕中央（截图友好） |
+| `window.move` | `{x,y}` | 移动窗口到 (x,y) |
+| `app.quit` | — | 退出应用 |
 
 ### 用法（LuaJIT）
 
