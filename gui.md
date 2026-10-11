@@ -350,7 +350,39 @@ cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/ap
 
 ---
 
-## 十四、待办 / 后续
+## 十四、开发工作流（自设计 · 自验证 · 自迭代）
+
+> Agent 可**自己设计、自己构建、自己截图验证、自己迭代**；细则见仓库根 `AGENTS.md`。
+
+```
+设计 → 构建 → 运行 → 截图 → 读图自检 → 迭代 → 提交
+```
+
+1. **构建**：`gui/flutter/build.sh`（先编 C 核心再 `flutter build linux --release`）；
+   改 Dart 先 `flutter analyze`（须 No issues）。
+2. **运行（必须会话内）**：以当前图形会话环境启动，避免 systemd 无 `XAUTHORITY` 导致 GL 失败：
+   ```bash
+   P=$(pgrep -x pcmanfm-qt|head -1); XA=$(tr '\0' '\n' </proc/$P/environ|sed -n 's/^XAUTHORITY=//p')
+   setsid env DISPLAY=:0 XAUTHORITY="$XA" XDG_RUNTIME_DIR=/run/user/1000 \
+     gui/flutter/run.sh >/tmp/opencode/wc.log 2>&1 </dev/null & disown
+   ```
+3. **截图自检**（`import -window` 抓不了 GL 窗口 → 全屏抓图 + 按几何裁剪）：
+   ```bash
+   export DISPLAY=:0 XAUTHORITY="$XA"; wmctrl -a "WordCard"; sleep 1
+   read X Y W H < <(wmctrl -lG | grep -i WordCard | awk '{print $3,$4,$5,$6}')
+   import -window root /tmp/opencode/full.png
+   convert /tmp/opencode/full.png -crop "${W}x${H}+${X}+${Y}" +repage ~/wordcard_ui.png
+   # 再用 Read 读 ~/wordcard_ui.png 即可看到真实界面
+   ```
+4. **驱动 UI**：所有按钮走 `Automation.invoke(id)`，用 LuaJIT FFI 查询/点击/读状态
+   （`luajit gui/flutter/automation/agent_demo.lua`）。
+
+**环境红线**：NVIDIA 内核态/用户态版本必须一致（否则所有 OpenGL 程序无窗口，需重启）；
+`.desktop` 需 `chmod 755` + `trusted`；用 `pkill -x`/括号技巧避免误杀 shell。
+
+---
+
+## 十五、待办 / 后续
 
 - [ ] 卡片图片导出（Flutter `RepaintBoundary` → PNG）
 - [ ] 深色模式调色板（Kami 暖米 ↔ 暖深）
