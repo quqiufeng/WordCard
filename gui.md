@@ -211,43 +211,74 @@ abstract final class AppFonts {
 
 ---
 
-## 十、UI 自动化接口（AI 驱动）
+## 十、对外自动化 API（AI / 语音 / 微信 驱动）
 
-**每个按钮都走 `Automation.invoke(id)`，UI 点击与 AI 调用同一条路径。**
+**目标：把全部能力暴露为稳定 API，任何外部 agent 都能完整操作本应用。**
 
 ```
 Flutter App ── UDS(JSON Lines) ── libwordcard_ctl.so(C) ── LuaJIT FFI ── agent
  /tmp/wordcard-automation.sock        automation_ctl.c        automation/wordcard.lua
 ```
 
-协议（Unix socket）：
+UI 按钮与 API 走同一入口：按钮点击 = `invoke(id)`；外部调用 = socket 命令。
 
-| 请求 | 响应 |
+### 协议（Unix socket，JSON Lines）
+
+| 请求 | 说明 |
 |------|------|
-| `{"cmd":"list"}` | `{"ok":true,"actions":[...]}` |
-| `{"cmd":"state"}` | `{"ok":true,"state":{page,total,done,word,...}}` |
-| `{"cmd":"click","id":"..."}` | `{"ok":true,"id":"..."}` |
-| `{"cmd":"ping"}` | `{"ok":true,"pong":true}` |
+| `{"cmd":"list"}` | 返回可用 `actions` 与 `functions` |
+| `{"cmd":"state"}` | 返回当前状态（页面 + 统计 + 任务 + 复习） |
+| `{"cmd":"click","id":"<action>"}` | 触发按钮动作 |
+| `{"cmd":"call","fn":"<fn>","args":{...}}` | 调用带参数的 API 函数 |
+| `{"cmd":"ping"}` | 存活探测 |
 
-事件推送：`{"event":"click","id":...,"source":"ui"|"ai"}`。
+事件推送：`{"event":"click","id":...,"source":"ui"|"ai"}`；连接建立时发 `{"event":"ready",...}`。
 
-**动作 id**：
+### 按钮动作 id
+
 - 导航：`nav.toggle` / `nav.home` / `nav.tasks` / `nav.import`
 - 记忆：`review.flip` / `review.know` / `review.dontKnow` / `review.restart` / `review.speakParagraph`
 - 导入：`import.dict.<name>` / `import.dict.all` / `import.ebook` / `import.paste` / `import.image`
 
+### API 函数（`call`，供其他 agent 完整操作）
+
+| fn | args | 说明 |
+|----|------|------|
+| `state` | — | 页面 + `stats` + `tasks` + `review` |
+| `stats` | — | 任务数/总词数/已记住/未记住/完成度/待复习 |
+| `nav.goto` | `{page:0\|1\|2}` | 切页（首页/任务/导入） |
+| `task.list` | — | 任务列表（含 done/count） |
+| `task.words` | `{tag,page,size}` | 翻页取某任务单词 |
+| `task.study` | `{tag}` | 打开该任务的**记忆**页 |
+| `task.dictate` | `{tag}` | 打开该任务的**听写**页 |
+| `task.delete` | `{tag}` | 删除任务 |
+| `task.create` | `{name,text}` | 粘贴文本建任务（支持词组） |
+| `import.wordlist` | `{name}` 或 `{names:'all'\|[..]}` | 导入考试词表 |
+| `import.ebook` | `{path}` | 导入电子书（解析 + 释义 + 翻译） |
+| `import.image` | `{paths:[..],name}` | 图片 OCR 建任务 |
+| `review.startDaily` | — | 打开今日记忆 |
+
+### 用法（LuaJIT）
+
 ```lua
 local wc = require("wordcard")
 local c = assert(wc.open())
-for _, id in ipairs(c:actions()) do print(id) end
-c:click("nav.tasks")
-print(c:state())
+for _, f in ipairs(c:actions()) do print(f) end   -- 或 c:list()
+print(c:stats())                     -- 统计
+print(c:tasks())                     -- 任务列表
+c:study("book:岛上书店")             -- 打开某任务记忆
+c:dictate("dict:cet4")               -- 听写该任务
+c:createTask("第3周", "abandon 放弃\nlook after 照顾")
 c:close()
 ```
+
+便捷方法（返回原始 JSON 字符串）：`stats / tasks / words / study / dictate /
+deleteTask / createTask / importWordlist / importEbook / goto / startDaily / call`。
 
 构建与运行：`cd src && make automation`（→ `libwordcard_ctl.so`）；
 `luajit gui/flutter/automation/agent_demo.lua`。
 环境变量：`WC_AUTOMATION_SOCK`、`WORDCARD_ROOT`、`WCCTL_LIB`。
+
 
 ---
 
