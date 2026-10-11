@@ -60,6 +60,23 @@ convert /tmp/opencode/full.png -crop "${W}x${H}+${X}+${Y}" +repage ~/wordcard_ui
 # 然后用 Read 工具读 ~/wordcard_ui.png 即可看到真实界面
 ```
 
+#### 3.5 把窗口移到屏幕中央（可选，截图更聚焦）
+
+**必须先激活窗口**（点任务栏 App 图标，或 `xdotool windowactivate`），否则拖动不生效；
+再拖**标题栏空白处**（避开标题文字与右侧按钮）：
+
+```bash
+HEX=$(wmctrl -lG | awk '/WordCard/{print $1; exit}'); WID=$((HEX))
+xdotool windowactivate --sync "$WID"; xdotool windowraise "$WID"; sleep 1
+read SW SH < <(xdotool getdisplaygeometry)
+read X0 Y0 W H < <(wmctrl -lG | grep -i WordCard | awk '{print $3,$4,$5,$6}')
+GX=$((X0+70)); GY=$((Y0+14))                 # 标题栏左侧空白区
+TX=$(( (SW-W)/2 )); TY=$(( (SH-H)/2 ))
+xdotool mousemove --sync $GX $GY; sleep 0.3; xdotool mousedown 1; sleep 0.3
+xdotool mousemove --sync $((GX+TX-X0)) $((GY+TY-Y0)); sleep 0.2; xdotool mouseup 1
+# 拖拽不稳时兜底：wmctrl -r "WordCard" -e "0,$TX,$TY,$W,$H"
+```
+
 ### 4. 驱动 UI（AI 自动化接口）
 
 每个按钮都走 `Automation.invoke(id)`，可用 LuaJIT FFI 远程查询/点击：

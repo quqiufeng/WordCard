@@ -374,6 +374,8 @@ cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/ap
    convert /tmp/opencode/full.png -crop "${W}x${H}+${X}+${Y}" +repage ~/wordcard_ui.png
    # 再用 Read 读 ~/wordcard_ui.png 即可看到真实界面
    ```
+   （可选：先 `xdotool windowactivate $WID` 激活，再拖标题栏空白处到屏幕中央，截图更聚焦；
+   拖拽不稳时用 `wmctrl -r "WordCard" -e "0,$TX,$TY,$W,$H"` 兜底。）
 4. **驱动 UI**：所有按钮走 `Automation.invoke(id)`，用 LuaJIT FFI 查询/点击/读状态
    （`luajit gui/flutter/automation/agent_demo.lua`）。
 
