@@ -68,6 +68,39 @@ function M:click(id)
   return self:raw(('{"cmd":"click","id":"%s"}'):format(id))
 end
 
+-- 调用带参数的 API 函数。args_json 为 JSON 对象字符串（默认 "{}"）。
+function M:call(fn, args_json)
+  return self:raw(('{"cmd":"call","fn":"%s","args":%s}'):format(fn, args_json or '{}'))
+end
+
+-- 常用便捷方法（返回原始 JSON 字符串）
+local function jstr(s)
+  s = tostring(s or ''):gsub('\\', '\\\\'):gsub('"', '\\"')
+       :gsub('\n', '\\n'):gsub('\r', '\\r'):gsub('\t', '\\t')
+  return '"' .. s .. '"'
+end
+
+function M:stats() return self:call('stats') end
+function M:tasks() return self:call('task.list') end
+function M:words(tag, page, size)
+  return self:call('task.words', ('{"tag":%s,"page":%d,"size":%d}'):format(
+    jstr(tag), page or 0, size or 50))
+end
+function M:study(tag) return self:call('task.study', ('{"tag":%s}'):format(jstr(tag))) end
+function M:dictate(tag) return self:call('task.dictate', ('{"tag":%s}'):format(jstr(tag))) end
+function M:deleteTask(tag) return self:call('task.delete', ('{"tag":%s}'):format(jstr(tag))) end
+function M:createTask(name, text)
+  return self:call('task.create', ('{"name":%s,"text":%s}'):format(jstr(name), jstr(text)))
+end
+function M:importWordlist(name)
+  return self:call('import.wordlist', ('{"name":%s}'):format(jstr(name)))
+end
+function M:importEbook(path)
+  return self:call('import.ebook', ('{"path":%s}'):format(jstr(path)))
+end
+function M:goto(page) return self:call('nav.goto', ('{"page":%d}'):format(page or 0)) end
+function M:startDaily() return self:call('review.startDaily') end
+
 -- 解析 list 响应，返回动作 id 数组
 function M:actions()
   local s = self:list() or ""

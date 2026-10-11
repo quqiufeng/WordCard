@@ -18,6 +18,7 @@ final class Automation {
   static final Automation instance = Automation._();
 
   final Map<String, void Function()> _actions = {};
+  final Map<String, dynamic Function(Map<String, dynamic> args)> _fns = {};
   final List<Socket> _clients = [];
 
   ServerSocket? _server;
@@ -27,10 +28,23 @@ final class Automation {
   Map<String, dynamic> state = {};
 
   List<String> get actionIds => _actions.keys.toList(growable: false);
+  List<String> get functionNames => _fns.keys.toList(growable: false);
 
   /// 注册一个可被点击的动作。
   void register(String id, void Function() handler) {
     _actions[id] = handler;
+  }
+
+  /// 注册一个带参数的 API 函数（对外暴露给其他 agent 调用）。
+  void registerFn(String name, dynamic Function(Map<String, dynamic> args) fn) {
+    _fns[name] = fn;
+  }
+
+  /// 调用 API 函数。
+  dynamic callFn(String name, Map<String, dynamic> args) {
+    final fn = _fns[name];
+    if (fn == null) throw StateError('unknown fn: $name');
+    return fn(args);
   }
 
   /// 触发动作（UI 点击 / AI 调用都走这里）并广播事件。
@@ -80,6 +94,7 @@ final class Automation {
     socket.write('${jsonEncode({
           'event': 'ready',
           'actions': actionIds,
+          'functions': functionNames,
         })}\n');
     socket
         .cast<List<int>>()
@@ -98,7 +113,7 @@ final class Automation {
     } catch (_) {}
   }
 
-  void _handle(Socket s, String line) {
+  Future<void> _handle(Socket s, String line) async {
     if (line.trim().isEmpty) return;
     Map<String, dynamic> req;
     try {
@@ -109,15 +124,34 @@ final class Automation {
     }
     switch ('${req['cmd']}') {
       case 'list':
-        _reply(s, {'ok': true, 'actions': actionIds});
+        _reply(s, {'ok': true, 'actions': actionIds, 'functions': functionNames});
         break;
       case 'state':
-        _reply(s, {'ok': true, 'state': state});
+        if (_fns.containsKey('state')) {
+          try {
+            final r = await callFn('state', {});
+            _reply(s, {'ok': true, 'state': r});
+          } catch (e) {
+            _reply(s, {'ok': true, 'state': state});
+          }
+        } else {
+          _reply(s, {'ok': true, 'state': state});
+        }
         break;
       case 'click':
         final id = '${req['id']}';
         final ok = invoke(id, source: 'ai');
         _reply(s, {'ok': ok, 'id': id, 'error': ok ? null : 'unknown action'});
+        break;
+      case 'call':
+        final name = '${req['fn']}';
+        final args = (req['args'] as Map?)?.cast<String, dynamic>() ?? {};
+        try {
+          final result = await callFn(name, args);
+          _reply(s, {'ok': true, 'fn': name, 'result': result});
+        } catch (e) {
+          _reply(s, {'ok': false, 'fn': name, 'error': '$e'});
+        }
         break;
       case 'ping':
         _reply(s, {'ok': true, 'pong': true});

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../automation/app_api.dart';
 import '../automation/automation.dart';
 import '../ffi/wordcard.dart';
 import '../state/study_session.dart';
@@ -7,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../theme/fonts.dart';
 import '../tts.dart';
 import 'dashboard_page.dart';
+import 'dictation_exam.dart';
 import 'import_page.dart';
 import 'review_screen.dart';
 import 'tasks_page.dart';
@@ -55,6 +57,15 @@ class _StudyPageState extends State<StudyPage> {
         _engine = engine;
         _userId = userId;
       });
+      // 对外 API（供其他 agent 驱动）
+      AppApi(
+        engine: engine,
+        userId: userId,
+        goToPage: (i) => setState(() => _index = i),
+        pageName: () => _titles[_index],
+        pushReview: _pushReview,
+        pushDictation: _pushDictation,
+      ).register();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
@@ -67,13 +78,23 @@ class _StudyPageState extends State<StudyPage> {
     final uid = _userId;
     if (engine == null || uid == null) return;
     final session = StudySession(engine: engine, userId: uid);
-    if (ids == null) {
+    if (ids == null || ids.isEmpty) {
       session.start();
     } else {
       session.startItems(ids);
     }
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ReviewScreen(session: session, title: title),
+    ));
+  }
+
+  /// 打开听写考试页。
+  void _pushDictation(List<int> ids, String name) {
+    final engine = _engine;
+    if (engine == null || ids.isEmpty) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) =>
+          DictationExamPage(engine: engine, itemIds: ids, title: '听写 · $name'),
     ));
   }
 
