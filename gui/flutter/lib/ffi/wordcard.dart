@@ -38,6 +38,7 @@ final class TaskInfo {
   String get name {
     if (tag.startsWith('book:')) return tag.substring(5);
     if (tag.startsWith('dict:')) return '词表 ${tag.substring(5)}';
+    if (tag.startsWith('custom:')) return tag.substring(7);
     if (tag.isEmpty) return '(未分类)';
     return tag;
   }
@@ -45,6 +46,7 @@ final class TaskInfo {
   String get kind {
     if (tag.startsWith('book:')) return '电子书';
     if (tag.startsWith('dict:')) return '词表';
+    if (tag.startsWith('custom:')) return '自建';
     return '其它';
   }
 }
