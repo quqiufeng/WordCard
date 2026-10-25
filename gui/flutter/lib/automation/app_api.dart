@@ -4,6 +4,7 @@ import '../ebook_import.dart';
 import '../ffi/wordcard.dart';
 import '../ocr_import.dart';
 import '../paste_import.dart';
+import '../reader_library.dart';
 import '../wordlist.dart';
 import 'automation.dart';
 
@@ -20,6 +21,7 @@ final class AppApi {
     required this.pageName,
     required this.pushReview,
     required this.pushDictation,
+    required this.openReader,
   });
 
   final WordCardEngine engine;
@@ -28,17 +30,20 @@ final class AppApi {
   final String Function() pageName;
   final void Function(List<int> itemIds, String name) pushReview;
   final void Function(List<int> itemIds, String name) pushDictation;
+  final void Function(ReaderBook book) openReader;
 
   void register() {
     final a = Automation.instance;
 
     // —— 状态 / 导航 ——
-    a.registerFn('state', (_) => {
-          'page': pageName(),
-          'stats': _stats(),
-          'tasks': _taskList(),
-          'review': a.state,
-        });
+    a.registerFn(
+        'state',
+        (_) => {
+              'page': pageName(),
+              'stats': _stats(),
+              'tasks': _taskList(),
+              'review': a.state,
+            });
     a.registerFn('nav.goto', (args) {
       goToPage((args['page'] as num?)?.toInt() ?? 0);
       return true;
@@ -61,7 +66,12 @@ final class AppApi {
         'size': size,
         'words': [
           for (final e in items.sublist(start, end))
-            {'id': e.id, 'w': e.questionText, 'a': e.answerText, 'hint': e.hintText},
+            {
+              'id': e.id,
+              'w': e.questionText,
+              'a': e.answerText,
+              'hint': e.hintText
+            },
         ],
       };
     });
@@ -98,7 +108,8 @@ final class AppApi {
           added += await svc.import(l.name);
         }
       } else {
-        final list = names is List ? names.map((e) => '$e') : ['${args['name'] ?? ''}'];
+        final list =
+            names is List ? names.map((e) => '$e') : ['${args['name'] ?? ''}'];
         for (final n in list) {
           added += await svc.import(n);
         }
@@ -116,10 +127,44 @@ final class AppApi {
     });
     a.registerFn('import.image', (args) async {
       final raw = args['paths'];
-      final paths = raw is List ? raw.map((e) => '$e').toList() : ['${args['path'] ?? ''}'];
+      final paths = raw is List
+          ? raw.map((e) => '$e').toList()
+          : ['${args['path'] ?? ''}'];
       final text = await OcrImporter().recognizeMany(paths);
       final name = '${args['name'] ?? '图片单词表'}';
       return PasteImporter(engine).import(name, text);
+    });
+
+    // —— 双语阅读 ——
+    a.registerFn(
+        'reader.list',
+        (_) => [
+              for (final b in ReaderLibrary.instance.listBooks())
+                {
+                  'slug': b.slug,
+                  'title': b.title,
+                  'author': b.author,
+                  'chapters': b.chapters.length,
+                  'pages': b.pages,
+                  'chapter': ReaderLibrary.instance.progressOf(b.slug),
+                },
+            ]);
+    a.registerFn('reader.open', (args) {
+      final slug = '${args['slug'] ?? args['name'] ?? ''}';
+      final book = ReaderLibrary.instance.bookBySlug(slug);
+      if (book == null) throw StateError('unknown book: $slug');
+      openReader(book);
+      return true;
+    });
+    a.registerFn('reader.import', (args) async {
+      final path = '${args['path'] ?? ''}';
+      if (path.isEmpty) throw StateError('missing path');
+      final code = await ReaderLibrary.instance.importBook(
+        path,
+        onLog: (l) => Automation.instance
+            .updateState({'page': 'reader-import', 'log': l}),
+      );
+      return code;
     });
 
     // —— 复习（每日） ——
@@ -128,42 +173,10 @@ final class AppApi {
       return true;
     });
 
-    // —— 窗口 ——
-    a.registerFn('window.activate', (_) async {
-      await _wmctl('WID=\$(xdotool search --name "\$W" | head -1); '
-          '[ -n "\$WID" ] && xdotool windowactivate --sync "\$WID" && '
-          'xdotool windowraise "\$WID"; echo ok');
-      return true;
-    });
-    a.registerFn('window.center', (_) async {
-      final r = await _wmctl('''
-read SW SH < <(xdotool getdisplaygeometry)
-read X Y WW HH < <(wmctrl -lG | grep -i "\$W" | awk '{print \$3,\$4,\$5,\$6}')
-TX=\$(( (SW-WW)/2 )); TY=\$(( (SH-HH)/2 ))
-wmctrl -r "\$W" -e "0,\$TX,\$TY,\$WW,\$HH"
-echo "\$TX \$TY \$WW \$HH"
-''');
-      return r;
-    });
-    a.registerFn('window.move', (args) async {
-      final x = (args['x'] as num?)?.toInt() ?? 0;
-      final y = (args['y'] as num?)?.toInt() ?? 0;
-      final r = await _wmctl(
-          'read X Y WW HH < <(wmctrl -lG | grep -i "\$W" | awk \'{print \$3,\$4,\$5,\$6}\'); '
-          'wmctrl -r "\$W" -e "0,$x,$y,\$WW,\$HH"; echo ok');
-      return r;
-    });
     a.registerFn('app.quit', (_) {
       Future<void>.delayed(const Duration(milliseconds: 100), () => exit(0));
       return true;
     });
-  }
-
-  /// 在会话内调用 wmctrl/xdotool 操作本窗口（$W = 窗口标题）。
-  Future<String> _wmctl(String body) async {
-    final script = 'W=\${WC_WINDOW_TITLE:-WordCard}\n$body';
-    final r = await Process.run('bash', ['-lc', script]);
-    return (r.stdout as String).trim();
   }
 
   Map<String, dynamic> _stats() {
@@ -193,7 +206,8 @@ echo "\$TX \$TY \$WW \$HH"
   List<Map<String, dynamic>> _taskList() {
     final status = <int, int>{};
     for (final it in engine.allItems()) {
-      status[it.id] = engine.mastery(userId: userId, itemId: it.id)?.status ?? 0;
+      status[it.id] =
+          engine.mastery(userId: userId, itemId: it.id)?.status ?? 0;
     }
     return [
       for (final t in engine.tasks())
@@ -202,10 +216,8 @@ echo "\$TX \$TY \$WW \$HH"
           'name': t.name,
           'kind': t.kind,
           'count': t.count,
-          'done': engine
-              .itemsByTag(t.tag)
-              .where((e) => status[e.id] == 2)
-              .length,
+          'done':
+              engine.itemsByTag(t.tag).where((e) => status[e.id] == 2).length,
         },
     ];
   }

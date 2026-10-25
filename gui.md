@@ -59,7 +59,8 @@ UI 层**只负责展示与交互**，不重写学习算法；解析、翻译、�
 └───────────────────────────────────────────────────────────────┘
 ```
 
-**页面导航**：侧栏三项 `首页 / 任务 / 导入`（`nav.home / nav.tasks / nav.import`）。
+**页面导航**：侧栏四项 `首页 / 任务 / 导入 / 阅读`
+（`nav.home / nav.tasks / nav.import / nav.reader`）。
 「记忆」不再是固定页，而是从 **首页「开始今日记忆」** 或 **任务行「学习」** 打开的
 `ReviewScreen` 路由；「听写」打开 `DictationExamPage` 路由。
 
@@ -72,6 +73,22 @@ UI 层**只负责展示与交互**，不重写学习算法；解析、翻译、�
           → 不会(空格, q=1) / 记得(→, q=4) → wc_sm2_update
           → 到期排程；结束时 wc_save_db
 ```
+
+### 双语阅读闭环
+
+```
+阅读书架（扫描 /opt/books/<slug>/chapters/NN-.../page_*.md）
+  → 章节正文清洗 + 段落还原（reader_library.dart）
+  → 段间对照：英文原文；点「译」或「翻译本章」→ memo_server（Hunyuan-MT-7B）
+  → 译文写入 data/reader_cache.jsonl，下次打开直接显示
+  → 点段落中的单词 → ECDICT / 词形还原 / LLM 兜底 → 「加入读书任务」
+  → tags = book:<书名>，与其它导入共用同一 SM-2 队列
+```
+
+- 译文按需生成，不预翻全书；`MemoService` 常驻进程逐段处理，界面按结果流式回填。
+- 阅读进度存 `data/reader_progress.json`（每本书的章节索引）。
+- 书库根目录默认 `/opt/books`，可用环境变量 `BOOK_MD_ROOT` 覆盖；导入复用
+  `/opt/my_db/tools/import_book`（`--skip-vectors`，只阅读不需要向量索引）。
 
 ### 任务模型（在 items 的 tags 之上分的一层）
 
@@ -182,7 +199,13 @@ abstract final class AppFonts {
 ### LLM / OCR / TTS 服务
 
 - **翻译**：`translate.py` 默认用 **Hunyuan-MT-7B**（`/data/models/Hunyuan-MT-7B-Q4_K_M.gguf`，
-  约 4.4G / 显存 ~5.3G），可 `WC_LLM_MODEL` 覆盖；兜底 Qwen3-4B。`llama-server` 自动拉起。
+  约 4.4G / 显存 ~5.3G），可 `WC_LLM_MODEL` 覆盖；兜底 Qwen3-4B。
+  `llama-server` 不再后台静默常驻，而是在**终端窗口**中前台启动（默认 xterm，
+  `WC_TERMINAL=qterminal` 可切换）：Ctrl+C / 关闭窗口即可停止；WordCard 退出时
+  也会自动停止并释放显存。手动控制：`python3 tools/llama_ctl.py start|stop|status`。
+  - **默认本地 LLM**；也可改用在线翻译：在 `.env` 配
+    `WC_TRANSLATE_BACKEND=deepseek`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_API_KEY`
+    （OpenAI 兼容），此时不启动本地模型/终端。`auto` 才根据 key 自动选择。
 - **OCR**：`tools/ocr_image.py` 调 `libocr_simple.so` + `models/ocr/` 的 PP-OCRv4 模型
   （det/rec onnx + 字典）；需 onnxruntime `VERS_1.26.0`，App 通过
   `LD_LIBRARY_PATH=/data/venv/onnxruntime-linux-x64-gpu-1.26.0/lib`（`WC_ORT_LIB` 可覆盖）传入。
@@ -246,7 +269,7 @@ UI 按钮与 API 走同一入口：按钮点击 = `invoke(id)`；外部调用 = 
 |----|------|------|
 | `state` | — | 页面 + `stats` + `tasks` + `review` |
 | `stats` | — | 任务数/总词数/已记住/未记住/完成度/待复习 |
-| `nav.goto` | `{page:0\|1\|2}` | 切页（首页/任务/导入） |
+| `nav.goto` | `{page:0\|1\|2\|3}` | 切页（首页/任务/导入/阅读） |
 | `task.list` | — | 任务列表（含 done/count） |
 | `task.words` | `{tag,page,size}` | 翻页取某任务单词 |
 | `task.study` | `{tag}` | 打开该任务的**记忆**页 |
@@ -257,9 +280,13 @@ UI 按钮与 API 走同一入口：按钮点击 = `invoke(id)`；外部调用 = 
 | `import.ebook` | `{path}` | 导入电子书（解析 + 释义 + 翻译） |
 | `import.image` | `{paths:[..],name}` | 图片 OCR 建任务 |
 | `review.startDaily` | — | 打开今日记忆 |
-| `window.activate` | — | 激活/置顶窗口 |
-| `window.center` | — | 窗口移到屏幕中央（截图友好） |
-| `window.move` | `{x,y}` | 移动窗口到 (x,y) |
+| `reader.list` | — | 书架：书名/章节/页数/阅读进度 |
+| `reader.open` | `{slug}` | 打开某本书（书内状态函数同时注册） |
+| `reader.import` | `{path}` | 调 `/opt/my_db/tools/import_book` 导入（--skip-vectors） |
+| `reader.state` | — | 当前书/章/段落/已译数 |
+| `reader.chapter` | `{index}` | 跳到某章 |
+| `reader.translate` | `{index}` 或 `{all:true}` | 翻译一段/整章 |
+| `reader.nextChapter` / `reader.prevChapter` | — | 章节翻页（按钮动作） |
 | `app.quit` | — | 退出应用 |
 
 ### 用法（LuaJIT）
@@ -273,15 +300,38 @@ print(c:tasks())                     -- 任务列表
 c:study("book:岛上书店")             -- 打开某任务记忆
 c:dictate("dict:cet4")               -- 听写该任务
 c:createTask("第3周", "abandon 放弃\nlook after 照顾")
+c:readerOpen("ddia"); c:readerChapter(10); c:readerTranslate(0)
 c:close()
 ```
 
+**原生窗口/截图（LuaJIT FFI，无 xdotool/wmctrl 子进程）**：
+
+```lua
+local c = require("wordcard").open()
+local w = assert(c:window())              -- libxdo 定位窗口
+w:activate():center()                     -- 激活/置顶/居中
+w:capture("/tmp/opencode/wordcard_ui.png")-- FFI 截屏（GL 窗口可用）
+w:click(92, 198); w:key("ctrl+l"); w:type("search")
+c:close()
+```
+
+一行式：`luajit -e 'package.path="/opt/WordCard/gui/flutter/automation/?.lua;"..package.path; local c=require("wordcard").open(); c:window():center():capture("/tmp/wc.png"); c:close()'`
+
+实现见 `automation/xdo.lua`（libxdo/X11 FFI）+ `automation/x11.lua`；
+截屏走 `/opt/my-agent/agentkit/lib/libagentkit.so`（FFI）。
+`c:activate()/c:center()/c:move()/c:capture()` 均为原生实现，不再提供 socket 窗口 API。
+
 便捷方法（返回原始 JSON 字符串）：`stats / tasks / words / study / dictate /
-deleteTask / createTask / importWordlist / importEbook / goto / startDaily / call`。
+deleteTask / createTask / importWordlist / importEbook / goto / startDaily /
+readerList / readerOpen / readerState / readerChapter / readerTranslate / call`。
+`activate / center / move / capture` 为原生窗口操作（成功返回 true/窗口对象），
+不经过 socket；`window()` 返回可直接链式调用的窗口对象。
 
 构建与运行：`cd src && make automation`（→ `libwordcard_ctl.so`）；
-`luajit gui/flutter/automation/agent_demo.lua`。
-环境变量：`WC_AUTOMATION_SOCK`、`WORDCARD_ROOT`、`WCCTL_LIB`。
+`luajit gui/flutter/automation/agent_demo.lua`；原生窗口演示
+`luajit gui/flutter/automation/native_demo.lua`。
+环境变量：`WC_AUTOMATION_SOCK`、`WORDCARD_ROOT`、`WCCTL_LIB`、`WC_WINDOW_TITLE`、
+`AGENTKIT_LIB`。
 
 
 ---
@@ -319,17 +369,22 @@ gui/flutter/
 │   ├── wordlist.dart / ebook_import.dart /
 │   │   paste_import.dart / ocr_import.dart          # 各导入来源
 │   ├── pages/
-│   │   ├── study_page.dart      # 主框架 + 侧栏（首页/任务/导入）
+│   │   ├── study_page.dart      # 主框架 + 侧栏（首页/任务/导入/阅读）
 │   │   ├── dashboard_page.dart  # 记忆数据面板
 │   │   ├── tasks_page.dart      # 任务列表 + 翻页词表
+│   │   ├── reader_page.dart     # 书架（/opt/books + 导入）
+│   │   ├── bilingual_reader.dart# 双语阅读（段间对照/查词/加入任务）
 │   │   ├── review_screen.dart   # 记忆（路由）
 │   │   ├── dictation_exam.dart  # 听写考试（路由）
 │   │   └── import_page.dart     # 导入
+│   ├── reader_library.dart      # 书库/章节/段落解析 + 译文/进度缓存
 │   └── widgets/
 │       ├── flash_card.dart      # 卡片（Kami 排版）
+│       ├── clickable_text.dart  # 可点词 RichText（查词）
 │       ├── memory_curve.dart    # 遗忘曲线（CustomPaint）
 │       └── task_bar_chart.dart  # 任务完成度柱状图
-├── automation/                  # wordcard.lua（LuaJIT FFI）+ agent_demo.lua
+├── automation/                  # wordcard.lua / xdo.lua / x11.lua（LuaJIT FFI）
+│                                # agent_demo.lua / native_demo.lua
 ├── linux/                       # flutter create 生成（GTK 运行器）
 └── snap/                        # snapcraft.yaml（预留）
 ```
@@ -401,16 +456,12 @@ cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/ap
    setsid env DISPLAY=:0 XAUTHORITY="$XA" XDG_RUNTIME_DIR=/run/user/1000 \
      gui/flutter/run.sh >/tmp/opencode/wc.log 2>&1 </dev/null & disown
    ```
-3. **截图自检**（`import -window` 抓不了 GL 窗口 → 全屏抓图 + 按几何裁剪）：
+3. **截图自检**（LuaJIT 原生窗口 + FFI 截屏，无外部进程）：
    ```bash
-   export DISPLAY=:0 XAUTHORITY="$XA"; wmctrl -a "WordCard"; sleep 1
-   read X Y W H < <(wmctrl -lG | grep -i WordCard | awk '{print $3,$4,$5,$6}')
-   import -window root /tmp/opencode/full.png
-   convert /tmp/opencode/full.png -crop "${W}x${H}+${X}+${Y}" +repage ~/wordcard_ui.png
-   # 再用 Read 读 ~/wordcard_ui.png 即可看到真实界面
+   WORDCARD_ROOT=/opt/WordCard luajit -e 'package.path="/opt/WordCard/gui/flutter/automation/?.lua;"..package.path;
+     local c=require("wordcard").open(); c:window():center():capture("/tmp/opencode/wordcard_ui.png"); c:close()'
+   # 再用 Read 读 /tmp/opencode/wordcard_ui.png 即可看到真实界面
    ```
-   （可选：先 `xdotool windowactivate $WID` 激活，再拖标题栏空白处到屏幕中央，截图更聚焦；
-   拖拽不稳时用 `wmctrl -r "WordCard" -e "0,$TX,$TY,$W,$H"` 兜底。）
 4. **驱动 UI**：所有按钮走 `Automation.invoke(id)`，用 LuaJIT FFI 查询/点击/读状态
    （`luajit gui/flutter/automation/agent_demo.lua`）。
 
@@ -429,4 +480,4 @@ cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/ap
 - [ ] 系统托盘常驻（需绕过 Flutter 隐藏窗口的 SEGV）
 - [ ] Snap 打包与 CI
 
-*最后更新: 2026-10-11*
+*最后更新: 2026-10-25*

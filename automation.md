@@ -54,10 +54,10 @@ Agent 设计 → 构建 → 在真实会话里运行 → 用 API 模拟人操作
    `DISPLAY`/`XAUTHORITY`），保证 GPU/GL 可用。
 3. **操作（驱动 UI）**：`Automation` 桥（Unix socket，JSON Lines）——
    - 每个按钮走 `invoke(id)`；外部可 `click`；
-   - 带参命令 `call(fn,args)`：数据/任务/导入/复习/窗口全套；
-   - LuaJIT FFI 封装 `automation/wordcard.lua`。
-4. **看见（视觉自检）**：`import -window root` 全屏抓图 → 按 `wmctrl -lG` 窗口几何
-   `convert -crop` 裁剪 → **`Read` 读图**（Agent 直接“看图”）。
+   - 带参命令 `call(fn,args)`：数据/任务/导入/复习/阅读；
+   - LuaJIT FFI 封装 `automation/wordcard.lua`；窗口/截图走 `automation/x11.lua`。
+4. **看见（视觉自检）**：LuaJIT FFI（libxdo + ak_capture）定位/激活/居中/截图 →
+   **`Read` 读图**（Agent 直接“看图”，无外部进程）。
 5. **迭代**：定位差异 → 改代码 → 重新构建运行 → 再截图验证 → 提交。
 
 ---
@@ -90,7 +90,8 @@ Agent 设计 → 构建 → 在真实会话里运行 → 用 API 模拟人操作
 动作（`click`）：`nav.*` `review.*` `import.*`
 函数（`call`）：`state` `stats` `nav.goto` `task.list` `task.words` `task.study`
 `task.dictate` `task.delete` `task.create` `import.wordlist` `import.ebook`
-`import.image` `review.startDaily` `window.activate` `window.center` `window.move` `app.quit`
+`import.image` `review.startDaily` `reader.list` `reader.open` `reader.import`
+`reader.state` `reader.chapter` `reader.translate` `app.quit`
 
 Lua：
 ```lua
@@ -98,8 +99,15 @@ local c = require("wordcard").open()
 print(c:stats()); print(c:tasks())
 c:study("book:岛上书店"); c:dictate("dict:cet4")
 c:createTask("第3周", "abandon 放弃\nlook after 照顾")
-c:center()
+c:readerOpen("ddia"); c:readerChapter(10); c:readerTranslate(0)
+-- 窗口/截图走原生 FFI，不启动 xdotool/wmctrl/import：
+local w = assert(c:window())
+w:activate():center():capture("/tmp/opencode/wordcard_ui.png")
+c:close()
 ```
+
+> 低层封装参考 `/opt/my-agent`：`automation/xdo.lua` 用 LuaJIT FFI 直连 libxdo/X11，
+> `automation/x11.lua` 提供窗口对象；`luajit -e` 可即时完成 定位→激活→点击→截图。
 
 ---
 
@@ -118,15 +126,10 @@ setsid env DISPLAY=:0 XAUTHORITY="$XA" XDG_RUNTIME_DIR=/run/user/1000 \
 # 3) 驱动（Lua）
 WORDCARD_ROOT=/opt/WordCard luajit gui/flutter/automation/agent_demo.lua
 
-# 4) 看见：置顶 → 居中 → 抓图裁剪
-HEX=$(wmctrl -lG|awk '/WordCard/{print $1;exit}'); WID=$((HEX))
-xdotool windowactivate --sync "$WID"; xdotool windowraise "$WID"
-read SW SH < <(xdotool getdisplaygeometry)
-read X Y W H < <(wmctrl -lG|grep -i WordCard|awk '{print $3,$4,$5,$6}')
-wmctrl -r WordCard -e "0,$(( (SW-W)/2 )),$(( (SH-H)/2 )),$W,$H"
-import -window root /tmp/opencode/full.png
-convert /tmp/opencode/full.png -crop "${W}x${H}+$(( (SW-W)/2 ))+$(( (SH-H)/2 ))" +repage ~/wordcard_ui.png
-# 5) Read ~/wordcard_ui.png 看图 → 判差异 → 改代码 → 回到 1)
+# 4) 看见：原生 FFI 定位 → 激活/居中 → 截图
+WORDCARD_ROOT=/opt/WordCard luajit -e 'package.path="gui/flutter/automation/?.lua;"..package.path;
+  local c=require("wordcard").open(); c:window():center():capture("/tmp/opencode/wordcard_ui.png"); c:close()'
+# 5) Read /tmp/opencode/wordcard_ui.png 看图 → 判差异 → 改代码 → 回到 1)
 ```
 
 ---
@@ -199,8 +202,8 @@ OpenAI 的 CUA/Operator、Anthropic 的 computer-use（`computer` 工具），�
 ### 6) 绕不开的工程坑（本项目已解）
 
 - **输入法**：非英文环境需切 IME，或用**剪贴板粘贴**绕过。
-- **窗口**：WM reparent/最大化会改变几何与坐标；**GL 窗口**不能被 `import -window` 直接抓，
-  需 root 抓取 + 裁剪（`shot.sh` 同法）。
+- **窗口**：WM reparent/最大化会改变几何与坐标；用 libxdo 取绝对几何 + ak_capture
+  截取 root 区域（GL 窗口同样可用），避免坐标漂移。
 - **时序**：动画/加载需等待；**合成鼠标移动可能不触发 hover tooltip**（故用“点击后看结果页”判定）。
 - **校验**：操作后必须复核（OCR 文本变化 / 图像差分）。
 
@@ -225,7 +228,7 @@ OpenAI 的 CUA/Operator、Anthropic 的 computer-use（`computer` 工具），�
 
 ### 1) 视觉识别（Visual Recognition）
 
-- **截图**：`import -window root` + `convert -crop`（GL 窗口走 root 抓取 + 裁剪）。
+- **截图**：LuaJIT FFI `ak_capture`（libagentkit，root 区域截取，GL 窗口可用）。
 - **OCR**：PP-OCRv4（`tools/` 管道）取文本 + 坐标——用于**验收**，以及在**无 API 界面**上的定位。
 - **模板匹配/差分**：OpenCV（识别无文字图标、判断状态变化）。
 
@@ -254,7 +257,7 @@ OpenAI 的 CUA/Operator、Anthropic 的 computer-use（`computer` 工具），�
 
 ### 5) 探索流程（一次性前置）
 
-1. **定位窗口**：`wmctrl -lG` / `xdotool`。
+1. **定位窗口**：LuaJIT FFI libxdo（`c:window()`）。
 2. **视觉识别**：截图 + 读图/OCR 识别界面结构；图标用像素行暗度分析或模板匹配。
 3. **交互验证**：`click`/`call` → 截图看结果**判定功能** → 记录。
 4. **固化**：写入 Lua 脚本（动态代码）/ 区域映射。

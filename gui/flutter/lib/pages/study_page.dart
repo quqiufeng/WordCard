@@ -7,9 +7,12 @@ import '../state/study_session.dart';
 import '../theme/app_theme.dart';
 import '../theme/fonts.dart';
 import '../tts.dart';
+import '../reader_library.dart';
+import 'bilingual_reader.dart';
 import 'dashboard_page.dart';
 import 'dictation_exam.dart';
 import 'import_page.dart';
+import 'reader_page.dart';
 import 'review_screen.dart';
 import 'tasks_page.dart';
 
@@ -22,12 +25,13 @@ class StudyPage extends StatefulWidget {
 }
 
 class _StudyPageState extends State<StudyPage> {
-  static const _titles = ['首页', '任务', '导入'];
-  static const _navIds = ['home', 'tasks', 'import'];
+  static const _titles = ['首页', '任务', '导入', '阅读'];
+  static const _navIds = ['home', 'tasks', 'import', 'reader'];
   static const _icons = [
     Icons.home_outlined,
     Icons.list_alt_outlined,
-    Icons.menu_book_outlined,
+    Icons.bookmark_add_outlined,
+    Icons.auto_stories_outlined,
   ];
 
   WordCardEngine? _engine;
@@ -65,6 +69,7 @@ class _StudyPageState extends State<StudyPage> {
         pageName: () => _titles[_index],
         pushReview: _pushReview,
         pushDictation: _pushDictation,
+        openReader: _pushReader,
       ).register();
     } catch (e) {
       if (!mounted) return;
@@ -85,6 +90,15 @@ class _StudyPageState extends State<StudyPage> {
     }
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ReviewScreen(session: session, title: title),
+    ));
+  }
+
+  /// 打开双语阅读页。
+  void _pushReader(ReaderBook book) {
+    final engine = _engine;
+    if (engine == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BilingualReaderScreen(engine: engine, book: book),
     ));
   }
 
@@ -179,7 +193,8 @@ class _StudyPageState extends State<StudyPage> {
             onSpeak: (t) => TtsService.instance.speak(t),
             onStudy: (ids, name) => _pushReview(ids, '记忆 · $name'),
           ),
-        _ => ImportPage(engine: _engine!),
+        2 => ImportPage(engine: _engine!),
+        _ => ReaderPage(onOpen: _pushReader),
       };
 
   Widget _errorView(BuildContext context) {

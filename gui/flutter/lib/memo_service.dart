@@ -1,10 +1,32 @@
 import 'dart:convert';
 import 'dart:io';
 
+/// 一次查词结果（ECDICT 优先，未收录由本地 LLM 兜底）。
+final class WordDef {
+  const WordDef({
+    required this.word,
+    required this.phonetic,
+    required this.pos,
+    required this.def,
+    required this.en,
+    this.base = '',
+  });
+
+  final String word;
+  final String phonetic;
+  final String pos;
+  final String def;
+  final String en;
+  final String base;
+
+  String get display => pos.isEmpty ? def : '$pos $def';
+}
+
 /// 按需「用法/场景」助记服务客户端。
 ///
 /// 懒启动 `tools/memo_server.py`（本地 LLM 常驻），复习到无 memo 的词时
-/// [request] 一行，得到结果后回调，用于写回卡片。
+/// [request] 一行，得到结果后回调，用于写回卡片。阅读页的段落翻译与
+/// 点词查词也复用同一个常驻进程。
 final class MemoService {
   MemoService._();
 
@@ -14,6 +36,7 @@ final class MemoService {
   String? _root;
   final Map<String, void Function(String memo)> _pending = {};
   final Map<String, void Function(String zh)> _pendingText = {};
+  final Map<String, void Function(WordDef def)> _pendingLookup = {};
 
   String? _findRoot() {
     for (final c in ['.', '/opt/WordCard']) {
@@ -49,7 +72,19 @@ final class MemoService {
     if (line.trim().isEmpty) return;
     try {
       final d = json.decode(line) as Map<String, dynamic>;
-      if (d.containsKey('zh')) {
+      if (d.containsKey('lookup')) {
+        final w = '${d['lookup']}';
+        final cb =
+            _pendingLookup.remove(w) ?? _pendingLookup.remove(w.toLowerCase());
+        cb?.call(WordDef(
+          word: w,
+          phonetic: '${d['ph'] ?? ''}',
+          pos: '${d['p'] ?? ''}',
+          def: '${d['d'] ?? ''}',
+          en: '${d['en'] ?? ''}',
+          base: '${d['base'] ?? ''}',
+        ));
+      } else if (d.containsKey('zh')) {
         _pendingText.remove('${d['t']}')?.call('${d['zh'] ?? ''}');
       } else {
         _pending.remove('${d['w']}')?.call('${d['memo'] ?? ''}');
@@ -79,6 +114,20 @@ final class MemoService {
       't': text,
       if (word != null && word.isNotEmpty) 'w': word,
     };
+    if (p == null) {
+      start().then((_) => _send(req));
+    } else {
+      _send(req);
+    }
+  }
+
+  /// 查词（阅读页点词）：ECDICT → 词形还原 → 本地 LLM 兜底。
+  void lookup(String word, void Function(WordDef def) onDef) {
+    final w = word.trim();
+    if (w.isEmpty) return;
+    _pendingLookup[w] = onDef;
+    final p = _proc;
+    final req = <String, dynamic>{'lookup': w};
     if (p == null) {
       start().then((_) => _send(req));
     } else {

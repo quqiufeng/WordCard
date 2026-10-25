@@ -49,34 +49,29 @@ setsid env DISPLAY=:0 XAUTHORITY="$XA" XDG_RUNTIME_DIR=/run/user/1000 \
 
 ### 3. 截图自检（**关键：Agent 能自己看图**）
 
-`import -window <id>` 抓不了 GL 窗口；改为**全屏抓图 + 按窗口几何裁剪**：
+**唯一方式：LuaJIT 原生窗口 + 截图（不启动 xdotool/wmctrl/import 进程）**
 
-```bash
-P=$(pgrep -x pcmanfm-qt | head -1); XA=$(tr '\0' '\n' < /proc/$P/environ | sed -n 's/^XAUTHORITY=//p')
-export DISPLAY=:0 XAUTHORITY="$XA"
-wmctrl -a "WordCard"; sleep 1            # 置顶（避免被终端挡住）
-read X Y W H < <(wmctrl -lG | grep -i WordCard | awk '{print $3,$4,$5,$6}')
-import -window root /tmp/opencode/full.png
-convert /tmp/opencode/full.png -crop "${W}x${H}+${X}+${Y}" +repage ~/wordcard_ui.png
-# 然后用 Read 工具读 ~/wordcard_ui.png 即可看到真实界面
+```lua
+package.path = "/opt/WordCard/gui/flutter/automation/?.lua;" .. package.path
+local c = require("wordcard").open()
+local w = c:window()                  -- 定位 WordCard 窗口（libxdo）
+w:activate():center()                 -- 激活/置顶/居中
+w:capture("/tmp/opencode/wordcard_ui.png")  -- FFI ak_capture（GL 窗口可用）
+c:close()
+-- 然后 Read /tmp/opencode/wordcard_ui.png
 ```
 
-#### 3.5 把窗口移到屏幕中央（可选，截图更聚焦）
-
-**必须先激活窗口**（点任务栏 App 图标，或 `xdotool windowactivate`），否则拖动不生效；
-再拖**标题栏空白处**（避开标题文字与右侧按钮）：
+一行式（适合 `luajit -e` 动态测试）：
 
 ```bash
-HEX=$(wmctrl -lG | awk '/WordCard/{print $1; exit}'); WID=$((HEX))
-xdotool windowactivate --sync "$WID"; xdotool windowraise "$WID"; sleep 1
-read SW SH < <(xdotool getdisplaygeometry)
-read X0 Y0 W H < <(wmctrl -lG | grep -i WordCard | awk '{print $3,$4,$5,$6}')
-GX=$((X0+70)); GY=$((Y0+14))                 # 标题栏左侧空白区
-TX=$(( (SW-W)/2 )); TY=$(( (SH-H)/2 ))
-xdotool mousemove --sync $GX $GY; sleep 0.3; xdotool mousedown 1; sleep 0.3
-xdotool mousemove --sync $((GX+TX-X0)) $((GY+TY-Y0)); sleep 0.2; xdotool mouseup 1
-# 拖拽不稳时兜底：wmctrl -r "WordCard" -e "0,$TX,$TY,$W,$H"
+WORDCARD_ROOT=/opt/WordCard luajit -e 'package.path="/opt/WordCard/gui/flutter/automation/?.lua;"..package.path;
+  local c=require("wordcard").open(); c:window():center():capture("/tmp/opencode/wc.png"); c:close()'
 ```
+
+也可直接运行 `luajit gui/flutter/automation/native_demo.lua`。窗口对象还支持
+`w:move(x,y)` / `w:click(rx,ry)` / `w:key("ctrl+l")` / `w:type("...")` / `w:geometry()`。
+截屏依赖 `/opt/my-agent/agentkit/lib/libagentkit.so`（FFI，无子进程）。
+旧的 `wmctrl`/`xdotool`/`import` 流程已移除。
 
 ### 4. 驱动 UI（AI 自动化接口）
 
@@ -95,9 +90,13 @@ WORDCARD_ROOT=/opt/WordCard luajit -e 'package.path="gui/flutter/automation/?.lu
 **对外 API（供 my-agent 语音/微信等驱动）**：除 `click` 外支持带参数命令
 `{"cmd":"call","fn":"<fn>","args":{...}}`。已暴露函数：
 `state` `stats` `nav.goto` `task.list` `task.words` `task.study` `task.dictate`
-`task.delete` `task.create` `import.wordlist` `import.ebook` `import.image` `review.startDaily` `window.activate` `window.center` `window.move` `app.quit`。
+`task.delete` `task.create` `import.wordlist` `import.ebook` `import.image` `review.startDaily`
+`reader.list` `reader.open` `reader.import` `reader.state` `reader.chapter` `reader.translate`
+`app.quit`。
+Lua 窗口控制只用原生对象：`local w=c:window(); w:activate():center():capture(path)`（libxdo FFI，无子进程）。
 Lua 封装 `automation/wordcard.lua` 提供 `call(fn,args_json)` 及便捷方法
-`stats()/tasks()/words()/study(tag)/dictate(tag)/createTask(name,text)/importWordlist/importEbook/goto/startDaily`。
+`stats()/tasks()/words()/study(tag)/dictate(tag)/createTask(name,text)/importWordlist/importEbook/goto/startDaily`
+`readerList()/readerOpen(slug)/readerState()/readerChapter(index)/readerTranslate(index)/readerTranslateAll()`。
 
 ```bash
 WORDCARD_ROOT=/opt/WordCard luajit -e 'package.path="gui/flutter/automation/?.lua;"..package.path;
@@ -148,4 +147,5 @@ gui/flutter/run.sh              # 会话内运行（配合上面的 env）
 gui/flutter/launch.sh           # 桌面图标入口（单实例）
 luajit gui/flutter/automation/agent_demo.lua   # UI 自动化示例
 python3 tools/ebook_extract.py <book>          # 解析电子书（复用管道）
+python3 tools/llama_ctl.py status|stop|start   # 翻译模型（终端窗口/显存）
 ```

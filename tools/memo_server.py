@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""memo_server.py — 常驻「用法/场景」助记服务（按需生成）。
+"""memo_server.py — 常驻「助记 / 段落翻译 / 查词」服务（按需生成）。
 
-App 在复习到某个尚无 memo 的词时，向本服务写一行 JSON；服务用本地 LLM
-生成一句中文用法描述并回传，App 再写回卡片。结果缓存，重复即时返回。
+App 在复习或双语阅读时，向本服务写一行 JSON；服务用本地 ECDICT 查词、
+本地 LLM 生成助记/译文并回传。结果缓存，重复即时返回。
 
-stdin 每行: {"w":"orbit","ctx":"The satellite orbits the Earth."}
-stdout 每行: {"w":"orbit","memo":"..."}
+stdin 每行:
+  {"w":"orbit","ctx":"The satellite orbits the Earth."}   → {"w":"orbit","memo":"..."}
+  {"t":"English paragraph","w":"orbit"(可选)}              → {"t":"...","zh":"..."}
+  {"lookup":"orbits"}                                      → {"lookup":"orbits","ph":...,"p":...,"d":...}
 启动后打印: READY
 """
 
@@ -21,12 +23,46 @@ import bilingual  # noqa: E402
 import translate  # noqa: E402
 
 
+def _lemma_candidates(word):
+    """轻量词形还原候选（不规则变化仍交给 LLM）。"""
+    w = word.lower().strip()
+    out = [w]
+    if len(w) < 3:
+        return out
+    if w.endswith("'s") or w.endswith('’s'):
+        out.append(w[:-2])
+    if w.endswith('ies') and len(w) > 4:
+        out.append(w[:-3] + 'y')
+    if w.endswith('es') and len(w) > 3:
+        out.append(w[:-2])
+    if w.endswith('s') and len(w) > 2:
+        out.append(w[:-1])
+    if w.endswith('ied') and len(w) > 4:
+        out.append(w[:-3] + 'y')
+    if w.endswith('ed') and len(w) > 3:
+        out.append(w[:-2])
+        out.append(w[:-1])
+        if len(w) > 4 and w[-3] == w[-4]:
+            out.append(w[:-3])
+    if w.endswith('ing') and len(w) > 4:
+        out.append(w[:-3])
+        out.append(w[:-3] + 'e')
+        if len(w) > 5 and w[-4] == w[-5]:
+            out.append(w[:-4])
+    if w.endswith('ly') and len(w) > 4:
+        out.append(w[:-2])
+    # 去重、保序
+    seen, uniq = set(), []
+    for c in out:
+        if c and c not in seen:
+            seen.add(c)
+            uniq.append(c)
+    return uniq[:8]
+
+
 def main():
     cache = bilingual.load_trans_cache()
-    try:
-        translate.available()  # 确保本地 LLM server 已就绪
-    except Exception as e:  # noqa: BLE001
-        print(f'ERR {e}', file=sys.stderr, flush=True)
+    lookups = {}
     print('READY', flush=True)
 
     for line in sys.stdin:
@@ -36,6 +72,34 @@ def main():
         try:
             req = json.loads(line)
         except Exception:  # noqa: BLE001
+            continue
+
+        # 查词（阅读页点词）: {"lookup":"orbits"} -> 音标/词性/释义
+        lookup_word = str(req.get('lookup') or '').strip()
+        if lookup_word:
+            key = lookup_word.lower()
+            ent = lookups.get(key)
+            if ent is None:
+                ph = pos = zh = en = base = ''
+                cands = _lemma_candidates(lookup_word)
+                ecd = bilingual.lookup_many(cands)
+                for cand in cands:
+                    if cand in ecd:
+                        ph, pos, zh, en = ecd[cand]
+                        base = cand if cand != key else ''
+                        break
+                if not zh:
+                    try:
+                        if translate.available():
+                            en, zh, pos = translate.define(lookup_word)
+                    except Exception:  # noqa: BLE001
+                        pass
+                ent = {'ph': ph, 'p': pos, 'd': zh, 'en': en, 'base': base}
+                if zh:
+                    lookups[key] = ent
+            payload = {'lookup': lookup_word}
+            payload.update(ent or {'ph': '', 'p': '', 'd': '', 'en': '', 'base': ''})
+            print(json.dumps(payload, ensure_ascii=False), flush=True)
             continue
 
         # 确保本地 LLM 在线（若被关闭则自动拉起）
@@ -72,6 +136,7 @@ def main():
         memo = cache.get(key, '')
         if not memo:
             try:
+                translate.available()
                 memo = translate.memo(word, ctx)
             except Exception:  # noqa: BLE001
                 memo = ''

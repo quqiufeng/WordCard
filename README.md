@@ -28,6 +28,7 @@
 
 - **C 核心引擎**：零依赖 SM-2 算法 + 哈希索引 + 结构体直写磁盘
 - **桌面应用**：Flutter + Yaru（Ubuntu），首页记忆数据 / 任务 / 听写 / 图片 OCR 导入
+- **双语阅读器**：直接读 `/opt/books` 的解析结果，段间对照、按需翻译（本地 llama.cpp 或 DeepSeek 在线 API）、点词查词并加入读书任务
 - **多来源导入**：考试词表 / 电子书 / 粘贴词表（含词组）/ 图片 OCR → 统一记忆任务
 - **智能选词**：`libwordpick.so` 内置 6 万词频表 + 词形还原，偏态难度曲线 + 覆盖率加权
 - **完整解析**：PDF/MOBI/AZW3/EPUB/MD → 清洗后的完整正文，按章节切分
@@ -51,7 +52,7 @@
 ```
 用户
  ├── 桌面 App (gui/flutter) ─ Flutter + Yaru；dart:ffi 直连 libwordcard.so
- │                         首页/任务/记忆/听写/导入(词表·电子书·粘贴·图片OCR)
+ │                         首页/任务/记忆/听写/导入(词表·电子书·粘贴·图片OCR)/双语阅读
  ├── CLI (cli.py) ──────── 终端交互复习
  ├── API (api.py) ──────── FastAPI REST (port 8000)
  ├── 卡片图片 ───────────── txt2png Canvas → PNG
@@ -141,9 +142,11 @@ python3 api.py
 
 ```bash
 gui/flutter/build.sh    # 编译 C 核心 + flutter build linux --release
-gui/flutter/run.sh      # 运行；或用桌面图标 / systemctl --user restart wordcard-app
+gui/flutter/run.sh      # 运行；或用桌面图标
 ```
 
+打开侧栏「阅读」：书架自动列出 `/opt/books` 中已解析的书；点书进入段间对照阅读，
+段落右侧「译」按需调用本地 LLM，点单词可查词并加入该书任务。
 详见 `gui.md`（UI 层技术架构）。
 
 ---
@@ -195,6 +198,11 @@ WordCard/
 ├── output/                      # 卡片输出
 │
 ├── gui/                         # 桌面应用（Flutter + Yaru）
+│   └── flutter/
+│       ├── lib/                 # reader_library.dart · pages/reader_page.dart
+│       │                        # pages/bilingual_reader.dart · widgets/clickable_text.dart
+│       └── automation/          # wordcard.lua · xdo.lua / x11.lua（LuaJIT FFI 窗口）
+│                                # agent_demo.lua · native_demo.lua
 ├── gui.md                       # UI 层技术架构
 ├── automation.md                # 全自动化开发模式（Fully-Automated Mode）
 ├── design.md                    # 架构文档
@@ -305,5 +313,6 @@ words = importer.extract_words(text, max_words=50, mode=1)
 | v3.0 | 2025-05 | 通用学习引擎 |
 | **v4.0** | **2026-07** | **纯 C 重构 + 电子书导入 + CLI/API + 卡片图片** |
 | **v4.1** | **2026-10** | **Flutter/Yaru 桌面应用：记忆数据 · 任务 · 听写 · 图片OCR · Kami 排版** |
+| **v4.2** | **2026-10** | **双语电子书阅读器：书架 · 段间对照 · 按需 LLM 翻译 · 点词查词/加入任务** |
 
-*最后更新: 2026-10-11*
+*最后更新: 2026-10-25*

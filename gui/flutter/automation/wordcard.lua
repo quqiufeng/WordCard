@@ -100,8 +100,45 @@ function M:importEbook(path)
 end
 function M:goto(page) return self:call('nav.goto', ('{"page":%d}'):format(page or 0)) end
 function M:startDaily() return self:call('review.startDaily') end
-function M:activate() return self:call('window.activate') end
-function M:center() return self:call('window.center') end
+function M:readerList() return self:call('reader.list') end
+function M:readerOpen(slug)
+  return self:call('reader.open', ('{"slug":%s}'):format(jstr(slug)))
+end
+function M:readerState() return self:call('reader.state') end
+function M:readerChapter(index)
+  return self:call('reader.chapter', ('{"index":%d}'):format(index or 0))
+end
+function M:readerTranslate(index)
+  return self:call('reader.translate', ('{"index":%d}'):format(index or 0))
+end
+function M:readerTranslateAll() return self:call('reader.translate', '{"all":true}') end
+function M:readerImport(path)
+  return self:call('reader.import', ('{"path":%s}'):format(jstr(path)))
+end
+-- —— 原生窗口控制（LuaJIT FFI libxdo；不启动 xdotool/wmctrl）——
+-- c:window() 返回窗口对象：activate/center/move/click/key/type/capture。
+-- 仅保留这一套实现，不再提供 shell / socket 窗口 API。
+function M:window(title)
+  local x11 = require("x11")
+  local custom = title or os.getenv("WC_WINDOW_TITLE")
+  local name = custom or "WordCard"
+  -- 优先 WM_CLASS，避免把 llama-server 终端窗口误认成主窗口
+  local w
+  if custom then
+    w = x11.window(name, { exact = true })
+  else
+    w = x11.window_class(os.getenv("WC_WINDOW_CLASS") or "com.example.wordcard")
+    if not w then w = x11.window(name, { exact = true }) end
+  end
+  assert(w, "WordCard window not found: " .. name)
+  return w
+end
+
+function M:activate() self:window():activate(); return true end
+function M:center() self:window():center(); return true end
+function M:move(x, y) self:window():move(x, y); return true end
+function M:capture(path) return self:window():capture(path) end
+
 function M:quit() return self:call('app.quit') end
 
 -- 解析 list 响应，返回动作 id 数组
