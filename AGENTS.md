@@ -92,6 +92,7 @@ WORDCARD_ROOT=/opt/WordCard luajit -e 'package.path="gui/flutter/automation/?.lu
 `state` `stats` `nav.goto` `task.list` `task.words` `task.study` `task.dictate`
 `task.delete` `task.create` `import.wordlist` `import.ebook` `import.image` `review.startDaily`
 `reader.list` `reader.open` `reader.import` `reader.state` `reader.chapter` `reader.translate`
+`speech.start` `{topic,ai_first}` `speech.stop` `speech.userText` `speech.aiOpen` `speech.replay` `speech.play` `speech.state`
 `app.quit`。
 Lua 窗口控制只用原生对象：`local w=c:window(); w:activate():center():capture(path)`（libxdo FFI，无子进程）。
 Lua 封装 `automation/wordcard.lua` 提供 `call(fn,args_json)` 及便捷方法
@@ -148,4 +149,8 @@ gui/flutter/launch.sh           # 桌面图标入口（单实例）
 luajit gui/flutter/automation/agent_demo.lua   # UI 自动化示例
 python3 tools/ebook_extract.py <book>          # 解析电子书（复用管道）
 python3 tools/llama_ctl.py status|stop|start   # 翻译模型（终端窗口/显存）
+tools/wordcard_brain.lua                       # 打开可见终端 + tmux（tui/serve/llama）
+tmux attach -t wordcard-brain                  # TUI=0 · serve=1 · llama=2
+voice/agent/voice.sh test                      # 本地 TTS 自检（小音响）
+voice/agent/voice.sh once                      # 本地 ASR 自检（说一句英文）
 ```

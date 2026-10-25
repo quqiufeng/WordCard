@@ -168,6 +168,10 @@ class Tts:
         if sid is not None:
             self.lib.voice_tts_set_sid(self.engine, int(sid))
 
+    def set_sid(self, sid):
+        if sid is not None:
+            self.lib.voice_tts_set_sid(self.engine, int(sid))
+
     def synthesize(self, text, output_path):
         text_p = self.lib.voice_tts_synthesize(self.engine, text.encode(),
                                                output_path.encode())

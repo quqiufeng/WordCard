@@ -60,25 +60,26 @@ final class TtsService {
     }
   }
 
-  /// 朗读一段文本（英文单词/句子）。
-  void speak(String text) {
+  /// 朗读一段文本（英文单词/句子）；[sid] 可指定 Kokoro 音色（47=中文女声）。
+  void speak(String text, {int? sid}) {
     final t = text.trim();
     if (t.isEmpty) return;
     busy.value = t;
+    final payload = sid == null ? t : jsonEncode({'text': t, 'sid': sid});
     final p = _proc;
     if (p == null) {
-      start().then((_) => _write(t));
+      start().then((_) => _write(payload));
     } else {
-      _write(t);
+      _write(payload);
     }
   }
 
-  void _write(String t) {
+  void _write(String payload) {
     try {
-      _proc?.stdin.writeln(t);
+      _proc?.stdin.writeln(payload);
     } catch (_) {
       _proc = null;
-      if (busy.value == t) busy.value = null;
+      busy.value = null;
     }
   }
 

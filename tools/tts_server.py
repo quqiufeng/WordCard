@@ -6,11 +6,13 @@
 
 用法（通常由 App 自动拉起）:
     python3 tools/tts_server.py
-环境变量: WC_TTS_SID（音色，默认 0）、WC_APLAY（播放器，默认 aplay）
+环境变量: WC_TTS_SID（默认音色，默认 0）、WC_APLAY（播放器，默认 aplay）
+输入每行：纯文本，或 JSON {"text":"...","sid":3}（3=英文，47=中文）
 """
 
 import array
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -39,8 +41,8 @@ def _player():
 PLAY = _player()
 
 
-def _cache_path(text):
-    h = hashlib.md5(text.encode('utf-8')).hexdigest()[:16]
+def _cache_path(text, sid):
+    h = hashlib.md5(f'{sid}:{text}'.encode('utf-8')).hexdigest()[:16]
     return os.path.join(CACHE, h + '.wav')
 
 
@@ -66,20 +68,38 @@ def _amplify(path, gain):
 
 
 def main():
+    default_sid = int(os.environ.get('WC_TTS_SID', '0'))
     try:
-        tts = voice.Tts(sid=int(os.environ.get('WC_TTS_SID', '0')))
+        tts = voice.Tts(sid=default_sid)
     except Exception as e:  # noqa: BLE001
         print(f'ERR init: {e}', file=sys.stderr, flush=True)
         return
     os.makedirs(CACHE, exist_ok=True)
     print('READY', flush=True)
 
+    current_sid = default_sid
     for line in sys.stdin:
-        text = line.strip()
+        raw = line.strip()
+        if not raw:
+            continue
+        text = raw
+        sid = default_sid
+        # 可选 JSON 行：{"text":"...","sid":3}
+        if raw.startswith('{'):
+            try:
+                req = json.loads(raw)
+                text = str(req.get('text') or '').strip()
+                if req.get('sid') is not None:
+                    sid = int(req['sid'])
+            except Exception:  # noqa: BLE001
+                text = raw
         if not text:
             continue
         try:
-            path = _cache_path(text)
+            if sid != current_sid:
+                tts.set_sid(sid)
+                current_sid = sid
+            path = _cache_path(text, sid)
             if not os.path.exists(path):
                 tts.synthesize(text, path)
                 _amplify(path, GAIN)

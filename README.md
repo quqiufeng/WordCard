@@ -29,6 +29,7 @@
 - **C 核心引擎**：零依赖 SM-2 算法 + 哈希索引 + 结构体直写磁盘
 - **桌面应用**：Flutter + Yaru（Ubuntu），首页记忆数据 / 任务 / 听写 / 图片 OCR 导入
 - **双语阅读器**：直接读 `/opt/books` 的解析结果，段间对照、按需翻译（本地 llama.cpp 或 DeepSeek 在线 API）、点词查词并加入读书任务
+- **英语口语对话**：本地 SenseVoice ASR + Kokoro TTS，外教双语陪练场景（生活/时事主题）；主题可输入（留空由 DeepSeek 给默认主题），AI 回复与开场由 DeepSeek API 生成，双方英文自动附中文译文；每句可点击朗读
 - **多来源导入**：考试词表 / 电子书 / 粘贴词表（含词组）/ 图片 OCR → 统一记忆任务
 - **智能选词**：`libwordpick.so` 内置 6 万词频表 + 词形还原，偏态难度曲线 + 覆盖率加权
 - **完整解析**：PDF/MOBI/AZW3/EPUB/MD → 清洗后的完整正文，按章节切分
@@ -200,9 +201,17 @@ WordCard/
 ├── gui/                         # 桌面应用（Flutter + Yaru）
 │   └── flutter/
 │       ├── lib/                 # reader_library.dart · pages/reader_page.dart
-│       │                        # pages/bilingual_reader.dart · widgets/clickable_text.dart
+│       │                        # pages/bilingual_reader.dart · pages/speech_page.dart
+│       │                        # voice_chat_service.dart · widgets/clickable_text.dart
 │       └── automation/          # wordcard.lua · xdo.lua / x11.lua（LuaJIT FFI 窗口）
 │                                # agent_demo.lua · native_demo.lua
+│
+├── voice/agent/                 # 本地语音运行时（从 my-agent 复制）
+│   ├── say.sh / say.lua         # Kokoro TTS → 小音响
+│   ├── listen/                  # ALSA + VAD + SenseVoice ASR
+│   └── config.lua / audio.lua
+├── tools/voice_chat_server.py   # 口语对话服务（ASR/TTS + opencode 大脑 + 双语）
+├── tools/wordcard_brain.sh      # tmux wordcard-brain（serve :4098 + tui）
 ├── gui.md                       # UI 层技术架构
 ├── automation.md                # 全自动化开发模式（Fully-Automated Mode）
 ├── design.md                    # 架构文档

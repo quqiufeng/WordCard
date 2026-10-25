@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../automation/app_api.dart';
+import '../brain_service.dart';
 import '../automation/automation.dart';
 import '../ffi/wordcard.dart';
 import '../state/study_session.dart';
@@ -14,6 +17,7 @@ import 'dictation_exam.dart';
 import 'import_page.dart';
 import 'reader_page.dart';
 import 'review_screen.dart';
+import 'speech_page.dart';
 import 'tasks_page.dart';
 
 /// 主页面：初始化引擎，承载可折叠侧栏（首页 / 任务 / 导入）。
@@ -25,13 +29,14 @@ class StudyPage extends StatefulWidget {
 }
 
 class _StudyPageState extends State<StudyPage> {
-  static const _titles = ['首页', '任务', '导入', '阅读'];
-  static const _navIds = ['home', 'tasks', 'import', 'reader'];
+  static const _titles = ['首页', '任务', '导入', '阅读', '口语'];
+  static const _navIds = ['home', 'tasks', 'import', 'reader', 'speech'];
   static const _icons = [
     Icons.home_outlined,
     Icons.list_alt_outlined,
     Icons.bookmark_add_outlined,
     Icons.auto_stories_outlined,
+    Icons.record_voice_over_outlined,
   ];
 
   WordCardEngine? _engine;
@@ -71,6 +76,8 @@ class _StudyPageState extends State<StudyPage> {
         pushDictation: _pushDictation,
         openReader: _pushReader,
       ).register();
+      // App 启动即拉起（或复用）可见的口语大脑 tmux/TUI，不等到开始对话
+      unawaited(BrainService.start());
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
@@ -194,7 +201,8 @@ class _StudyPageState extends State<StudyPage> {
             onStudy: (ids, name) => _pushReview(ids, '记忆 · $name'),
           ),
         2 => ImportPage(engine: _engine!),
-        _ => ReaderPage(onOpen: _pushReader),
+        3 => ReaderPage(onOpen: _pushReader),
+        _ => const SpeechPage(),
       };
 
   Widget _errorView(BuildContext context) {

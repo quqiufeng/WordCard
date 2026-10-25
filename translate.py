@@ -138,6 +138,16 @@ def backend():
     return 'local'
 
 
+def chat_backend():
+    """对话后端：默认有 DeepSeek key 就用在线，否则本地；可用 WC_CHAT_BACKEND 覆盖。"""
+    b = (os.environ.get('WC_CHAT_BACKEND') or os.environ.get('WC_DIALOGUE_BACKEND') or '').strip().lower()
+    if b in ('deepseek', 'api', 'online'):
+        return 'deepseek'
+    if b in ('local', 'llama'):
+        return 'local'
+    return 'deepseek' if DEEPSEEK_KEY else 'local'
+
+
 def _deepseek_url():
     if DEEPSEEK_CHAT_URL:
         return DEEPSEEK_CHAT_URL
@@ -208,6 +218,7 @@ def server_status():
             'configured': bool(DEEPSEEK_KEY),
             'url': _deepseek_url(),
             'model': DEEPSEEK_MODEL,
+            'chat_backend': chat_backend(),
         }
     return {
         'backend': 'local',
@@ -217,26 +228,26 @@ def server_status():
         'url': URL,
         'model': MODEL,
         'terminal': _terminal() or '',
+        'chat_backend': chat_backend(),
     }
 
 
-def _chat_deepseek(prompt, system=None, max_tokens=400, temperature=0.2):
+def _chat_messages_deepseek(messages, max_tokens=400, temperature=0.2,
+                            json_mode=False):
     if not DEEPSEEK_KEY:
         raise RuntimeError('DEEPSEEK_API_KEY 未配置（可写入 .env）')
-    msgs = []
-    if system:
-        msgs.append({'role': 'system', 'content': system})
-    msgs.append({'role': 'user', 'content': prompt})
-    body = json.dumps({
+    payload = {
         'model': DEEPSEEK_MODEL,
-        'messages': msgs,
+        'messages': messages,
         'temperature': temperature,
         'max_tokens': max_tokens,
         'thinking': {'type': 'disabled'},
         'stream': False,
-    }).encode()
+    }
+    if json_mode:
+        payload['response_format'] = {'type': 'json_object'}
     req = urllib.request.Request(
-        _deepseek_url(), data=body,
+        _deepseek_url(), data=json.dumps(payload).encode(),
         headers={
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + DEEPSEEK_KEY,
@@ -253,6 +264,57 @@ def _chat_deepseek(prompt, system=None, max_tokens=400, temperature=0.2):
         return d['choices'][0]['message']['content'].strip()
     except (KeyError, IndexError, TypeError) as e:
         raise RuntimeError(f'DeepSeek 返回格式异常: {str(d)[:300]}') from e
+
+
+def _chat_deepseek(prompt, system=None, max_tokens=400, temperature=0.2):
+    msgs = []
+    if system:
+        msgs.append({'role': 'system', 'content': system})
+    msgs.append({'role': 'user', 'content': prompt})
+    return _chat_messages_deepseek(msgs, max_tokens, temperature)
+
+
+def _chat_messages_local(messages, max_tokens=400, temperature=0.2):
+    if not _health():
+        ensure_server()
+    payload = {
+        'messages': messages,
+        'temperature': temperature,
+        'max_tokens': max_tokens,
+    }
+    req = urllib.request.Request(
+        URL + '/v1/chat/completions', data=json.dumps(payload).encode(),
+        headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=180) as r:
+        d = json.load(r)
+    try:
+        return d['choices'][0]['message']['content'].strip()
+    except (KeyError, IndexError, TypeError) as e:
+        raise RuntimeError(f'本地 LLM 返回格式异常: {str(d)[:300]}') from e
+
+
+def deepseek_available():
+    return bool(DEEPSEEK_KEY)
+
+
+def chat_available():
+    if chat_backend() == 'deepseek':
+        return bool(DEEPSEEK_KEY)
+    return ensure_server() if not _health() else True
+
+
+def chat_deepseek(messages, max_tokens=500, temperature=0.7, json_mode=False):
+    """口语对话固定走 DeepSeek（AI 回复 + 话题生成）。"""
+    return _chat_messages_deepseek(messages, max_tokens, temperature,
+                                   json_mode=json_mode)
+
+
+def chat(messages, max_tokens=500, temperature=0.7, json_mode=False):
+    """通用对话（口语陪练用）。messages = [{role, content}, ...]"""
+    if chat_backend() == 'deepseek':
+        return _chat_messages_deepseek(messages, max_tokens, temperature,
+                                       json_mode=json_mode)
+    return _chat_messages_local(messages, max_tokens, temperature)
 
 
 def _chat(prompt, system=None, max_tokens=400, temperature=0.2):

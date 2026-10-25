@@ -91,7 +91,8 @@ Agent 设计 → 构建 → 在真实会话里运行 → 用 API 模拟人操作
 函数（`call`）：`state` `stats` `nav.goto` `task.list` `task.words` `task.study`
 `task.dictate` `task.delete` `task.create` `import.wordlist` `import.ebook`
 `import.image` `review.startDaily` `reader.list` `reader.open` `reader.import`
-`reader.state` `reader.chapter` `reader.translate` `app.quit`
+`reader.state` `reader.chapter` `reader.translate` `speech.start` `speech.stop`
+`speech.userText` `speech.aiOpen` `speech.replay` `speech.play` `speech.state` `app.quit`
 
 Lua：
 ```lua
@@ -100,6 +101,7 @@ print(c:stats()); print(c:tasks())
 c:study("book:岛上书店"); c:dictate("dict:cet4")
 c:createTask("第3周", "abandon 放弃\nlook after 照顾")
 c:readerOpen("ddia"); c:readerChapter(10); c:readerTranslate(0)
+c:call("speech.start", '{"topic":"最近看的一部电影","ai_first":true}')
 -- 窗口/截图走原生 FFI，不启动 xdotool/wmctrl/import：
 local w = assert(c:window())
 w:activate():center():capture("/tmp/opencode/wordcard_ui.png")

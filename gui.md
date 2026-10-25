@@ -59,8 +59,8 @@ UI 层**只负责展示与交互**，不重写学习算法；解析、翻译、�
 └───────────────────────────────────────────────────────────────┘
 ```
 
-**页面导航**：侧栏四项 `首页 / 任务 / 导入 / 阅读`
-（`nav.home / nav.tasks / nav.import / nav.reader`）。
+**页面导航**：侧栏五项 `首页 / 任务 / 导入 / 阅读 / 口语`
+（`nav.home / nav.tasks / nav.import / nav.reader / nav.speech`）。
 「记忆」不再是固定页，而是从 **首页「开始今日记忆」** 或 **任务行「学习」** 打开的
 `ReviewScreen` 路由；「听写」打开 `DictationExamPage` 路由。
 
@@ -89,6 +89,31 @@ UI 层**只负责展示与交互**，不重写学习算法；解析、翻译、�
 - 阅读进度存 `data/reader_progress.json`（每本书的章节索引）。
 - 书库根目录默认 `/opt/books`，可用环境变量 `BOOK_MD_ROOT` 覆盖；导入复用
   `/opt/my_db/tools/import_book`（`--skip-vectors`，只阅读不需要向量索引）。
+
+### 英语口语对话闭环
+
+```
+SpeechPage 点「开始对话」
+  → tools/voice_chat_server.py（常驻，JSON Lines）
+  → tmux wordcard-brain：TUI（tab 0）+ opencode serve :4098（tab 1）+ 本地 llama 翻译模型 :8081（tab 2）
+  → 学习者英文走 TUI 端口：POST /tui/append-prompt + /tui/submit-prompt；
+    再从 /session/{id}/message 读回 AI 回复（会话上下文连续）
+  → 本地 listen --once --no-forward（ALSA + VAD + SenseVoice）识别用户英文
+  → DeepSeek API（首次提示词描述双语外教陪练场景；生成默认主题/开场/AI 回复）
+  → 返回 {"user_zh","en","zh"}：用户英文/中文 + AI 英文/中文
+  → 本地 say.sh（Kokoro，英文音色）朗读 AI 英文 → 小音响
+  → 再开一轮麦克风
+```
+
+- 每轮独立开/关麦克风，AI 说话时不监听，避免回声。
+- 点击对话里的英文或中文句子即可朗读（与单词朗读共用 TTS 服务/缓存/等待动画）。
+- 主题由用户输入；留空时第一次请求会要求 DeepSeek 提供一个具体默认主题
+  （例如“外卖软件与我们的饮食习惯”）。AI 可先开场，也可由用户先说；场景固定为外教陪练，
+  主题尽量贴近现实生活与时事（电影、工作、旅行、科技、环境等），不采用正式外交会谈。
+- 语音运行时（`voice/agent/`）从 `/opt/my-agent/voice` 复制，依赖 SenseVoice.cpp、sherpa-onnx/Kokoro 与本地小音响。
+- 大脑独立：App 启动时 `BrainService` → `tools/wordcard_brain.lua`，打开可见终端里的 tmux
+  `wordcard-brain`：TUI / serve(:4098) / llama 翻译模型(:8081) 三个 tab；不占用 my-agent 的
+  `my-agent-brain`（:4097）。`WC_BRAIN_URL` 可覆盖地址。
 
 ### 任务模型（在 items 的 tags 之上分的一层）
 
@@ -200,9 +225,9 @@ abstract final class AppFonts {
 
 - **翻译**：`translate.py` 默认用 **Hunyuan-MT-7B**（`/data/models/Hunyuan-MT-7B-Q4_K_M.gguf`，
   约 4.4G / 显存 ~5.3G），可 `WC_LLM_MODEL` 覆盖；兜底 Qwen3-4B。
-  `llama-server` 不再后台静默常驻，而是在**终端窗口**中前台启动（默认 xterm，
-  `WC_TERMINAL=qterminal` 可切换）：Ctrl+C / 关闭窗口即可停止；WordCard 退出时
-  也会自动停止并释放显存。手动控制：`python3 tools/llama_ctl.py start|stop|status`。
+  App 启动时由 `wordcard_brain.lua` 把 `llama-server` 放进 tmux 的**第三个 tab**
+  （`wordcard-brain:llama`，:8081）前台运行，日志可见；WordCard 退出时自动停止并释放显存。
+  手动控制：`python3 tools/llama_ctl.py start|stop|status`。
   - **默认本地 LLM**；也可改用在线翻译：在 `.env` 配
     `WC_TRANSLATE_BACKEND=deepseek`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_API_KEY`
     （OpenAI 兼容），此时不启动本地模型/终端。`auto` 才根据 key 自动选择。
@@ -211,7 +236,8 @@ abstract final class AppFonts {
   `LD_LIBRARY_PATH=/data/venv/onnxruntime-linux-x64-gpu-1.26.0/lib`（`WC_ORT_LIB` 可覆盖）传入。
 - **TTS**：`tools/tts_server.py` 常驻（Kokoro/sherpa-onnx，模型只加载一次），
   合成缓存 `data/tts_cache/` 并 `paplay` 播放；默认 **2.5× 增益**（`WC_TTS_VOLUME`）。
-  点单词/段落、听写考试读词均走此服务；合成期间按钮显示等待动画。
+  点单词/段落、听写考试读词、口语对话逐句朗读均走此服务；支持 JSON 行
+  `{"text":"...","sid":3}` 切换音色（3=英文，47=中文）；合成期间按钮显示等待动画。
 
 ---
 
@@ -269,7 +295,7 @@ UI 按钮与 API 走同一入口：按钮点击 = `invoke(id)`；外部调用 = 
 |----|------|------|
 | `state` | — | 页面 + `stats` + `tasks` + `review` |
 | `stats` | — | 任务数/总词数/已记住/未记住/完成度/待复习 |
-| `nav.goto` | `{page:0\|1\|2\|3}` | 切页（首页/任务/导入/阅读） |
+| `nav.goto` | `{page:0\|1\|2\|3\|4}` | 切页（首页/任务/导入/阅读/口语） |
 | `task.list` | — | 任务列表（含 done/count） |
 | `task.words` | `{tag,page,size}` | 翻页取某任务单词 |
 | `task.study` | `{tag}` | 打开该任务的**记忆**页 |
@@ -287,6 +313,13 @@ UI 按钮与 API 走同一入口：按钮点击 = `invoke(id)`；外部调用 = 
 | `reader.chapter` | `{index}` | 跳到某章 |
 | `reader.translate` | `{index}` 或 `{all:true}` | 翻译一段/整章 |
 | `reader.nextChapter` / `reader.prevChapter` | — | 章节翻页（按钮动作） |
+| `speech.start` | `{topic,ai_first}` | 开始口语对话（topic 可空，AI 给默认主题） |
+| `speech.stop` | — | 结束对话 |
+| `speech.userText` | `{text}` | 以文字注入一轮用户发言 |
+| `speech.aiOpen` | — | 让 AI 主动说一句/换话题 |
+| `speech.replay` | — | 重听上一句 AI 英文 |
+| `speech.play` | `{text,sid}` | 逐句朗读（默认 sid=3 英文，47 中文） |
+| `speech.state` | — | 对话状态 + 消息 |
 | `app.quit` | — | 退出应用 |
 
 ### 用法（LuaJIT）
@@ -374,10 +407,12 @@ gui/flutter/
 │   │   ├── tasks_page.dart      # 任务列表 + 翻页词表
 │   │   ├── reader_page.dart     # 书架（/opt/books + 导入）
 │   │   ├── bilingual_reader.dart# 双语阅读（段间对照/查词/加入任务）
+│   │   ├── speech_page.dart     # 英语口语对话（ASR/TTS + 双语）
 │   │   ├── review_screen.dart   # 记忆（路由）
 │   │   ├── dictation_exam.dart  # 听写考试（路由）
 │   │   └── import_page.dart     # 导入
 │   ├── reader_library.dart      # 书库/章节/段落解析 + 译文/进度缓存
+│   ├── voice_chat_service.dart  # 口语对话服务客户端（JSON Lines）
 │   └── widgets/
 │       ├── flash_card.dart      # 卡片（Kami 排版）
 │       ├── clickable_text.dart  # 可点词 RichText（查词）
@@ -385,6 +420,8 @@ gui/flutter/
 │       └── task_bar_chart.dart  # 任务完成度柱状图
 ├── automation/                  # wordcard.lua / xdo.lua / x11.lua（LuaJIT FFI）
 │                                # agent_demo.lua / native_demo.lua
+├── ../voice/agent/              # 从 my-agent 复制的本地语音运行时
+│                                # say.sh / listen/ / config.lua
 ├── linux/                       # flutter create 生成（GTK 运行器）
 └── snap/                        # snapcraft.yaml（预留）
 ```
