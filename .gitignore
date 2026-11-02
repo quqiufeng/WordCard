@@ -252,3 +252,23 @@ output/
 !data/wordlists/
 !data/wordlists/**
 !data/
+
+# StaticPy POC build artifacts
+native/staticpy/wc_native
+native/staticpy/wc_native.so
+
+# StaticPy voice POC artifacts
+native/staticpy/voice/wc_voice
+native/staticpy/voice/wc_voice.so
+
+# StaticPy text POC artifacts
+native/staticpy/text/wc_text
+native/staticpy/text/wc_text.so
+
+# StaticPy CLI POC artifacts
+native/staticpy/cli/wc_cli
+native/staticpy/cli/wc_cli.so
+
+# StaticPy card POC artifacts
+native/staticpy/card/wc_card
+native/staticpy/card/wc_card.so
