@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../automation/automation.dart';
@@ -8,6 +11,13 @@ import '../theme/app_theme.dart';
 import '../theme/fonts.dart';
 import '../tts.dart';
 import '../widgets/clickable_text.dart';
+
+class _ExportWord {
+  const _ExportWord(this.word, this.definition, this.context);
+  final String word;
+  final String definition;
+  final String context;
+}
 
 /// 双语阅读页：段间对照（英文原文 + 按需生成的中文译文），点词查词，
 /// 可把生词加入该书对应的记忆任务（`book:<书名>`）。
@@ -26,8 +36,8 @@ class BilingualReaderScreen extends StatefulWidget {
 }
 
 class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
-  /// 正文 14 号（pt）≈ 18.7 逻辑像素；中英同号。
-  static const double _bodyFontSize = 18.7;
+  /// 正文 14 号（pt）≈ 18.7 逻辑像素；中英同号，可手动增减。
+  double _bodyFontSize = 18.7;
 
   final ScrollController _scroll = ScrollController();
   final Map<String, WordDef> _defs = {};
@@ -38,10 +48,328 @@ class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
   final Set<int> _loading = {};
   int _generation = 0;
   bool _showChapters = true;
+  double _chapterWidth = 320;
+  String _bodyFont = AppFonts.tsangerJinKai;
+  bool _exporting = false;
 
   ReaderChapter get _chapter => widget.book.chapters[_chapterIndex];
 
+  void _setBodyFontSize(double delta) {
+    setState(() {
+      _bodyFontSize =
+          (_bodyFontSize + delta).clamp(12.0, 36.0).toDouble();
+    });
+  }
+
   String get _tag => 'book:${widget.book.title}';
+
+  bool get _isToc => _chapter.title.trim().toLowerCase().contains(
+        'table of contents',
+      );
+
+  String? _cardRoot() {
+    for (final c in ['.', '/opt/WordCard']) {
+      if (File('$c/native/staticpy/card_txt/wc_card_txt').existsSync()) {
+        return c;
+      }
+    }
+    return null;
+  }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Map<String, String> _loadDictionary(String root) {
+    final out = <String, String>{};
+    final f = File('$root/data/wordlists/cet4.tsv');
+    if (!f.existsSync()) return out;
+    for (final line in f.readAsLinesSync()) {
+      final p = line.split('\t');
+      if (p.length < 4) continue;
+      final pos = p[2].trim();
+      final def = p[3].trim();
+      if (def.isEmpty) continue;
+      out[p[0].toLowerCase()] = pos.isEmpty ? def : '$pos $def';
+    }
+    return out;
+  }
+
+  Future<String> _translateForExport(String text) async {
+    final c = Completer<String>();
+    MemoService.instance.translateText(text, (zh) {
+      if (!c.isCompleted) c.complete(zh.trim());
+    });
+    try {
+      return await c.future.timeout(const Duration(seconds: 60));
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _cleanCardText(String s) {
+    var t = s
+        .replaceAllMapped(
+          RegExp(r'\[([^\]]*)\]\([^)]*\)'),
+          (m) => m.group(1) ?? '',
+        )
+        .replaceAll(RegExp(r'[*_`#]+'), '')
+        .replaceAll(RegExp(r'[ \t]+'), ' ')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+    return t;
+  }
+
+  List<String> _splitChineseContent(String text) {
+    const target = 1000;
+    final chunks = <String>[];
+    final buf = StringBuffer();
+    var size = 0;
+
+    void flush() {
+      final t = buf.toString().trim();
+      if (t.isNotEmpty) chunks.add(t);
+      buf.clear();
+      size = 0;
+    }
+
+    void append(String s) {
+      if (s.trim().isEmpty) return;
+      if (size > 0 && size + s.length > target) flush();
+      buf.write(s.trim());
+      buf.write('\n\n');
+      size += s.length;
+    }
+
+    for (final p in text.split(RegExp(r'\n{2,}'))) {
+      final t = p.trim();
+      if (t.isEmpty) continue;
+      if (t.length <= target) {
+        append(t);
+        continue;
+      }
+      final sentences = RegExp(r'[^。！？!?]*[。！？!?]+|[^。！？!?]+$')
+          .allMatches(t)
+          .map((m) => m.group(0)?.trim() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList(growable: false);
+      if (sentences.isEmpty) {
+        for (var i = 0; i < t.length; i += target) {
+          append(t.substring(
+              i, i + target > t.length ? t.length : i + target));
+        }
+      } else {
+        for (final s in sentences) {
+          if (s.length > target) {
+            for (var i = 0; i < s.length; i += target) {
+              append(s.substring(
+                  i, i + target > s.length ? s.length : i + target));
+            }
+          } else {
+            append(s);
+          }
+        }
+      }
+    }
+    flush();
+    return chunks;
+  }
+
+  Future<List<_ExportWord>> _extractWords(
+      String root, String pageText) async {
+    final dict = _loadDictionary(root);
+    final outFile = File(
+        '${Directory.systemTemp.path}/wordcard_words_${DateTime.now().microsecondsSinceEpoch}.tsv');
+    try {
+      final r = await Process.run(
+        '$root/native/staticpy/text/wc_text',
+        [
+          '$root/src/wordpick/en_freq.tsv',
+          pageText,
+          outFile.path,
+          '12',
+        ],
+        workingDirectory: root,
+        environment: {
+          ...Platform.environment,
+          'LD_LIBRARY_PATH': '$root/native/staticpy/text:$root/src',
+        },
+      );
+      if (r.exitCode != 0 || !outFile.existsSync()) return const [];
+      final out = <_ExportWord>[];
+      for (final line in outFile.readAsLinesSync()) {
+        final p = line.split('\t');
+        if (p.length < 6) continue;
+        final word = p[0].trim();
+        if (word.isEmpty) continue;
+        final context = _cleanCardText(p.sublist(5).join('\t'));
+        out.add(_ExportWord(
+          word,
+          dict[word.toLowerCase()] ?? '',
+          context,
+        ));
+      }
+      return out;
+    } catch (_) {
+      return const [];
+    } finally {
+      if (outFile.existsSync()) outFile.deleteSync();
+    }
+  }
+
+  Future<String> _hashFile(File f) async {
+    try {
+      final r = await Process.run('sha256sum', [f.path]);
+      final h = (r.stdout as String).trim().split(RegExp(r'\s+')).first;
+      if (h.length >= 16) return h.substring(0, 16);
+      if (h.isNotEmpty) return h;
+    } catch (_) {}
+    return DateTime.now().microsecondsSinceEpoch.toRadixString(16);
+  }
+
+  Future<void> _exportCardImage() async {
+    if (_exporting) return;
+    final root = _cardRoot();
+    if (root == null) {
+      _toast('未找到图片导出组件，请先构建 wc_card_txt');
+      return;
+    }
+    final home = Platform.environment['HOME'] ?? Directory.systemTemp.path;
+    setState(() => _exporting = true);
+    final input = File(
+        '${Directory.systemTemp.path}/wordcard_export_${DateTime.now().microsecondsSinceEpoch}.txt');
+    final md = File('${input.path}.md');
+    try {
+      final hasLatin = RegExp(r'[A-Za-z]');
+      final contentParagraphs = _paragraphs
+          .where((p) => p.text.trim().isNotEmpty)
+          .toList(growable: false);
+      final allChinese = contentParagraphs.isNotEmpty &&
+          contentParagraphs
+              .every((p) => p.isChinese || !hasLatin.hasMatch(p.text));
+      if (allChinese) {
+        final content = StringBuffer();
+        for (final p in _paragraphs) {
+          final t = _cleanCardText(p.text);
+          if (t.isEmpty ||
+              !RegExp(r'[\u4e00-\u9fffA-Za-z0-9]').hasMatch(t)) {
+            continue;
+          }
+          content.writeln(t);
+          content.writeln();
+        }
+        final full = content.toString().trim();
+        final chunks = _splitChineseContent(full);
+        if (chunks.isEmpty) chunks.add(full);
+        input.writeAsStringSync(full);
+        final hash = await _hashFile(input);
+        final names = <String>[];
+        for (var i = 0; i < chunks.length; i++) {
+          input.writeAsStringSync(chunks[i]);
+          final png = chunks.length == 1
+              ? '$home/$hash.png'
+              : '$home/${hash}_${i + 1}.png';
+          final title = chunks.length == 1
+              ? '${widget.book.title} · ${_chapter.title}'
+              : '${widget.book.title} · ${_chapter.title} · ${i + 1}/${chunks.length}';
+          final r = await Process.run(
+            '$root/native/staticpy/card_cn/wc_card_cn',
+            [title, input.path, png, '1200'],
+            workingDirectory: root,
+            environment: {
+              ...Platform.environment,
+              'LD_LIBRARY_PATH':
+                  '$root/native/staticpy/card_cn:$root/src:${Platform.environment['LD_LIBRARY_PATH'] ?? ''}',
+            },
+          );
+          if (r.exitCode != 0) {
+            throw StateError((r.stderr as String).trim());
+          }
+          names.add(png);
+        }
+        _toast(chunks.length == 1
+            ? '已导出中文卡片：${names.first}'
+            : '已导出 ${chunks.length} 张中文卡片：${names.first} …');
+        return;
+      }
+
+      final pageText = _paragraphs.map((p) => p.text).join('\n\n');
+      final words = await _extractWords(root, pageText);
+      final hasChinesePage = _paragraphs.any((p) => p.isChinese);
+      final buf = StringBuffer();
+      buf.writeln('TITLE: ${widget.book.title} · ${_chapter.title}');
+      buf.writeln('---');
+      var translatedExamples = 0;
+      buf.writeln('EN-CH:');
+      for (final w in words) {
+        if (w.context.isEmpty) continue;
+        buf.writeln(w.context);
+        var zh = '';
+        final idx =
+            _paragraphs.indexWhere((p) => p.text.contains(w.context));
+        if (idx >= 0 && idx < _translations.length) {
+          zh = _translations[idx]?.trim() ?? '';
+        }
+        if (zh.isEmpty) {
+          final near =
+              hasChinesePage ? _nearestChineseParagraph(idx) : '';
+          zh = near.isNotEmpty ? near : await _translateForExport(w.context);
+        }
+        if (zh.isNotEmpty) {
+          buf.writeln(zh);
+          translatedExamples++;
+        }
+        buf.writeln();
+      }
+      buf.writeln('---');
+      buf.writeln('VOCABULARY:');
+      for (final w in words) {
+        buf.writeln(
+            '${w.word}|${w.definition.isEmpty ? '（词典未收录）' : w.definition}');
+      }
+      buf.writeln('---');
+      buf.writeln('SENTENCES:');
+      input.writeAsStringSync(buf.toString());
+
+      final hash = await _hashFile(input);
+      final png = '$home/$hash.png';
+      final r = await Process.run(
+        '$root/native/staticpy/card_txt/wc_card_txt',
+        [input.path, png, md.path, ''],
+        workingDirectory: root,
+        environment: {
+          ...Platform.environment,
+          'LD_LIBRARY_PATH':
+              '$root/native/staticpy/card_txt:$root/src:${Platform.environment['LD_LIBRARY_PATH'] ?? ''}',
+        },
+      );
+      if (r.exitCode != 0) {
+        throw StateError((r.stderr as String).trim());
+      }
+      _toast('已导出：$png（词汇 ${words.length} 条'
+          '${translatedExamples > 0 ? '，双语例句 $translatedExamples 条' : ''}）');
+    } catch (e) {
+      _toast('导出失败：$e');
+    } finally {
+      if (input.existsSync()) input.deleteSync();
+      if (md.existsSync()) md.deleteSync();
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  String _nearestChineseParagraph(int index) {
+    if (index < 0) return '';
+    for (var d = 1; d <= 3; d++) {
+      final a = index - d;
+      final b = index + d;
+      if (a >= 0 && _paragraphs[a].isChinese) return _paragraphs[a].text;
+      if (b < _paragraphs.length && _paragraphs[b].isChinese) {
+        return _paragraphs[b].text;
+      }
+    }
+    return '';
+  }
 
   @override
   void initState() {
@@ -64,6 +392,9 @@ class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
   void _registerAutomation() {
     final a = Automation.instance;
     a.register('reader.translateChapter', _translateChapter);
+    a.register('reader.export', () {
+      _exportCardImage();
+    });
     a.register('reader.prevChapter', () => _stepChapter(-1));
     a.register('reader.nextChapter', () => _stepChapter(1));
     a.register('reader.toggleChapters',
@@ -212,10 +543,49 @@ class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
               color: Kami.ink),
         ),
         actions: [
+          PopupMenuButton<String>(
+            tooltip: '正文字体',
+            initialValue: _bodyFont,
+            onSelected: (v) => setState(() => _bodyFont = v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: AppFonts.tsangerJinKai,
+                child: Text('仓耳今楷'),
+              ),
+              PopupMenuItem(
+                value: AppFonts.mapleMono,
+                child: Text('Maple Mono'),
+              ),
+            ],
+          ),
+          IconButton(
+            tooltip: '减小字号（${_bodyFontSize.toStringAsFixed(1)}）',
+            icon: const Icon(Icons.text_decrease),
+            onPressed: _bodyFontSize <= 12
+                ? null
+                : () => _setBodyFontSize(-1.5),
+          ),
+          IconButton(
+            tooltip: '增大字号（${_bodyFontSize.toStringAsFixed(1)}）',
+            icon: const Icon(Icons.text_increase),
+            onPressed: _bodyFontSize >= 36
+                ? null
+                : () => _setBodyFontSize(1.5),
+          ),
           IconButton(
             tooltip: _showChapters ? '隐藏目录' : '显示目录',
             icon: Icon(_showChapters ? Icons.toc : Icons.menu_book_outlined),
             onPressed: () => setState(() => _showChapters = !_showChapters),
+          ),
+          IconButton(
+            tooltip: '导出当前页为图片',
+            icon: _exporting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.image_outlined),
+            onPressed: _exporting ? null : _exportCardImage,
           ),
           IconButton(
             tooltip: '翻译本章',
@@ -225,14 +595,55 @@ class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: Row(
-        children: [
-          if (_showChapters) ...[
-            SizedBox(width: 250, child: _chapterList()),
-            const VerticalDivider(width: 1, color: Kami.hairline),
-          ],
-          Expanded(child: _reader()),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth =
+              (constraints.maxWidth * 0.6).clamp(220.0, 560.0).toDouble();
+          final width = _chapterWidth.clamp(220.0, maxWidth).toDouble();
+          return Row(
+            children: [
+              if (_showChapters) ...[
+                SizedBox(width: width, child: _chapterList()),
+                _resizeHandle(maxWidth),
+              ] else
+                SizedBox(
+                  width: 36,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: IconButton(
+                        tooltip: '显示目录',
+                        icon: const Icon(Icons.keyboard_double_arrow_right,
+                            size: 20),
+                        onPressed: () => setState(() => _showChapters = true),
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(child: _reader()),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _resizeHandle(double maxWidth) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (d) => setState(() {
+          _chapterWidth = (_chapterWidth + d.delta.dx)
+              .clamp(220.0, maxWidth)
+              .toDouble();
+        }),
+        child: const VerticalDivider(
+          width: 9,
+          thickness: 1,
+          color: Kami.hairline,
+        ),
       ),
     );
   }
@@ -243,10 +654,24 @@ class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-          child: Text(
-            '目录 · ${widget.book.chapters.length} 章',
-            style: theme.textTheme.bodySmall?.copyWith(color: Kami.muted),
+          padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '目录 · ${widget.book.chapters.length} 章',
+                  style:
+                      theme.textTheme.bodySmall?.copyWith(color: Kami.muted),
+                ),
+              ),
+              IconButton(
+                tooltip: '隐藏目录',
+                iconSize: 20,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.keyboard_double_arrow_left),
+                onPressed: () => setState(() => _showChapters = false),
+              ),
+            ],
           ),
         ),
         const Divider(height: 1, color: Kami.hairline),
@@ -363,13 +788,27 @@ class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
   Widget _paragraph(int i) {
     final p = _paragraphs[i];
     final theme = Theme.of(context);
+    if (_isToc) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(28, 2, 20, 2),
+        child: Text(
+          p.text,
+          style: TextStyle(
+            fontFamily: _bodyFont,
+            fontSize: _bodyFontSize * 0.88,
+            height: 1.45,
+            color: Kami.ink,
+          ),
+        ),
+      );
+    }
     if (p.heading) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(28, 22, 28, 6),
         child: Text(
           p.text,
-          style: const TextStyle(
-              fontFamily: AppFonts.tsangerJinKai,
+          style: TextStyle(
+              fontFamily: _bodyFont,
               fontSize: 21,
               fontWeight: FontWeight.w500,
               height: 1.4,
@@ -394,8 +833,8 @@ class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
                 child: ClickableText(
                   p.text,
                   onWordTap: _showWord,
-                  style: const TextStyle(
-                      fontFamily: AppFonts.tsangerJinKai,
+                  style: TextStyle(
+                      fontFamily: _bodyFont,
                       fontSize: _bodyFontSize,
                       height: 1.8,
                       color: Kami.ink),
@@ -448,7 +887,7 @@ class _BilingualReaderScreenState extends State<BilingualReaderScreen> {
               child: Text(
                 zh,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontFamily: AppFonts.tsangerJinKai,
+                  fontFamily: _bodyFont,
                   fontSize: _bodyFontSize,
                   height: 1.8,
                   color: Kami.muted,

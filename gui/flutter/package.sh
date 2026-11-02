@@ -16,7 +16,7 @@ mkdir -p "$STAGE" "$STAGE/src" "$STAGE/data" "$STAGE/native/staticpy" \
     "$STAGE/voice" "$STAGE/importer" "$STAGE/models"
 
 cp -a "$HERE/build/linux/x64/release/bundle" "$STAGE/bundle"
-cp -a "$ROOT/src/libwordcard.so" "$STAGE/src/"
+cp -a "$ROOT/src"/*.so "$STAGE/src/"
 cp -a "$ROOT/libs" "$STAGE/libs"
 cp -a "$ROOT/voice/libs" "$STAGE/voice/libs"
 cp -a "$ROOT/importer/libs" "$STAGE/importer/libs"
@@ -28,7 +28,7 @@ for f in "$ROOT"/*.ttf "$ROOT"/*.pkl; do
     [ -f "$f" ] && cp -a "$f" "$STAGE/"
 done
 
-for d in define translate ocr voice ebook_json; do
+for d in define translate ocr voice ebook_json card_txt text card_cn; do
     mkdir -p "$STAGE/native/staticpy/$d"
     cp -a "$ROOT/native/staticpy/$d"/wc_* "$STAGE/native/staticpy/$d/" 2>/dev/null || true
     cp -a "$ROOT/native/staticpy/$d"/lib*.so "$STAGE/native/staticpy/$d/" 2>/dev/null || true

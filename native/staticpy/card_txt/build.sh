@@ -50,6 +50,7 @@ static void extract(const char *buf, const char *marker, char *out, size_t cap) 
     if (!p) return;
     p += strlen(marker);
     while (*p == '\r' || *p == '\n') p++;
+    if (!strncmp(p, "---", 3)) return;
     const char *e = strstr(p, "\n---");
     size_t n = e ? (size_t)(e - p) : strlen(p);
     if (n >= cap) n = cap - 1;
@@ -129,27 +130,33 @@ static int layout_card(txt2png_canvas_t c) {
     if (drawing) txt2png_canvas_line(c, 40.0, (double)y, 740.0, (double)y, LINE, 1.0);
     y += 30;
 
-    draw_section(c, "原文", 40, &y);
-    draw_para(c, orig, 40, &y, 700, 18, BODY, 28, 2000);
-    y += 16;
+    if (orig[0]) {
+        draw_section(c, "原文", 40, &y);
+        draw_para(c, orig, 40, &y, 700, 18, BODY, 28, 2000);
+        y += 16;
+    }
 
-    draw_section(c, "中英对照", 40, &y);
-    {
+    if (en[0]) {
+        draw_section(c, "中英对照", 40, &y);
         const char *p = en; int lines = 0;
         while (*p && lines < 2000) {
             const char *e = strchr(p, '\n');
             size_t n = e ? (size_t)(e - p) : strlen(p);
             char tmp[2048]; if (n >= sizeof(tmp)) n = sizeof(tmp) - 1;
             memcpy(tmp, p, n); tmp[n] = 0;
-            if (tmp[0]) { draw_wrapped(c, tmp, 40, &y, 700, 17, cjk(tmp) ? MUTED : BODY, 26, 6); lines++; }
+            if (tmp[0]) {
+                draw_wrapped(c, tmp, 40, &y, 700, 17,
+                             cjk(tmp) ? MUTED : BODY, 26, 6);
+                lines++;
+            }
             if (!e) break;
             p = e + 1;
         }
+        y += 16;
     }
-    y += 16;
 
-    draw_section(c, "词汇表", 40, &y);
-    {
+    if (vocab[0]) {
+        draw_section(c, "词汇表", 40, &y);
         const char *p = vocab; int rows = 0;
         while (*p && rows < 2000) {
             const char *e = strchr(p, '\n');
@@ -159,7 +166,8 @@ static int layout_card(txt2png_canvas_t c) {
             char *bar = strchr(tmp, '|');
             if (bar) {
                 *bar = 0;
-                char *w = tmp; while (*w == ' ' || (*w >= '0' && *w <= '9') || *w == '.') w++;
+                char *w = tmp;
+                while (*w == ' ' || (*w >= '0' && *w <= '9') || *w == '.') w++;
                 if (drawing) {
                     txt2png_canvas_draw_text(c, FONT, 17, w, 56, y, INK);
                     txt2png_canvas_draw_text(c, FONT, 17, bar + 1, 230, y, MUTED);
@@ -169,11 +177,13 @@ static int layout_card(txt2png_canvas_t c) {
             if (!e) break;
             p = e + 1;
         }
+        y += 16;
     }
 
-    y += 16;
-    draw_section(c, "精彩句子", 40, &y);
-    draw_para(c, sent, 40, &y, 700, 18, BODY, 28, 600);
+    if (sent[0]) {
+        draw_section(c, "精彩句子", 40, &y);
+        draw_para(c, sent, 40, &y, 700, 18, BODY, 28, 600);
+    }
     return y;
 }
 

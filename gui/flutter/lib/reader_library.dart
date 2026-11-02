@@ -181,6 +181,31 @@ final class ReaderLibrary {
     return out;
   }
 
+  /// EPUB 导出的目录是大量 `[标题](Chapter_1.xhtml#h2_3)` 链接，
+  /// 通用分段会把它们挤成一团；这里按 h1/h2/h3 还原成缩进列表。
+  List<ReaderParagraph>? _parseToc(String text) {
+    final links = RegExp(r'\[([\s\S]*?)\]\([^)]*#h(\d)_[^)]*\)')
+        .allMatches(text)
+        .toList();
+    if (links.length < 3) return null;
+    final out = <ReaderParagraph>[];
+    final seen = <String>{};
+    for (final m in links) {
+      final label = (m.group(1) ?? '')
+          .replaceAll('*', '')
+          .replaceAll('•', ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (label.isEmpty) continue;
+      final rawLevel = int.tryParse(m.group(2) ?? '1') ?? 1;
+      final level = rawLevel < 1 ? 1 : (rawLevel > 4 ? 4 : rawLevel);
+      final indent = List.filled(level - 1, '    ').join();
+      final line = '$indent$label';
+      if (seen.add(line)) out.add(ReaderParagraph(line));
+    }
+    return out.length >= 3 ? out : null;
+  }
+
   List<ReaderParagraph> _parsePage(String raw) {
     var text = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     // YAML front matter
@@ -189,6 +214,9 @@ final class ReaderLibrary {
       if (end > 0) text = text.substring(end + 4);
     }
     text = text.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
+
+    final toc = _parseToc(text);
+    if (toc != null) return toc;
 
     final lines = <String>[];
     for (final line in text.split('\n')) {

@@ -324,3 +324,7 @@ native/staticpy/ebook_json/wc_ebook_json.so
 # StaticPy wordlists artifacts
 native/staticpy/wordlists/wc_build_wordlists
 native/staticpy/wordlists/wc_build_wordlists.so
+
+# StaticPy card_cn artifacts
+native/staticpy/card_cn/wc_card_cn
+native/staticpy/card_cn/wc_card_cn.so

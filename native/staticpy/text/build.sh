@@ -74,9 +74,15 @@ extern fn wc_wordpick_tsv(freq: str, text: str, out: str, max_words: int) -> int
 extern fn wc_render_png(text: str, font: str, out: str) -> int from "wc_text_static"
 
 def main():
-    text = "The quick brown fox jumps over the lazy dog. Vocabulary learning should be deliberate and consistent. Reading original books builds durable knowledge."
-    print(wc_wordpick_tsv("src/wordpick/en_freq.tsv", text, "/tmp/opencode/wc_words.tsv", 10))
-    print(wc_render_png("WordCard StaticPy\n选词 + 卡片渲染", "LXGWWenKai-Regular.ttf", "/tmp/opencode/wc_text.png"))
+    args = list_to_py_list(argv())
+    n: int = py_list_length(args)
+    if n < 4:
+        print("usage: wc_text <freq.tsv> <text> <out.tsv> [max_words]")
+        exit_program(1)
+    max_words: int = 10
+    if n > 4: max_words = string_to_int(py_list_ref(args, 4))
+    print(wc_wordpick_tsv(py_list_ref(args, 1), py_list_ref(args, 2),
+                          py_list_ref(args, 3), max_words))
 PY
 
 CC="${CC:-gcc}"

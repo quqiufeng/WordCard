@@ -23,12 +23,15 @@ fi
 if [ -f /opt/StaticPy/staticpy/static_build_comfycli.sh ] &&
    [ -f "$ROOT/native/staticpy/translate/build.sh" ] &&
    [ -f "$ROOT/native/staticpy/define/build.sh" ]; then
-    echo "[1.5/3] 编译 StaticPy wc_translate/wc_define/wc_ocr/wc_voice/wc_ebook_json ..."
+    echo "[1.5/3] 编译 StaticPy wc_translate/wc_define/wc_ocr/wc_voice/wc_ebook_json/wc_card_txt/wc_text/wc_card_cn ..."
     bash "$ROOT/native/staticpy/translate/build.sh" >/tmp/opencode/wc_translate_build.log 2>&1 || true
     bash "$ROOT/native/staticpy/define/build.sh" >/tmp/opencode/wc_define_build.log 2>&1 || true
     bash "$ROOT/native/staticpy/ocr/build.sh" >/tmp/opencode/wc_ocr_build.log 2>&1 || true
     bash "$ROOT/native/staticpy/voice/build.sh" >/tmp/opencode/wc_voice_build.log 2>&1 || true
     bash "$ROOT/native/staticpy/ebook_json/build.sh" >/tmp/opencode/wc_ebook_json_build.log 2>&1 || true
+    bash "$ROOT/native/staticpy/card_txt/build.sh" >/tmp/opencode/wc_card_txt_build.log 2>&1 || true
+    bash "$ROOT/native/staticpy/text/build.sh" >/tmp/opencode/wc_text_build.log 2>&1 || true
+    bash "$ROOT/native/staticpy/card_cn/build.sh" >/tmp/opencode/wc_card_cn_build.log 2>&1 || true
 fi
 
 # 2) Flutter SDK

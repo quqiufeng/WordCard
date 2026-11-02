@@ -80,3 +80,6 @@ extern fn wc_cli_review_interactive(db_path: str, user_id: int) -> int from "wc_
 
 # wordlist generator
 extern fn wc_build_wordlists(cache: str, out: str, mask: int, refresh: int) -> int from "wc_build_wordlists"
+
+# chinese-only card
+extern fn wc_card_cn(title: str, content: str, png: str, height: int) -> int from "wc_card_cn"
