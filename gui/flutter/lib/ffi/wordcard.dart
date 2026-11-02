@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
+import '../native_paths.dart';
 import 'structs.dart';
 
 export 'structs.dart';
@@ -249,11 +250,12 @@ final class WordCardEngine {
   }
 
   static String _resolveLibrary(String? override) {
+    final root = NativePaths.root;
     final candidates = <String>[
       if (override != null) override,
       'libwordcard.so',
       'src/libwordcard.so',
-      '/opt/WordCard/src/libwordcard.so',
+      if (root != null) '$root/src/libwordcard.so',
     ];
     for (final c in candidates) {
       if (File(c).existsSync()) return c;
@@ -263,10 +265,11 @@ final class WordCardEngine {
   }
 
   static String _resolveDb(String? override) {
+    final root = NativePaths.root;
     final candidates = <String>[
       if (override != null) override,
       'data/wordcard.db',
-      '/opt/WordCard/data/wordcard.db',
+      if (root != null) '$root/data/wordcard.db',
     ];
     for (final c in candidates) {
       if (File(c).existsSync()) return c;

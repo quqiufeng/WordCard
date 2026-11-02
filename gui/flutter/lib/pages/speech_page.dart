@@ -486,6 +486,12 @@ class _SpeechPageState extends State<SpeechPage> {
                 ),
               ),
               const SizedBox(width: 8),
+              IconButton(
+                tooltip: '录音 4 秒后识别',
+                onPressed: active ? _service.listen : null,
+                icon: const Icon(Icons.mic, size: 20),
+              ),
+              const SizedBox(width: 4),
               IconButton.filled(
                 tooltip: '发送',
                 onPressed: active ? _sendText : null,

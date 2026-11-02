@@ -2,6 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'llama_service.dart';
+import 'memo_service.dart';
+import 'native_paths.dart';
+import 'tts.dart';
+
 /// 一条口语对话消息（英文 + 中文译文）。
 final class SpeechMessage {
   SpeechMessage({
@@ -19,8 +24,7 @@ final class SpeechMessage {
   final String topic;
 }
 
-/// 口语对话服务：懒启动 `tools/voice_chat_server.py`，
-/// 本地 ASR/TTS + 可切 LLM（默认 DeepSeek，有 key 时）。
+/// 口语对话服务：本地 llama-server 生成英文回复，wc_voice 做 TTS。
 final class VoiceChatService {
   VoiceChatService({required this.onUpdate});
 
@@ -31,107 +35,80 @@ final class VoiceChatService {
   String statusState = 'idle';
   String requestedTopic = '';
   String topic = '';
-  String backend = '';
+  String backend = 'local';
   bool active = false;
   String? error;
+  bool _busy = false;
 
-  Process? _proc;
-  String? _root;
-  final List<String> _stderr = [];
+  String get _url =>
+      Platform.environment['WC_LLM_URL'] ?? 'http://127.0.0.1:8081';
 
-  String? _findRoot() {
-    for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/tools/voice_chat_server.py').existsSync()) return c;
-    }
-    return null;
+  String get _model =>
+      Platform.environment['WC_CHAT_MODEL'] ??
+      Platform.environment['DEEPSEEK_MODEL'] ??
+      'deepseek-flash';
+
+  String _systemPrompt() {
+    final t = topic.isEmpty ? 'daily life' : topic;
+    return 'You are a friendly English conversation tutor for a Chinese learner. '
+        'Topic: $t. Reply in English only, in 1-2 natural sentences, and end '
+        'with a short follow-up question. Do not translate.';
   }
 
-  Future<void> _ensure() async {
-    if (_proc != null) return;
-    _root ??= _findRoot();
-    if (_root == null) throw StateError('未找到 tools/voice_chat_server.py');
-    final p = await Process.start(
-      'python3',
-      ['$_root/tools/voice_chat_server.py'],
-      workingDirectory: _root,
-    );
-    _proc = p;
-    p.stderr
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen((l) {
-      _stderr.add(l);
-      if (_stderr.length > 60) _stderr.removeAt(0);
-    });
-    p.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen(_onLine, onDone: () {
-      if (identical(_proc, p)) {
-        _proc = null;
-        active = false;
-        if (status.isEmpty) status = '服务已退出';
-        onUpdate();
-      }
-    });
-    p.exitCode.then((_) {
-      if (identical(_proc, p)) _proc = null;
-    });
-  }
-
-  void _onLine(String line) {
-    if (line.trim().isEmpty) return;
-    Map<String, dynamic> d;
+  Future<String> _chat(String userText, {bool includeUser = true}) async {
+    final recent = messages.length > 12
+        ? messages.sublist(messages.length - 12)
+        : messages;
+    final history = [
+      for (final m in recent)
+        {'role': m.isUser ? 'user' : 'assistant', 'content': m.en},
+    ];
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 3);
     try {
-      d = json.decode(line) as Map<String, dynamic>;
-    } catch (_) {
-      return;
+      final req = await client.postUrl(
+          Uri.parse('$_url/v1/chat/completions'));
+      req.headers.contentType = ContentType.json;
+      req.write(jsonEncode({
+        'model': _model,
+        'temperature': 0.7,
+        'messages': [
+          {'role': 'system', 'content': _systemPrompt()},
+          ...history,
+          if (includeUser) {'role': 'user', 'content': userText},
+        ],
+      }));
+      final res = await req.close().timeout(const Duration(seconds: 120));
+      final body = await utf8.decoder.bind(res).join();
+      final doc = jsonDecode(body) as Map<String, dynamic>;
+      final choices = doc['choices'] as List?;
+      final first = choices?.isNotEmpty == true ? choices!.first : null;
+      final msg = first is Map ? first['message'] : null;
+      final content = msg is Map ? '${msg['content'] ?? ''}' : '';
+      return content.trim();
+    } finally {
+      client.close(force: true);
     }
-    switch ('${d['event']}') {
-      case 'ready':
-        backend = '${d['backend'] ?? ''}';
-        break;
-      case 'state':
-        statusState = '${d['state'] ?? ''}';
-        status = '${d['text'] ?? ''}';
-        if (statusState == 'ended') active = false;
-        break;
-      case 'user':
-        messages.add(SpeechMessage(
-          isUser: true,
-          en: '${d['en'] ?? ''}',
-          zh: '${d['zh'] ?? ''}',
-        ));
-        break;
-      case 'assistant':
-        final t = '${d['topic'] ?? ''}';
-        if (t.isNotEmpty) topic = t;
-        messages.add(SpeechMessage(
-          isUser: false,
-          en: '${d['en'] ?? ''}',
-          zh: '${d['zh'] ?? ''}',
-          opening: d['opening'] == true,
-          topic: t,
-        ));
-        break;
-      case 'error':
-        error = '${d['message'] ?? '未知错误'}';
-        active = false;
-        status = error!;
-        statusState = 'error';
-        break;
-      case 'end':
-        active = false;
-        break;
-    }
-    onUpdate();
   }
 
-  void _send(Map<String, dynamic> m) {
+  Future<String> _translate(String en) async {
+    if (en.trim().isEmpty) return '';
+    final c = Completer<String>();
+    MemoService.instance.translateText(en, (zh) {
+      if (!c.isCompleted) c.complete(zh.trim());
+    });
     try {
-      _proc?.stdin.writeln(json.encode(m));
+      return await c.future.timeout(const Duration(seconds: 45));
     } catch (_) {
-      _proc = null;
+      return '';
+    }
+  }
+
+  void _update() => onUpdate();
+
+  Future<void> _ensureReady() async {
+    if (!await LlamaService.instance.ensure()) {
+      throw StateError('本地模型未就绪');
     }
   }
 
@@ -139,44 +116,166 @@ final class VoiceChatService {
     required String topic,
     required bool aiFirst,
   }) async {
-    await _ensure();
     messages.clear();
     error = null;
     requestedTopic = topic.trim();
-    this.topic = requestedTopic;
+    this.topic = requestedTopic.isEmpty ? 'daily life' : requestedTopic;
     active = true;
     statusState = 'thinking';
-    status = aiFirst ? '外教正在准备开场…' : '正在打开麦克风…';
-    onUpdate();
-    _send({'cmd': 'start', 'topic': requestedTopic, 'ai_first': aiFirst});
+    status = aiFirst ? '外教正在准备开场…' : '输入英文开始对话';
+    _update();
+    try {
+      await _ensureReady();
+      if (aiFirst) await aiOpen();
+    } catch (e) {
+      error = '$e';
+      active = false;
+      status = error!;
+      statusState = 'error';
+      _update();
+    }
   }
 
-  void stop() {
-    _send({'cmd': 'stop'});
-    active = false;
-    statusState = 'ended';
-    status = '对话结束';
-    onUpdate();
+  Future<void> aiOpen() async {
+    if (!active || _busy) return;
+    _busy = true;
+    statusState = 'thinking';
+    status = '外教正在回应…';
+    _update();
+    try {
+      final en = await _chat(
+          'Start the conversation now with a short greeting and a question.');
+      if (en.isEmpty) throw StateError('模型没有返回内容');
+      final zh = await _translate(en);
+      messages.add(SpeechMessage(
+        isUser: false,
+        en: en,
+        zh: zh,
+        opening: true,
+        topic: topic,
+      ));
+      TtsService.instance.speak(en);
+      status = '输入英文继续对话';
+      statusState = 'listening';
+    } catch (e) {
+      error = '$e';
+      status = error!;
+      statusState = 'error';
+    } finally {
+      _busy = false;
+      _update();
+    }
   }
 
-  void sendText(String text) {
+  Future<void> sendText(String text) async {
     final t = text.trim();
-    if (t.isEmpty || !active) return;
+    if (t.isEmpty || !active || _busy) return;
+    messages.add(SpeechMessage(isUser: true, en: t, zh: ''));
+    _busy = true;
     error = null;
     statusState = 'thinking';
     status = '外教正在回应…';
-    onUpdate();
-    _send({'cmd': 'user_text', 'text': t});
+    _update();
+    try {
+      final en = await _chat(t, includeUser: false);
+      if (en.isEmpty) throw StateError('模型没有返回内容');
+      final zh = await _translate(en);
+      messages.add(SpeechMessage(
+        isUser: false,
+        en: en,
+        zh: zh,
+        topic: topic,
+      ));
+      TtsService.instance.speak(en);
+      status = '输入英文继续对话';
+      statusState = 'listening';
+    } catch (e) {
+      error = '$e';
+      status = error!;
+      statusState = 'error';
+    } finally {
+      _busy = false;
+      _update();
+    }
   }
 
-  void aiOpen() {
-    if (!active) return;
-    _send({'cmd': 'ai_open'});
+  Future<void> listen() async {
+    if (!active || _busy) return;
+    final root = NativePaths.findFile('native/staticpy/voice/wc_voice');
+    if (root == null) {
+      error = '未找到 wc_voice';
+      statusState = 'error';
+      status = error!;
+      _update();
+      return;
+    }
+    _busy = true;
+    statusState = 'listening';
+    status = '正在录音（4 秒）…';
+    _update();
+    final wav = File(
+        '${Directory.systemTemp.path}/wordcard_mic_${DateTime.now().microsecondsSinceEpoch}.wav');
+    try {
+      final env = {
+        ...Platform.environment,
+        'LD_LIBRARY_PATH': '$root/native/staticpy/voice:$root/voice/libs',
+      };
+      final bin = '$root/native/staticpy/voice/wc_voice';
+      final rec = await Process.run(
+        bin,
+        [
+          'record',
+          wav.path,
+          '4',
+          '16000',
+          Platform.environment['WC_MIC_DEVICE'] ?? 'default',
+        ],
+        environment: env,
+      ).timeout(const Duration(seconds: 20));
+      if (rec.exitCode != 0 || !wav.existsSync()) {
+        throw StateError('录音失败');
+      }
+      status = '识别中…';
+      _update();
+      final asr = await Process.run(
+        bin,
+        ['asr', wav.path, 'en'],
+        environment: env,
+      ).timeout(const Duration(seconds: 60));
+      final text = (asr.stdout as String).trim();
+      _busy = false;
+      if (text.isEmpty) {
+        status = '没听清，再说一次';
+        statusState = 'listening';
+        _update();
+        return;
+      }
+      await sendText(text);
+    } catch (e) {
+      error = '$e';
+      status = error!;
+      statusState = 'error';
+      _busy = false;
+      _update();
+    } finally {
+      if (wav.existsSync()) wav.deleteSync();
+    }
   }
 
   void replay() {
-    if (!active) return;
-    _send({'cmd': 'replay'});
+    final last = messages.lastWhere(
+      (m) => !m.isUser,
+      orElse: () => SpeechMessage(isUser: false, en: '', zh: ''),
+    );
+    if (last.en.isNotEmpty) TtsService.instance.speak(last.en);
+  }
+
+  void stop() {
+    active = false;
+    _busy = false;
+    statusState = 'ended';
+    status = '对话结束';
+    _update();
   }
 
   Map<String, dynamic> state() => {
@@ -195,13 +294,6 @@ final class VoiceChatService {
       };
 
   Future<void> dispose() async {
-    _send({'cmd': 'stop'});
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-    try {
-      await _proc?.stdin.close();
-    } catch (_) {}
-    _proc?.kill();
-    _proc = null;
-    active = false;
+    stop();
   }
 }

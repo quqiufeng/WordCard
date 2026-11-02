@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'llama_service.dart';
+import 'native_paths.dart';
 
 /// 一次查词结果（ECDICT 优先，未收录由本地 LLM 兜底）。
 final class WordDef {
@@ -32,12 +33,8 @@ final class MemoService {
 
   String? _root;
 
-  String? _findRoot() {
-    for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/native/staticpy/define/wc_define').existsSync()) return c;
-    }
-    return null;
-  }
+  String? _findRoot() =>
+      NativePaths.findFile('native/staticpy/define/wc_define');
 
   Future<String?> _ensureRoot() async {
     _root ??= _findRoot();

@@ -39,6 +39,8 @@ cat > "$STAGE/run-wordcard.sh" <<'SH'
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
+export WORDCARD_ROOT="$HERE"
+export WORDCARD_FONT="$HERE/LXGWWenKai-Regular.ttf"
 export LD_LIBRARY_PATH="$HERE/src:$HERE/libs:$HERE/voice/libs:$HERE/importer/libs:${LD_LIBRARY_PATH:-}"
 exec "$HERE/bundle/wordcard" "$@"
 SH

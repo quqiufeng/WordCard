@@ -1,16 +1,13 @@
 import 'dart:io';
 
+import 'native_paths.dart';
+
 /// 图片 OCR 导入：选图 → 用 tools/ocr_image.py（PP-OCRv4）识别文字 → 供粘贴导入建任务。
 final class OcrImporter {
   static const _defaultOrt =
       '/data/venv/onnxruntime-linux-x64-gpu-1.26.0/lib';
 
-  static String? _root() {
-    for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/native/staticpy/ocr/wc_ocr').existsSync()) return c;
-    }
-    return null;
-  }
+  static String? _root() => NativePaths.findFile('native/staticpy/ocr/wc_ocr');
 
   /// 选择多张图片；取消返回空。
   Future<List<String>> pickImages() async {

@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+
+import 'native_paths.dart';
 
 /// 一本已解析的书（来自 `/opt/books/<slug>/chapters/*/page_*.md`）。
 ///
@@ -65,14 +68,8 @@ final class ReaderLibrary {
   static String get root =>
       Platform.environment['BOOK_MD_ROOT'] ?? '/opt/books';
 
-  static String? _appRoot() {
-    for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/native/staticpy/translate/wc_translate').existsSync()) {
-        return Directory(c).absolute.path;
-      }
-    }
-    return null;
-  }
+  static String? _appRoot() =>
+      NativePaths.findFile('native/staticpy/translate/wc_translate');
 
   static File? _dataFile(String name) {
     final root = _appRoot();
@@ -165,7 +162,9 @@ final class ReaderLibrary {
     for (final path in chapter.pages) {
       final f = File(path);
       if (!f.existsSync()) continue;
-      final paragraphs = _parsePage(f.readAsStringSync());
+      final toc = chapter.title.toLowerCase().contains('table of contents') ||
+          chapter.title.contains('目录');
+      final paragraphs = _parsePage(f.readAsStringSync(), toc: toc);
       for (final p in paragraphs) {
         if (p.text.trim().isEmpty) continue;
         if (out.isNotEmpty &&
@@ -180,6 +179,9 @@ final class ReaderLibrary {
     }
     return out;
   }
+
+  Future<List<ReaderParagraph>> loadChapterAsync(ReaderChapter chapter) =>
+      Isolate.run(() => loadChapter(chapter));
 
   /// EPUB 导出的目录是大量 `[标题](Chapter_1.xhtml#h2_3)` 链接，
   /// 通用分段会把它们挤成一团；这里按 h1/h2/h3 还原成缩进列表。
@@ -206,7 +208,7 @@ final class ReaderLibrary {
     return out.length >= 3 ? out : null;
   }
 
-  List<ReaderParagraph> _parsePage(String raw) {
+  List<ReaderParagraph> _parsePage(String raw, {bool toc = false}) {
     var text = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     // YAML front matter
     if (text.startsWith('---')) {
@@ -215,8 +217,8 @@ final class ReaderLibrary {
     }
     text = text.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
 
-    final toc = _parseToc(text);
-    if (toc != null) return toc;
+    final tocParagraphs = toc ? _parseToc(text) : null;
+    if (tocParagraphs != null) return tocParagraphs;
 
     final lines = <String>[];
     for (final line in text.split('\n')) {

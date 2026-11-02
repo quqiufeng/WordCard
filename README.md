@@ -1,326 +1,115 @@
 # WordCard — 电子书「读前预习」词汇学习系统
 
-> 解析电子书 → 挑出最值得学的词（带上下文）→ SM-2 记住 → 顺畅读完不卡顿
+> 解析电子书 → 选出最值得学的词（带上下文）→ SM-2 记忆 → 双语阅读 → 卡片/口语复习
 
 ---
 
 ## 设计目标
 
-**把一本原版书读懂、读顺，不再卡顿。**
-
-核心思路：读之前，先把这本书里「**你不认识、又在书中高频**」的词学会——它们每读几页就撞一次，不学就一直卡。
+把一本原版书读懂、读顺：先学会「不认识、又在书中高频」的词，再进入阅读，减少反复卡顿。
 
 ```
 电子书(PDF/MOBI/AZW3/EPUB/MD)
-   │ ① 解析 → 完整正文，按章节切分
-   ▼
-   │ ② 选词 → 通用词频(Zipf) + 书内词频 + 散布度 + 学习者水平
-   │          在「覆盖率(能读通)」与「学习价值(值得学)」间平衡
-   ▼
-   │ ③ 材料 → 中英双语释义 + 含词的双语段落 + 双语句例 + 英文朗读 + 卡片图片
-   ▼
-   │ ④ 记忆 → 导入 SM-2 间隔重复引擎，到期自动复习
-   ▼
-   ⑤ 复读 → 词都记住了，原文读起来就顺了
+  → 解析/分章
+  → 选词(zipf + 书内词频 + 散布度 + 水平)
+  → 释义/例句/翻译/卡片
+  → SM-2 复习
+  → 双语阅读
 ```
 
-## 核心特性
-
-- **C 核心引擎**：零依赖 SM-2 算法 + 哈希索引 + 结构体直写磁盘
-- **桌面应用**：Flutter + Yaru（Ubuntu），首页记忆数据 / 任务 / 听写 / 图片 OCR 导入
-- **双语阅读器**：直接读 `/opt/books` 的解析结果，段间对照、按需翻译（本地 llama.cpp 或 DeepSeek 在线 API）、点词查词并加入读书任务
-- **英语口语对话**：本地 SenseVoice ASR + Kokoro TTS，外教双语陪练场景（生活/时事主题）；主题可输入（留空由 DeepSeek 给默认主题），AI 回复与开场由 DeepSeek API 生成，双方英文自动附中文译文；每句可点击朗读
-- **多来源导入**：考试词表 / 电子书 / 粘贴词表（含词组）/ 图片 OCR → 统一记忆任务
-- **智能选词**：`libwordpick.so` 内置 6 万词频表 + 词形还原，偏态难度曲线 + 覆盖率加权
-- **完整解析**：PDF/MOBI/AZW3/EPUB/MD → 清洗后的完整正文，按章节切分
-- **双语材料**：本地 LLM 翻译 + Kokoro 语音 + HarfBuzz/Cairo 卡片
-- **双接口**：CLI 终端复习 + FastAPI REST 接口
-- **全本地**：无外部数据库/API 依赖
-
----
-
-## 示例卡片
-
-![示例词汇卡](docs/sample_card.png)
-
-`vocab_card.py` 生成的一张词汇卡（示例文本：狄更斯《双城记》开篇，公有领域）——包含：
-**单词 + 词性 + 中英双语释义 + 含该词的双语段落 + 双语句例**，1920×2560（小红书尺寸）。
-
----
-
-## 架构
+## 当前架构
 
 ```
-用户
- ├── 桌面 App (gui/flutter) ─ Flutter + Yaru；dart:ffi 直连 libwordcard.so
- │                         首页/任务/记忆/听写/导入(词表·电子书·粘贴·图片OCR)/双语阅读
- ├── CLI (cli.py) ──────── 终端交互复习
- ├── API (api.py) ──────── FastAPI REST (port 8000)
- ├── 卡片图片 ───────────── txt2png Canvas → PNG
- └── 语音 ──────────────── ASR (SenseVoice) + TTS (Kokoro)
+Flutter UI (gui/flutter)
+  ├─ dart:ffi ───────────── libwordcard.so        SM-2 引擎
+  ├─ native 进程 ────────── native/staticpy/*     解析/选词/翻译/OCR/TTS/卡片
+  └─ llama-server(:8081) ── 本地翻译/口语模型
 
-Python 层
- ├── engine.py    ────────── SM-2 ctypes 绑定 → libwordcard.so
- ├── importer.py  ────────── 电子书解析 → 词汇提取 → DB
- ├── txt2png.py   ────────── 画布 API → libtxt2png.so
- ├── voice.py     ────────── ASR/TTS → libvoice_engine.so
- └── native/staticpy/card_txt ─ 多格式输出 (MD/PNG/PDF)
-
-C/C++ 层
- ├── libwordcard.so     ───── SM-2 学习引擎 (wordcard.c + modes.c)
- ├── libcache.so        ───── KV Cache (14 个模块)
- ├── libtxt2png.so      ───── HarfBuzz + Knuth-Plass + Cairo
- ├── libwordpick.so     ───── 智能词汇选择 (基于通用词频 zipf)
- ├── libqwen3_asr.so    ───── Qwen3-ASR (ONNX + llama.cpp)
- │                         来源: /opt/friday/agent/qwen3_asr_engine.cpp
- ├── importer/libs/
- │   ├── libmobiparse.so ──── MOBI/AZW3 解析 (libmobi)
- │   └── libpdfparse.so ──── PDF/EPUB 解析 (MuPDF)
- └── voice/wrappers/
-     ├── piper_wrapper.cpp ─── TTS (需编译)
-     ├── sensevoice_wrapper.cpp ─ ASR 备选
-     └── qwen3_asr_bridge.*  ─── Qwen3-ASR C ABI
+C/C++ 底层
+  ├─ src/                  libwordcard.so / libwordpick.so / libtxt2png.so
+  ├─ importer/libs/        MOBI/PDF/EPUB 解析
+  ├─ voice/libs/           voice_engine + OCR
+  └─ native/src/           StaticPy 入口对应的 C 源码
 ```
 
----
+运行时不依赖 Python。`native/staticpy/ffi.static.py` 只是 StaticPy 源码输入。
 
-## 快速开始
+## 主要能力
 
-### 1. 安装依赖
+- **学习引擎**：C 实现 SM-2、哈希索引、结构体直写磁盘
+- **桌面 UI**：Flutter + Yaru，首页/任务/记忆/听写/导入/阅读/口语
+- **阅读器**：`/opt/books` 书架、目录拖动/隐藏、字号/字体切换、TOC 清洗、段间翻译
+- **导入**：考试词表、电子书、粘贴词表、图片 OCR
+- **卡片导出**：直接保存到 `~`，内容 hash 命名；双语页提取词汇/例句，全中文走独立 `wc_card_cn`，固定 `780×1200` 分页
+- **语音**：`wc_voice` 录音/ASR/TTS；本地 `llama-server` 生成口语回复
+- **本地优先**：翻译/朗读/卡片均本地完成，DeepSeek 仅可选
+
+## 构建与运行
 
 ```bash
-# C 核心库
-cd src && make
+# 完整构建：C 核心 + StaticPy + Flutter release
+gui/flutter/build.sh
 
-# 电子书解析（可选，仅 PDF/MOBI 需要）
-cd importer/wrappers && make
+# 运行
+gui/flutter/run.sh
 
-# Python 依赖
-pip install fastapi uvicorn pyphen uniseg  # API + txt2png
+# 打包 Linux x64
+gui/flutter/package.sh
+# → dist/wordcard-linux-x64.tar.gz
 ```
 
-### 2. 初始化数据库
+单独构建 native：
 
 ```bash
-python3 -c "
-import engine
-db = engine.WordCardDB()
-db.create_user('default', 'Default User')
-db.save('data/wordcard.db')
-"
+bash native/staticpy/build.sh
 ```
 
-### 3. 导入电子书
+## 常用 native 入口
 
 ```bash
-python3 cli.py import book.mobi
-python3 cli.py import book.pdf
-python3 cli.py import chapter.md
+native/staticpy/ebook_json/wc_ebook_json <book> <out.json>
+native/staticpy/card_cn/wc_card_cn <title> <content.txt> <out.png> 1200
+native/staticpy/card_txt/wc_card_txt <input.txt> <out.png> <out.md>
+native/staticpy/define/wc_define <word> --dict data/wordlists/cet4.tsv
+native/staticpy/voice/wc_voice tts <text> <out.wav> 3
+native/staticpy/voice/wc_voice asr <wav> en
 ```
 
-### 4. 开始复习
+## 测试与检查
 
 ```bash
-# CLI 交互
-python3 cli.py review
-
-# 查看统计
-python3 cli.py stats
-
-# 生成单词卡片图片
-python3 cli.py card 1
+cd gui/flutter
+flutter analyze
+flutter test
+flutter build linux --release
 ```
 
-### 5. 启动 API
+## 数据与模型
 
-```bash
-python3 api.py
-# → http://localhost:8000/docs
-```
+- 电子书解析结果：`/opt/books/<slug>/chapters/*/page_*.md`
+- 数据库：`data/wordcard.db`
+- 词表：`data/wordlists/*.tsv`
+- 字体：`LXGWWenKai-Regular.ttf`（可用 `WORDCARD_FONT` 覆盖）
+- 本地模型默认：`/data/models/Hunyuan-MT-7B-Q4_K_M.gguf`（可用 `WC_LLM_MODEL` 覆盖）
+- OCR：`models/ocr/` + onnxruntime 1.26（可用 `WC_ORT_LIB` 覆盖）
 
-### 6. 启动桌面应用（Flutter / Ubuntu）
-
-```bash
-gui/flutter/build.sh    # 编译 C 核心 + flutter build linux --release
-gui/flutter/run.sh      # 运行；或用桌面图标
-```
-
-打开侧栏「阅读」：书架自动列出 `/opt/books` 中已解析的书；点书进入段间对照阅读，
-段落右侧「译」按需调用本地 LLM，点单词可查词并加入该书任务。
-详见 `gui.md`（UI 层技术架构）。
-
----
-
-## 项目结构
+## 目录
 
 ```
-WordCard/
-├── src/                          # C 核心库
-│   ├── wordcard.h / wordcard.c  # SM-2 引擎
-│   ├── modes.c                  # 智能推荐算法
-│   ├── cache/                   # KV Cache（14 个模块）
-│   ├── txt2png/                 # C++ txt2png 桥接
-│   │   ├── linebreak.h/cpp      # Knuth-Plass 算法
-│   │   ├── textrender_core.cpp  # HarfBuzz + Cairo 渲染
-│   │   └── txt2png_bridge.h     # C ABI 接口
-│   └── Makefile
-│
-├── engine.py                    # SM-2 ctypes 绑定
-├── importer.py                  # 电子书导入管道
-├── cli.py                       # CLI 交互复习
-├── api.py                       # FastAPI REST
-├── txt2png.py                   # 画布 API (Canvas)
-├── voice.py                     # ASR/TTS (Qwen3-ASR / SenseVoice / Piper)
-├── native/staticpy/card_txt      # 多格式卡片输出（StaticPy）
-│
-├── importer/
-│   ├── wrappers/                # C++ 电子书解析
-│   │   ├── mobi_wrapper.cpp     # MOBI/AZW3 (libmobi)
-│   │   ├── pdf_wrapper.cpp      # PDF (MuPDF)
-│   │   ├── epub_wrapper.cpp     # EPUB (libzip + libxml2)
-│   │   └── Makefile
-│   └── libs/                    # 编译产物
-│       ├── libmobiparse.so
-│       └── libpdfparse.so
-│
-├── voice/                       # 语音引擎
-│   ├── libs/libqwen3_asr.so     # Qwen3-ASR (来自 /opt/friday)
-│   ├── wrappers/
-│   │   ├── qwen3_asr_bridge.h/cpp  # C ABI 桥
-│   │   ├── sensevoice_wrapper.cpp  # SenseVoice 封装
-│   │   └── piper_wrapper.cpp       # Piper TTS 封装
-│   └── Makefile
-│
-├── data/                        # 数据库目录
-│   └── wordcard.db
-│
-├── output/                      # 卡片输出
-│
-├── gui/                         # 桌面应用（Flutter + Yaru）
-│   └── flutter/
-│       ├── lib/                 # reader_library.dart · pages/reader_page.dart
-│       │                        # pages/bilingual_reader.dart · pages/speech_page.dart
-│       │                        # voice_chat_service.dart · widgets/clickable_text.dart
-│       └── automation/          # wordcard.lua · xdo.lua / x11.lua（LuaJIT FFI 窗口）
-│                                # agent_demo.lua · native_demo.lua
-│
-├── voice/agent/                 # 本地语音运行时（从 my-agent 复制）
-│   ├── say.sh / say.lua         # Kokoro TTS → 小音响
-│   ├── listen/                  # ALSA + VAD + SenseVoice ASR
-│   └── config.lua / audio.lua
-├── tools/voice_chat_server.py   # 口语对话服务（ASR/TTS + opencode 大脑 + 双语）
-├── tools/wordcard_brain.sh      # tmux wordcard-brain（serve :4098 + tui）
-├── gui.md                       # UI 层技术架构
-├── automation.md                # 全自动化开发模式（Fully-Automated Mode）
-├── design.md                    # 架构文档
-├── README.md                    # 本文档
-└── todolist.md                    # 应用方向
+src/                 C 核心/选词/渲染
+native/staticpy/     StaticPy 构建入口与 wrapper
+native/src/          抽出的 C 源码
+importer/            MOBI/PDF/EPUB 解析
+voice/               语音引擎与 OCR 运行库
+gui/flutter/         Flutter 桌面应用
+data/                数据库/词表/缓存
 ```
 
----
+## 已知限制
 
-## API 一览
-
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/user` | POST | 创建用户 |
-| `/api/v1/user/{id}` | GET | 获取用户 |
-| `/api/v1/item` | POST | 添加学习项 |
-| `/api/v1/item/{id}` | GET | 获取学习项 |
-| `/api/v1/review` | POST | 提交复习 (quality 0-5) |
-| `/api/v1/queue/{user_id}` | GET | 获取今日学习队列 |
-| `/api/v1/import` | POST | 导入电子书 |
-| `/api/v1/stats/{user_id}` | GET | 学习统计 |
-
----
-
-## SM-2 间隔重复
-
-| 场景 | 行为 |
-|------|------|
-| 新项首次学习 | interval = 1 天，repetitions = 1 |
-| 第二次记住 | interval = 6 天 |
-| 第三次记住 | interval × ease_factor |
-| 忘记 (quality < 3) | interval 重置为 1 天 |
-| 掌握判定 | repetions ≥ 5 且 interval ≥ 21 天 |
-
----
-
-## 词汇卡生成（vocab_card）
-
-为选出的单词生成学习卡片（PNG + MD），含：
-
-- **中英双语释义**（本地 LLM 生成）
-- **含该词的段落**（原文 + 中文翻译）
-- **数条含该词的例句**（原文 + 中文翻译）
-
-```bash
-# 需要本地 llama-server（自动拉起，Qwen3-14B）
-python3 vocab_card.py book.azw3 --max 30 --level 4 --sent 3 --out output/
-```
-
-译义/翻译由 `translate.py` 调用本地 `llama-server`（OpenAI 兼容 API）完成，零外部 API 依赖。
-
----
-
-## 智能词汇选择（wordpick）
-
-从电子书正文挑选「最值得学习」的单词，用于 SM-2 卡片：
-
-```
-score = U(zipf) · (0.35 + 0.65·rel) · spread · prod · lenpen
-  U      : 偏态难度曲线（简单侧陡衰减，生僻侧长尾）
-  rel    : 书内词频 log 归一
-  spread : 书内散布度（跨 chunk）
-  prod   : 构词能产性分级（高/低后缀）
-  lenpen : 过长词惩罚
-```
-
-| 特性 | 说明 |
-|------|------|
-| 难度轴 | 通用词频 Zipf（内置 6 万词表），CEFR A1–C2 预设 |
-| 词形还原 | 内置 1.6 万条 lemma 表 + 规则回退 |
-| 过滤 | 噪声 / CapRatio 专有名词 / 停用词 / 基础词 |
-| 模式 | 0=学习价值，1=覆盖率 |
-| 评估 | `eval_wordpick.py`：Precision@K / NDCG@K / 覆盖率曲线 |
-
-```python
-import importer
-# 学习价值模式（默认），可选 CEFR 等级
-words = importer.extract_words(text, max_words=50, level=4)   # B2
-# 覆盖率模式
-words = importer.extract_words(text, max_words=50, mode=1)
-```
-
----
-
-## 技术栈
-
-| 层 | 技术 | 来源 | 产物 |
-|-----|------|------|------|
-| **学习引擎** | C (C11) | 本项目 | `libwordcard.so` |
-| **KV Cache** | C (C11) | `/opt/my_db` | `libcache.so` |
-| **文本渲染** | C++17 + HarfBuzz + Cairo | `/opt/txt2png` | `libtxt2png.so` |
-| **ASR 引擎** | C++17 + ONNX + llama.cpp | `/opt/friday/agent/` | `libqwen3_asr.so` |
-| **ASR 备选** | subprocess | `/opt/friday/shell/` | SenseVoice |
-| **TTS** | C++ Piper | `voice/wrappers/` | 需编译 |
-| **电子书解析** | C++17 + libmobi/MuPDF | `importer/wrappers/` | `libmobiparse.so` / `libpdfparse.so` |
-| **词汇选择** | C++17 | 本项目 | `libwordpick.so` |
-| **业务逻辑** | Python ctypes | 本项目 | `engine.py` |
-| **CLI / API** | Python | 本项目 | `cli.py` / `api.py` |
-
----
-
-## 版本历史
-
-| 版本 | 时间 | 核心变更 |
-|------|------|----------|
-| v1.0 | 2024 | 文章翻译工具 |
-| v2.0 | 2025-05 | C + Python 架构，SM-2 单词记忆 |
-| v3.0 | 2025-05 | 通用学习引擎 |
-| **v4.0** | **2026-07** | **纯 C 重构 + 电子书导入 + CLI/API + 卡片图片** |
-| **v4.1** | **2026-10** | **Flutter/Yaru 桌面应用：记忆数据 · 任务 · 听写 · 图片OCR · Kami 排版** |
-| **v4.2** | **2026-10** | **双语电子书阅读器：书架 · 段间对照 · 按需 LLM 翻译 · 点词查词/加入任务** |
-| **v4.3** | **2026-11** | **英语口语外教：SenseVoice ASR + Kokoro TTS + 独立 wordcard-brain** |
+- OCR 依赖 onnxruntime 1.26；不同机器需设置 `WC_ORT_LIB`
+- 口语录音当前固定 4 秒，未接 VAD
+- 复杂 EPUB 的正文/目录排版仍依赖源文件质量
+- `bilingual_reader.dart` 仍在继续拆分中
 
 *最后更新: 2026-11-02*

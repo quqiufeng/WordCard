@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'native_paths.dart';
+
 /// App 启动时拉起/复用可见的 WordCard 口语大脑终端（tmux + serve + TUI）。
 ///
 /// 实际动作在 `tools/wordcard_brain.lua`：LuaJIT FFI(libxdo) 打开终端，
@@ -8,13 +10,7 @@ final class BrainService {
   BrainService._();
 
   static Future<void> start() async {
-    String? root;
-    for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/tools/wordcard_brain.lua').existsSync()) {
-        root = Directory(c).absolute.path;
-        break;
-      }
-    }
+    final root = NativePaths.findFile('tools/wordcard_brain.lua');
     if (root == null) return;
     try {
       final p = await Process.start(

@@ -83,3 +83,5 @@ extern fn wc_build_wordlists(cache: str, out: str, mask: int, refresh: int) -> i
 
 # chinese-only card
 extern fn wc_card_cn(title: str, content: str, png: str, height: int) -> int from "wc_card_cn"
+extern fn wc_card_cn_measure(title: str, content: str) -> int from "wc_card_cn"
+extern fn wc_wordpick_tsv_file(freq: str, text_path: str, out: str, max_words: int) -> int from "wc_text_static"

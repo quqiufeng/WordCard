@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'ffi/wordcard.dart';
+import 'native_paths.dart';
 
 /// 一个考试词表（CET4/CET6/考研/托福/雅思/GRE/高考）。
 final class WordlistInfo {
@@ -26,12 +27,8 @@ final class WordlistService {
   final WordCardEngine engine;
 
   static Directory? _resolveDir() {
-    const candidates = ['data/wordlists', '/opt/WordCard/data/wordlists'];
-    for (final c in candidates) {
-      final d = Directory(c);
-      if (d.existsSync()) return d;
-    }
-    return null;
+    final root = NativePaths.findDir('data/wordlists');
+    return root == null ? null : Directory('$root/data/wordlists');
   }
 
   /// 可用词表列表；数据缺失时返回空。

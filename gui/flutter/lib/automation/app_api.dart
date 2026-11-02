@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../ebook_import.dart';
 import '../ffi/wordcard.dart';
+import '../llama_service.dart';
 import '../ocr_import.dart';
 import '../paste_import.dart';
 import '../reader_library.dart';
@@ -174,6 +175,7 @@ final class AppApi {
     });
 
     a.registerFn('app.quit', (_) {
+      LlamaService.instance.stop();
       Future<void>.delayed(const Duration(milliseconds: 100), () => exit(0));
       return true;
     });

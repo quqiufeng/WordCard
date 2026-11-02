@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'ffi/wordcard.dart';
+import 'native_paths.dart';
 
 final class _Def {
   const _Def(this.ph, this.pos, this.def);
@@ -18,12 +19,8 @@ final class PasteImporter {
   final WordCardEngine engine;
   static final _cjk = RegExp(r'[\u4e00-\u9fff]');
 
-  static String? _root() {
-    for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/native/staticpy/define/wc_define').existsSync()) return c;
-    }
-    return null;
-  }
+  static String? _root() =>
+      NativePaths.findFile('native/staticpy/define/wc_define');
 
   Future<int> import(
     String name,

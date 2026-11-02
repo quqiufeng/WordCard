@@ -8,7 +8,8 @@
 ## 一、项目速览
 
 - **C 核心**：`src/` → `libwordcard.so`（SM-2 引擎 + 哈希索引），`make -C src wordcard` 构建。
-- **Python 管道**：解析 / 选词(ECDICT) / LLM 翻译 / OCR / TTS（`tools/`、`importer.py`、`translate.py`…）。
+- **Native 管道**：`native/staticpy/`（StaticPy + C ABI）负责解析 / 选词 / 翻译 / OCR / TTS / 卡片；运行时不依赖 Python。
+- **入口**：`gui/flutter/` 通过进程或 `libwordcard.so` 调用 native；打包脚本 `gui/flutter/package.sh`。
 - **桌面 UI**：`gui/flutter/`（Flutter + Yaru，`dart:ffi` 直连 `libwordcard.so`）。
 - **UI 架构文档**：`gui.md`；**总览**：`README.md`；**引擎设计**：`design.md`。
 - **全自动化开发模式（Fully-Automated Mode）**：`automation.md`——Agent 能看见并使用自己做的软件，在使用中迭代验证。
@@ -133,8 +134,8 @@ WORDCARD_ROOT=/opt/WordCard luajit -e 'package.path="gui/flutter/automation/?.lu
 ## 五、代码规范
 
 - Dart：`flutter analyze` 必须 **No issues**（提交前必过）。
-- C：`make -C src wordcard` 无 warning；改动结构体需同步更新 `engine.py`（ctypes）与 Dart `lib/ffi/structs.dart` 的布局。
-- 复用而非重写：解析/翻译/查词/OCR 一律调 `tools/*.py`，UI 只经 FFI 触发与展示。
+- C：`make -C src wordcard` 无 warning；改动结构体需同步更新 Dart `lib/ffi/structs.dart` 的布局。
+- 复用而非重写：解析/翻译/查词/OCR 一律调 `native/staticpy/` 下的 native 二进制，UI 只经 FFI/进程触发与展示。
 - 提交信息用约定式（`feat/fix/style/docs/chore(scope): ...`）。
 
 ---
@@ -147,8 +148,8 @@ gui/flutter/build.sh            # 构建 C 核心 + Flutter release
 gui/flutter/run.sh              # 会话内运行（配合上面的 env）
 gui/flutter/launch.sh           # 桌面图标入口（单实例）
 luajit gui/flutter/automation/agent_demo.lua   # UI 自动化示例
-python3 tools/ebook_extract.py <book>          # 解析电子书（复用管道）
-python3 tools/llama_ctl.py status|stop|start   # 翻译模型（终端窗口/显存）
+native/staticpy/ebook_json/wc_ebook_json <book> <out.json>   # 解析电子书
+native/staticpy/card_cn/wc_card_cn <title> <content.txt> <out.png> 1200  # 中文卡片
 tools/wordcard_brain.lua                       # 打开可见终端 + tmux（tui/serve/llama）
 tmux attach -t wordcard-brain                  # TUI=0 · serve=1 · llama=2
 voice/agent/voice.sh test                      # 本地 TTS 自检（小音响）

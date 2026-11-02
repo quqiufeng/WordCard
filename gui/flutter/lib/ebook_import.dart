@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'ffi/wordcard.dart';
+import 'memo_service.dart';
+import 'native_paths.dart';
 
 /// 电子书解析结果中的一个词条（含段落/例句对照）。
 final class BookWord {
@@ -54,15 +57,8 @@ final class EbookImporter {
 
   final WordCardEngine engine;
 
-  static String? _root() {
-    const candidates = ['.', '/opt/WordCard'];
-    for (final c in candidates) {
-      if (File('$c/native/staticpy/ebook_json/wc_ebook_json').existsSync()) {
-        return c;
-      }
-    }
-    return null;
-  }
+  static String? _root() =>
+      NativePaths.findFile('native/staticpy/ebook_json/wc_ebook_json');
 
   static String _truncUtf8(String s, int maxBytes) {
     final bytes = utf8.encode(s);
@@ -192,13 +188,55 @@ final class EbookImporter {
     return added;
   }
 
-  /// 段落/例句翻译待接入原生 LLM 批处理；当前导入不阻塞。
+  Future<String> _translateText(String text) {
+    if (text.trim().isEmpty) return Future.value('');
+    final c = Completer<String>();
+    MemoService.instance.translateText(text, (zh) {
+      if (!c.isCompleted) c.complete(zh.trim());
+    });
+    return c.future.timeout(const Duration(seconds: 60), onTimeout: () => '');
+  }
+
+  /// 逐词补齐段落/例句译文，并回填已有的学习项。
   Future<int> translateAll(
     BookExtract extract, {
     void Function(int done, int total)? onProgress,
   }) async {
     if (extract.words.isEmpty) return 0;
-    onProgress?.call(extract.words.length, extract.words.length);
-    return 0;
+    final total = extract.words.length;
+    final cache = <String, String>{};
+    Future<String> translateCached(String text) async {
+      if (text.trim().isEmpty) return '';
+      final hit = cache[text];
+      if (hit != null) return hit;
+      final zh = await _translateText(text);
+      cache[text] = zh;
+      return zh;
+    }
+
+    var updated = 0;
+    var done = 0;
+    for (final w in extract.words) {
+      if (w.para.isNotEmpty && w.paraZh.isEmpty) {
+        w.paraZh = await translateCached(w.para);
+      }
+      if (w.sents.isNotEmpty) {
+        w.sentsZh = List<String>.filled(w.sents.length, '');
+        for (var i = 0; i < w.sents.length; i++) {
+          w.sentsZh[i] = await translateCached(w.sents[i]);
+        }
+      }
+      if (w.paraZh.isNotEmpty || w.sentsZh.any((z) => z.isNotEmpty)) {
+        final id = engine.itemIdByQuestion(w.word);
+        if (id != null && engine.updateItemExplanation(id, _explanation(w))) {
+          updated++;
+        }
+      }
+      done++;
+      onProgress?.call(done, total);
+      await Future<void>.delayed(Duration.zero);
+    }
+    engine.save();
+    return updated;
   }
 }

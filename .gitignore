@@ -328,3 +328,6 @@ native/staticpy/wordlists/wc_build_wordlists.so
 # StaticPy card_cn artifacts
 native/staticpy/card_cn/wc_card_cn
 native/staticpy/card_cn/wc_card_cn.so
+
+# StaticPy ebook_text artifacts
+native/staticpy/ebook_text/wc_ebook_text

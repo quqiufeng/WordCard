@@ -16,66 +16,24 @@ FFI="$ROOT/native/staticpy/ffi.static.py"
 mkdir -p "$BUILD" /tmp/opencode
 [ -f "$BUILD_COMPILER" ] && [ -f "$FFI" ] || { echo "missing StaticPy compiler: $BUILD_COMPILER" >&2; exit 1; }
 
-cat > "$BUILD/wc_text_static.c" <<'C'
-// wordpick + txt2png → StaticPy 友好接口
-#include <stdio.h>
-#include <string.h>
-#include "wordpick.h"
-#include "txt2png/txt2png_bridge.h"
-
-int wc_wordpick_tsv(const char *freq, const char *text, const char *out, int max_words) {
-    if (max_words <= 0) max_words = 10;
-    if (max_words > 128) max_words = 128;
-    void *h = wp_create(freq);
-    if (!h) return -1;
-    wp_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.max_words = max_words;
-    cfg.target_zipf = 3.8f;
-    cfg.min_len = 5;
-    cfg.mode = 0;
-    cfg.level = 0;
-    cfg.known_zipf = 5.0f;
-    cfg.coverage_weight = 0.5f;
-    wp_word_t words[128];
-    int n = wp_select_ex(h, text ? text : "", &cfg, words, max_words);
-    wp_destroy(h);
-    if (n < 0) return -2;
-    FILE *f = fopen(out, "w");
-    if (!f) return -3;
-    for (int i = 0; i < n; i++) {
-        fprintf(f, "%s\t%.4f\t%.2f\t%d\t%d\t%s\n",
-                words[i].word, words[i].score, words[i].zipf,
-                words[i].count, words[i].level, words[i].context);
-    }
-    fclose(f);
-    return n;
-}
-
-int wc_render_png(const char *text, const char *font, const char *out) {
-    txt2png_bridge_style_t st;
-    memset(&st, 0, sizeof(st));
-    st.font_size = 32.0;
-    st.width = 800;
-    st.height = 0;
-    st.margin = 32;
-    st.leading = 1.4;
-    st.tolerance = 200;
-    st.fg_color = 0x1B365D;
-    st.bg_color = 0xF5F4ED;
-    st.nohyphen = 0;
-    st.hyphen_dict_path = NULL;
-    return txt2png_bridge_render_file(text ? text : "", font ? font : "", &st, out);
-}
-C
 
 cat > "$BUILD/wc_text.static.py" <<'PY'
 extern fn wc_wordpick_tsv(freq: str, text: str, out: str, max_words: int) -> int from "wc_text_static"
+extern fn wc_wordpick_tsv_file(freq: str, text_path: str, out: str, max_words: int) -> int from "wc_text_static"
 extern fn wc_render_png(text: str, font: str, out: str) -> int from "wc_text_static"
 
 def main():
     args = list_to_py_list(argv())
     n: int = py_list_length(args)
+    if n > 1 and py_list_ref(args, 1) == "--file":
+        if n < 5:
+            print("usage: wc_text --file <freq.tsv> <text.txt> <out.tsv> [max_words]")
+            exit_program(1)
+        max_words: int = 10
+        if n > 5: max_words = string_to_int(py_list_ref(args, 5))
+        print(wc_wordpick_tsv_file(py_list_ref(args, 2), py_list_ref(args, 3),
+                                   py_list_ref(args, 4), max_words))
+        exit_program(0)
     if n < 4:
         print("usage: wc_text <freq.tsv> <text> <out.tsv> [max_words]")
         exit_program(1)
@@ -86,7 +44,7 @@ def main():
 PY
 
 CC="${CC:-gcc}"
-$CC -O2 -fPIC -shared -I"$ROOT/src" -I"$ROOT/src/wordpick" -I"$ROOT/src/txt2png" "$BUILD/wc_text_static.c" \
+$CC -O2 -fPIC -shared -I"$ROOT/src" -I"$ROOT/src/wordpick" -I"$ROOT/src/txt2png" "$ROOT/native/src/wc_text_static.c" \
   -L"$ROOT/src" -lwordpick -ltxt2png -Wl,-rpath,'$ORIGIN/../../../src' \
   -o "$HERE/libwc_text_static.so"
 
