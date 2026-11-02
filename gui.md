@@ -1,7 +1,7 @@
 # WordCard UI 层技术架构
 
 > Flutter Desktop (Linux) + Yaru + dart:ffi → `libwordcard.so`
-> 文档版本: v1.0 — 2026-10-11
+> 文档版本: v1.1 — 2026-11-02
 
 ---
 
@@ -285,7 +285,7 @@ UI 按钮与 API 走同一入口：按钮点击 = `invoke(id)`；外部调用 = 
 
 ### 按钮动作 id
 
-- 导航：`nav.toggle` / `nav.home` / `nav.tasks` / `nav.import`
+- 导航：`nav.toggle` / `nav.home` / `nav.tasks` / `nav.import` / `nav.reader` / `nav.speech`
 - 记忆：`review.flip` / `review.know` / `review.dontKnow` / `review.restart` / `review.speakParagraph`
 - 导入：`import.dict.<name>` / `import.dict.all` / `import.ebook` / `import.paste` / `import.image`
 
@@ -509,6 +509,8 @@ cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/ap
 
 ## 十五、待办 / 后续
 
+> 统一维护在仓库根 `todolist.md`；本节只保留 UI 相关项。
+
 - [ ] 卡片图片导出（Flutter `RepaintBoundary` → PNG）
 - [ ] 深色模式调色板（Kami 暖米 ↔ 暖深）
 - [ ] 「中国色 / 系统色」主题切换设置项
@@ -517,4 +519,4 @@ cp gui/flutter/assets/icons/wordcard.png ~/.local/share/icons/hicolor/256x256/ap
 - [ ] 系统托盘常驻（需绕过 Flutter 隐藏窗口的 SEGV）
 - [ ] Snap 打包与 CI
 
-*最后更新: 2026-10-25*
+*最后更新: 2026-11-02*
