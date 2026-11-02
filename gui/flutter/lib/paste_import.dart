@@ -20,7 +20,7 @@ final class PasteImporter {
 
   static String? _root() {
     for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/tools/define_words.py').existsSync()) return c;
+      if (File('$c/native/staticpy/define/wc_define').existsSync()) return c;
     }
     return null;
   }
@@ -91,30 +91,51 @@ final class PasteImporter {
   }
 
   Future<Map<String, _Def>> _lookup(List<String> words) async {
-    final out = <String, _Def>{};
-    if (words.isEmpty) return out;
-    final root = _root();
-    if (root == null) return out;
-    final proc = await Process.start(
-      'python3',
-      ['$root/tools/define_words.py'],
-      workingDirectory: root,
-    );
-    proc.stdin.write(words.join('\n'));
-    await proc.stdin.flush();
-    await proc.stdin.close();
-    proc.stderr.drain<void>();
-    final lines =
-        proc.stdout.transform(utf8.decoder).transform(const LineSplitter());
-    await for (final line in lines) {
-      if (line.trim().isEmpty) continue;
-      try {
-        final d = json.decode(line) as Map<String, dynamic>;
-        out['${d['w']}'] = _Def(
-            '${d['ph'] ?? ''}', '${d['p'] ?? ''}', '${d['d'] ?? ''}');
-      } catch (_) {}
-    }
-    await proc.exitCode;
-    return out;
+    if (words.isEmpty) return {};
+    return await _lookupNative(words) ?? {};
   }
+
+  Future<Map<String, _Def>?> _lookupNative(List<String> words) async {
+    final root = _root();
+    if (root == null) return null;
+    final bin = File('$root/native/staticpy/define/wc_define');
+    if (!bin.existsSync()) return null;
+    try {
+      final env = Map<String, String>.from(Platform.environment);
+      env['LD_LIBRARY_PATH'] = [
+        '$root/native/staticpy/define',
+        '$root/native/staticpy/translate',
+        env['LD_LIBRARY_PATH'] ?? '',
+      ].where((e) => e.isNotEmpty).join(':');
+      final proc = await Process.start(
+        bin.path,
+        words,
+        workingDirectory: root,
+        environment: env,
+      );
+      proc.stdin.write(words.join('\n'));
+      await proc.stdin.flush();
+      await proc.stdin.close();
+      proc.stderr.drain<void>();
+      final out = <String, _Def>{};
+      var idx = 0;
+      await for (final line
+          in proc.stdout.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (idx >= words.length) break;
+        final w = words[idx++];
+        final text = line.trim();
+        if (text.isEmpty) continue;
+        final p = text.split('\t');
+        out[w] = p.length >= 4
+            ? _Def(p[1], p[2], p[3])
+            : _Def('', '', text);
+      }
+      final code = await proc.exitCode;
+      if (code != 0) return null;
+      return out.length == words.length ? out : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
 }

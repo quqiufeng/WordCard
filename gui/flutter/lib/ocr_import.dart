@@ -7,7 +7,7 @@ final class OcrImporter {
 
   static String? _root() {
     for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/tools/ocr_image.py').existsSync()) return c;
+      if (File('$c/native/staticpy/ocr/wc_ocr').existsSync()) return c;
     }
     return null;
   }
@@ -48,16 +48,22 @@ final class OcrImporter {
 
   Future<String> recognize(String imagePath) async {
     final root = _root();
-    if (root == null) throw StateError('未找到 tools/ocr_image.py');
+    if (root == null) throw StateError('未找到 OCR 实现');
     final tmp = File('${Directory.systemTemp.path}/wc_ocr_'
         '${DateTime.now().microsecondsSinceEpoch}.txt');
     final env = Map<String, String>.from(Platform.environment);
     final ort = Platform.environment['WC_ORT_LIB'] ?? _defaultOrt;
-    env['LD_LIBRARY_PATH'] = '$ort:${env['LD_LIBRARY_PATH'] ?? ''}';
+    env['LD_LIBRARY_PATH'] = [
+      '$root/native/staticpy/ocr',
+      '$root/voice/libs',
+      ort,
+      env['LD_LIBRARY_PATH'] ?? '',
+    ].where((e) => e.isNotEmpty).join(':');
     try {
+      final native = File('$root/native/staticpy/ocr/wc_ocr');
       final r = await Process.run(
-        'python3',
-        ['$root/tools/ocr_image.py', imagePath, '--out', tmp.path],
+        native.path,
+        [imagePath, tmp.path],
         workingDirectory: root,
         environment: env,
       );

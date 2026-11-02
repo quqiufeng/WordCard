@@ -64,7 +64,7 @@ Python 层
  ├── importer.py  ────────── 电子书解析 → 词汇提取 → DB
  ├── txt2png.py   ────────── 画布 API → libtxt2png.so
  ├── voice.py     ────────── ASR/TTS → libvoice_engine.so
- └── generate_card.py ────── 多格式输出 (MD/PNG/PDF)
+ └── native/staticpy/card_txt ─ 多格式输出 (MD/PNG/PDF)
 
 C/C++ 层
  ├── libwordcard.so     ───── SM-2 学习引擎 (wordcard.c + modes.c)
@@ -171,7 +171,7 @@ WordCard/
 ├── api.py                       # FastAPI REST
 ├── txt2png.py                   # 画布 API (Canvas)
 ├── voice.py                     # ASR/TTS (Qwen3-ASR / SenseVoice / Piper)
-├── generate_card.py             # 多格式卡片输出
+├── native/staticpy/card_txt      # 多格式卡片输出（StaticPy）
 │
 ├── importer/
 │   ├── wrappers/                # C++ 电子书解析

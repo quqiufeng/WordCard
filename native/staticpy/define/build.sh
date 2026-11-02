@@ -19,7 +19,9 @@ cat > "$BUILD/wc_define.c" <<'C'
 
 static char g_buf[8192];
 
-const char *wc_define_word(const char *word, const char *dict) {
+int wc_translate(const char *text, const char *out_path, const char *url, const char *model);
+
+const char *wc_define_word(const char *word, const char *dict, const char *url, const char *model) {
     if (!word || !dict) return "";
     FILE *f = fopen(dict, "r");
     if (!f) return "";
@@ -38,37 +40,56 @@ const char *wc_define_word(const char *word, const char *dict) {
         }
     }
     fclose(f);
-    g_buf[0] = 0;
+    if (url && *url) {
+        char prompt[2048], tmp[256] = "/tmp/opencode/wc_define.txt";
+        snprintf(prompt, sizeof(prompt),
+                 "Give a concise Chinese dictionary definition for the English word: %s. Only output the definition.", word);
+        if (wc_translate(prompt, tmp, url, model) == 0) {
+            FILE *tf = fopen(tmp, "r");
+            if (tf) {
+                size_t r = fread(g_buf, 1, sizeof(g_buf)-1, tf); fclose(tf); g_buf[r] = 0;
+                while (r && (g_buf[r-1]=='\n'||g_buf[r-1]=='\r'||g_buf[r-1]==' ')) g_buf[--r] = 0;
+            }
+        }
+    }
     return g_buf;
 }
 C
 
 cat > "$BUILD/wc_define.static.py" <<'PY'
-extern fn wc_define_word(word: str, dict: str) -> str from "wc_define"
+extern fn wc_define_word(word: str, dict: str, url: str, model: str) -> str from "wc_define"
 
 def main():
     args = list_to_py_list(argv())
     n: int = py_list_length(args)
     if n < 2:
-        print("usage: wc_define <word> [word...] [--dict path]")
+        print("usage: wc_define <word> [word...] [--dict path] [--url url] [--model name]")
         exit_program(1)
     dict: str = "data/wordlists/cet4.tsv"
-    end: int = n
+    url: str = ""
+    model: str = ""
+    words = py_list()
     i: int = 1
     while i < n:
-        if py_list_ref(args, i) == "--dict" and i + 1 < n:
-            dict = py_list_ref(args, i + 1)
-            end = i
-            break
-        i += 1
-    i = 1
-    while i < end:
-        print(wc_define_word(py_list_ref(args, i), dict))
+        a: str = py_list_ref(args, i)
+        if a == "--dict" and i + 1 < n:
+            dict = py_list_ref(args, i + 1); i += 2
+        elif a == "--url" and i + 1 < n:
+            url = py_list_ref(args, i + 1); i += 2
+        elif a == "--model" and i + 1 < n:
+            model = py_list_ref(args, i + 1); i += 2
+        else:
+            words = py_list_append(words, a); i += 1
+    i = 0
+    while i < py_list_length(words):
+        print(wc_define_word(py_list_ref(words, i), dict, url, model))
         i += 1
 PY
 
 CC="${CC:-gcc}"
-$CC -O2 -fPIC -shared "$BUILD/wc_define.c" -o "$HERE/libwc_define.so"
+$CC -O2 -fPIC -shared "$BUILD/wc_define.c" \
+  -L"$ROOT/native/staticpy/translate" -lwc_translate -lcurl -lcjson \
+  -Wl,-rpath,'$ORIGIN/../translate' -o "$HERE/libwc_define.so"
 
 sed '/^extern fn /d' "$BUILD/wc_define.static.py" > "$BUILD/wc_define.body.py"
 grep -E '^extern fn wc_define_' "$FFI" > "$BUILD/wc_define.ffi.py"

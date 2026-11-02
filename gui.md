@@ -210,7 +210,7 @@ abstract final class AppFonts {
 |------|---------|------|
 | 考试词表 | `import.dict.<name>` / `import.dict.all` | 读 `data/wordlists/<name>.tsv`（ECDICT 生成） |
 | 电子书 | `import.ebook` | `tools/ebook_extract.py` 解析 + ECDICT 释义 + `tools/ebook_translate.py` LLM 译段落/例句 |
-| 粘贴词表 | `import.paste` | 支持**词组**（按首个中文切分 `look after 照顾`）→ `tools/define_words.py` 查词 |
+| 粘贴词表 | `import.paste` | 支持**词组**（按首个中文切分 `look after 照顾`）→ `native/staticpy/define/wc_define` 查词 |
 | 图片 OCR | `import.image` | PP-OCRv4 识别（可多选）→ 复用粘贴导入 |
 
 - **单词释义 = 词典**：离线查 **ECDICT**（`tools/bilingual.py`，秒级，含音标/词性/中英释义），
@@ -231,7 +231,7 @@ abstract final class AppFonts {
   - **默认本地 LLM**；也可改用在线翻译：在 `.env` 配
     `WC_TRANSLATE_BACKEND=deepseek`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_API_KEY`
     （OpenAI 兼容），此时不启动本地模型/终端。`auto` 才根据 key 自动选择。
-- **OCR**：`tools/ocr_image.py` 调 `libocr_simple.so` + `models/ocr/` 的 PP-OCRv4 模型
+- **OCR**：`native/staticpy/ocr/wc_ocr` 调 `libocr_simple.so` + `models/ocr/` 的 PP-OCRv4 模型
   （det/rec onnx + 字典）；需 onnxruntime `VERS_1.26.0`，App 通过
   `LD_LIBRARY_PATH=/data/venv/onnxruntime-linux-x64-gpu-1.26.0/lib`（`WC_ORT_LIB` 可覆盖）传入。
 - **TTS**：`tools/tts_server.py` 常驻（Kokoro/sherpa-onnx，模型只加载一次），

@@ -19,6 +19,16 @@ else
     echo "[1/3] 复用已有 $ROOT/src/libwordcard.so"
 fi
 
+# 1.5) StaticPy 原生查词（可选；失败则 App 回退 Python）
+if [ -f /opt/StaticPy/staticpy/static_build_comfycli.sh ] &&
+   [ -f "$ROOT/native/staticpy/translate/build.sh" ] &&
+   [ -f "$ROOT/native/staticpy/define/build.sh" ]; then
+    echo "[1.5/3] 编译 StaticPy wc_define ..."
+    bash "$ROOT/native/staticpy/translate/build.sh" >/tmp/opencode/wc_translate_build.log 2>&1 || true
+    bash "$ROOT/native/staticpy/define/build.sh" >/tmp/opencode/wc_define_build.log 2>&1 || true
+    bash "$ROOT/native/staticpy/ocr/build.sh" >/tmp/opencode/wc_ocr_build.log 2>&1 || true
+fi
+
 # 2) Flutter SDK
 if [ ! -x "$FLUTTER" ]; then
     echo "未找到 Flutter SDK: $FLUTTER" >&2

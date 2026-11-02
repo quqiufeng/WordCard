@@ -288,3 +288,31 @@ native/staticpy/define/wc_define.so
 # StaticPy OCR POC artifacts
 native/staticpy/ocr/wc_ocr
 native/staticpy/ocr/wc_ocr.so
+
+# StaticPy translate POC artifacts
+native/staticpy/translate/wc_translate
+native/staticpy/translate/wc_translate.so
+
+# StaticPy import_wordlist POC artifacts
+native/staticpy/import_wordlist/wc_import_wordlist
+native/staticpy/import_wordlist/wc_import_wordlist.so
+
+# StaticPy import_book POC artifacts
+native/staticpy/import_book/wc_import_book
+native/staticpy/import_book/wc_import_book.so
+
+# StaticPy capture POC artifacts
+native/staticpy/capture/wc_capture
+native/staticpy/capture/wc_capture.so
+
+# StaticPy backfill POC artifacts
+native/staticpy/backfill/wc_backfill
+native/staticpy/backfill/wc_backfill.so
+
+# StaticPy vocab_card POC artifacts
+native/staticpy/vocab_card/wc_vocab_card
+native/staticpy/vocab_card/wc_vocab_card.so
+
+# StaticPy backfill_memo POC artifacts
+native/staticpy/backfill_memo/wc_backfill_memo
+native/staticpy/backfill_memo/wc_backfill_memo.so
