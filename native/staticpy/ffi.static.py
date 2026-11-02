@@ -35,3 +35,15 @@ extern fn wc_canvas_measure(c: ptr, font: str, fs: int, text: str) -> int from "
 extern fn wc_canvas_line(c: ptr, x1: int, y1: int, x2: int, y2: int, color: int, width: int) -> int from "wc_card"
 extern fn wc_canvas_rect(c: ptr, x: int, y: int, w: int, h: int, color: int, filled: int) -> int from "wc_card"
 extern fn wc_canvas_save(c: ptr, path: str) -> int from "wc_card"
+
+# full card from _trans.txt
+extern fn wc_card_txt(input: str, png: str, md: str, pdf: str) -> int from "wc_card_txt"
+
+# markdown importer
+extern fn wc_import_md(md: str, db: str, tag: str, max_words: int, freq: str) -> int from "wc_import_md"
+
+# define / bilingual lookup
+extern fn wc_define_word(word: str, dict: str) -> str from "wc_define"
+
+# OCR
+extern fn wc_ocr(image: str, out_path: str) -> int from "wc_ocr"

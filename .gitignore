@@ -272,3 +272,19 @@ native/staticpy/cli/wc_cli.so
 # StaticPy card POC artifacts
 native/staticpy/card/wc_card
 native/staticpy/card/wc_card.so
+
+# StaticPy card_txt POC artifacts
+native/staticpy/card_txt/wc_card_txt
+native/staticpy/card_txt/wc_card_txt.so
+
+# StaticPy import_md POC artifacts
+native/staticpy/import_md/wc_import_md
+native/staticpy/import_md/wc_import_md.so
+
+# StaticPy define POC artifacts
+native/staticpy/define/wc_define
+native/staticpy/define/wc_define.so
+
+# StaticPy OCR POC artifacts
+native/staticpy/ocr/wc_ocr
+native/staticpy/ocr/wc_ocr.so
