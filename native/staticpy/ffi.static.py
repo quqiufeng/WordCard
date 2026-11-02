@@ -12,6 +12,7 @@ extern fn wc_static_review(db_path: str, user_id: int, item_id: int, quality: in
 extern fn voice_static_tts(text: str, out_path: str, sid: str) -> int from "voice_static"
 extern fn voice_static_asr(wav: str, lang: str) -> str from "voice_static"
 extern fn voice_static_play(wav: str) -> int from "voice_static"
+extern fn voice_static_say(text: str, sid: str) -> int from "voice_static"
 extern fn voice_static_convert(input_path: str, output_path: str, rate: int) -> int from "voice_static"
 extern fn voice_static_record(out: str, seconds: int, rate: int, device: str) -> int from "voice_static"
 extern fn voice_static_wav_info(wav: str) -> str from "voice_static"
@@ -60,6 +61,7 @@ extern fn wc_import_wordlist(tsv: str, db: str, name: str, limit: int) -> int fr
 
 # ebook importer (PDF/MOBI/EPUB/MD)
 extern fn wc_import_book(path: str, db: str, tag: str, max_words: int, freq: str) -> int from "wc_import_book"
+extern fn wc_ebook_json(path: str, out: str, max_words: int, dict: str, freq: str) -> int from "wc_ebook_json"
 
 # capture
 extern fn wc_capture(out: str, seconds: int, device: str) -> int from "wc_capture"

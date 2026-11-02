@@ -63,6 +63,13 @@ const char *voice_static_asr(const char *wav, const char *lang) {
 
 int voice_static_play(const char *wav) { return voice_play_wav(wav, NULL); }
 
+int voice_static_say(const char *text, const char *sid) {
+    const char *out = "/tmp/opencode/wc_tts.wav";
+    int rc = voice_static_tts(text, out, sid);
+    if (rc != 0) return rc;
+    return voice_static_play(out);
+}
+
 int voice_static_record(const char *out, int seconds, int rate, const char *device) {
     if (!out || !*out) return -1;
     char sr[16], st[16];
@@ -126,12 +133,40 @@ extern fn voice_static_tts(text: str, out_path: str, sid: str) -> int from "voic
 extern fn voice_static_asr(wav: str, lang: str) -> str from "voice_static"
 extern fn voice_static_record(out: str, seconds: int, rate: int, device: str) -> int from "voice_static"
 extern fn voice_static_wav_info(wav: str) -> str from "voice_static"
+extern fn voice_static_play(wav: str) -> int from "voice_static"
+extern fn voice_static_say(text: str, sid: str) -> int from "voice_static"
 
 def main():
-    print(voice_static_tts("测试语音", "/tmp/opencode/wc_voice.wav", "3"))
-    print(voice_static_asr("/tmp/opencode/wc_voice.wav", "zh"))
-    print(voice_static_record("/tmp/opencode/wc_record.wav", 1, 16000, "plughw:CARD=Webcams,0"))
-    print(voice_static_wav_info("/tmp/opencode/wc_record.wav"))
+    args = list_to_py_list(argv())
+    n: int = py_list_length(args)
+    cmd: str = ""
+    if n > 1: cmd = py_list_ref(args, 1)
+    if cmd == "say" and n > 2:
+        sid: str = "3"
+        if n > 3: sid = py_list_ref(args, 3)
+        print(voice_static_say(py_list_ref(args, 2), sid))
+    elif cmd == "tts" and n > 3:
+        sid: str = "3"
+        if n > 4: sid = py_list_ref(args, 4)
+        print(voice_static_tts(py_list_ref(args, 2), py_list_ref(args, 3), sid))
+    elif cmd == "play" and n > 2:
+        print(voice_static_play(py_list_ref(args, 2)))
+    elif cmd == "asr" and n > 2:
+        lang: str = "auto"
+        if n > 3: lang = py_list_ref(args, 3)
+        print(voice_static_asr(py_list_ref(args, 2), lang))
+    elif cmd == "record" and n > 2:
+        seconds: int = 3
+        if n > 3: seconds = string_to_int(py_list_ref(args, 3))
+        rate: int = 16000
+        if n > 4: rate = string_to_int(py_list_ref(args, 4))
+        device: str = "default"
+        if n > 5: device = py_list_ref(args, 5)
+        print(voice_static_record(py_list_ref(args, 2), seconds, rate, device))
+    elif cmd == "wavinfo" and n > 2:
+        print(voice_static_wav_info(py_list_ref(args, 2)))
+    else:
+        print("usage: wc_voice say|tts|play|asr|record|wavinfo ...")
 PY
 
 CC="${CC:-gcc}"

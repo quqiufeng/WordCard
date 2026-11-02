@@ -139,7 +139,7 @@ mv -f "$STATICPY_ROOT/wc_native.so" "$HERE/wc_native.so"
 echo "built: $HERE/wc_native"
 
 # 其余 StaticPy 脚本共用 ffi.static.py，一次编译全部
-for sub in voice capture text card card_txt import_md import_wordlist import_book translate define ocr backfill backfill_memo vocab_card cli; do
+for sub in voice capture text card card_txt import_md import_wordlist import_book ebook_json translate define ocr backfill backfill_memo vocab_card cli; do
   if [ -f "$HERE/$sub/build.sh" ]; then
     bash "$HERE/$sub/build.sh"
   fi

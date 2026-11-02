@@ -67,7 +67,7 @@ final class ReaderLibrary {
 
   static String? _appRoot() {
     for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/tools/memo_server.py').existsSync()) {
+      if (File('$c/native/staticpy/translate/wc_translate').existsSync()) {
         return Directory(c).absolute.path;
       }
     }

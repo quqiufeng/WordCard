@@ -47,8 +47,8 @@ final class BookExtract {
 
 /// 电子书导入。
 ///
-/// 策略（已定）：单词释义走本地 **ECDICT 词典**；
-/// 段落/例句由本地 **LLM 异步翻译**（`tools/ebook_translate.py`）并动态回填。
+/// 策略（已定）：解析与取词走 StaticPy `wc_ebook_json`；
+/// 单词释义走本地 **ECDICT 词典**，段落翻译后续接原生 LLM。
 final class EbookImporter {
   EbookImporter(this.engine);
 
@@ -57,16 +57,11 @@ final class EbookImporter {
   static String? _root() {
     const candidates = ['.', '/opt/WordCard'];
     for (final c in candidates) {
-      if (File('$c/tools/ebook_extract.py').existsSync()) return c;
+      if (File('$c/native/staticpy/ebook_json/wc_ebook_json').existsSync()) {
+        return c;
+      }
     }
     return null;
-  }
-
-  static String _slug(String path) {
-    final base = path.split('/').last;
-    final name =
-        base.contains('.') ? base.substring(0, base.lastIndexOf('.')) : base;
-    return name.replaceAll(RegExp(r'[^\w\u4e00-\u9fff-]+'), '_');
   }
 
   static String _truncUtf8(String s, int maxBytes) {
@@ -95,26 +90,26 @@ final class EbookImporter {
     void Function(String stage)? onStage,
   }) async {
     final root = _root();
-    if (root == null) throw StateError('未找到 tools/ebook_extract.py');
+    if (root == null) throw StateError('未找到 native/staticpy/ebook_json/wc_ebook_json');
     onStage?.call('解析中');
-    final slug = _slug(bookPath);
-    final dir = Directory('$root/data/books')..createSync(recursive: true);
-    final bilingual = File('${dir.path}/$slug.tsv');
-    final material = File('${dir.path}/$slug.jsonl');
     final tmp = File('${Directory.systemTemp.path}/wordcard_'
         '${DateTime.now().microsecondsSinceEpoch}.json');
     try {
       final r = await Process.run(
-        'python3',
+        '$root/native/staticpy/ebook_json/wc_ebook_json',
         [
-          '$root/tools/ebook_extract.py',
           bookPath,
-          '--max', '$max',
-          '--bilingual', bilingual.path,
-          '--material', material.path,
-          '--out', tmp.path,
+          tmp.path,
+          '$max',
+          '$root/data/wordlists/cet4.tsv',
+          '$root/src/wordpick/en_freq.tsv',
         ],
         workingDirectory: root,
+        environment: {
+          ...Platform.environment,
+          'LD_LIBRARY_PATH':
+              '$root/native/staticpy/ebook_json:$root/importer/libs:$root/src',
+        },
       );
       if (r.exitCode != 0 || !tmp.existsSync()) {
         throw StateError('解析失败: ${(r.stderr as String).trim()}');
@@ -136,8 +131,6 @@ final class EbookImporter {
         title: '${data['title'] ?? ''}',
         author: '${data['author'] ?? ''}',
         words: words,
-        bilingualPath: bilingual.path,
-        materialPath: material.path,
       );
     } finally {
       if (tmp.existsSync()) tmp.deleteSync();
@@ -199,51 +192,13 @@ final class EbookImporter {
     return added;
   }
 
-  /// 异步用 LLM 翻译段落/例句，逐条**动态回填** explanation。
+  /// 段落/例句翻译待接入原生 LLM 批处理；当前导入不阻塞。
   Future<int> translateAll(
     BookExtract extract, {
     void Function(int done, int total)? onProgress,
   }) async {
-    final root = _root();
-    final material = extract.materialPath;
-    if (root == null || material == null || extract.words.isEmpty) return 0;
-    final byWord = {for (final w in extract.words) w.word: w};
-    var updated = 0;
-    var done = 0;
-    try {
-      final proc = await Process.start(
-        'python3',
-        ['$root/tools/ebook_translate.py', '--material', material],
-        workingDirectory: root,
-      );
-      proc.stderr.drain<void>();
-      final lines = proc.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
-      await for (final line in lines) {
-        if (line.trim().isEmpty) continue;
-        done++;
-        try {
-          final d = json.decode(line) as Map<String, dynamic>;
-          final w = byWord['${d['w']}'];
-          if (w == null) continue;
-          w.paraZh = '${d['para_zh'] ?? ''}';
-          w.sentsZh = (d['sents_zh'] as List? ?? []).map((s) => '$s').toList();
-          w.memo = '${d['memo'] ?? ''}';
-          final id = engine.itemIdByQuestion(w.word);
-          if (id != null && engine.updateItemExplanation(id, _explanation(w))) {
-            updated++;
-          }
-        } catch (_) {
-          // 跳过无法解析的行
-        }
-        onProgress?.call(done, extract.words.length);
-      }
-      await proc.exitCode;
-      engine.save();
-    } finally {
-      // 物料文件由脚本原地补全，保留供下次加载
-    }
-    return updated;
+    if (extract.words.isEmpty) return 0;
+    onProgress?.call(extract.words.length, extract.words.length);
+    return 0;
   }
 }

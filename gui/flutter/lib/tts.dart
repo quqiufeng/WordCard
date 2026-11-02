@@ -1,85 +1,69 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-/// 常驻 TTS 客户端：懒启动 `tools/tts_server.py`（模型只加载一次），
-/// 之后 [speak] 只需写入一行文本即可朗读。
+/// TTS 客户端：调用 StaticPy 原生 `wc_voice say`，不再依赖 Python 常驻服务。
 final class TtsService {
   TtsService._();
 
   static final TtsService instance = TtsService._();
 
-  /// 正在合成（即将播放）的文本；完成广播后置空。用于播放按钮的等待动画。
   final ValueNotifier<String?> busy = ValueNotifier<String?>(null);
 
   Process? _proc;
   String? _root;
+  String? _binary;
 
   String? _findRoot() {
     for (final c in ['.', '/opt/WordCard']) {
-      if (File('$c/tools/tts_server.py').existsSync()) return c;
+      if (File('$c/native/staticpy/voice/wc_voice').existsSync()) return c;
     }
     return null;
   }
 
-  /// 预启动守护进程（加载模型）。
   Future<void> start() async {
-    if (_proc != null) return;
     _root ??= _findRoot();
     if (_root == null) return;
-    try {
-      final p = await Process.start(
-        'python3',
-        ['$_root/tools/tts_server.py'],
-        workingDirectory: _root,
-      );
-      p.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen(_onLine, onDone: () {
-        if (identical(_proc, p)) _proc = null;
-      });
-      p.stderr.drain<void>();
-      p.exitCode.then((_) {
-        if (identical(_proc, p)) _proc = null;
-      });
-      _proc = p;
-    } catch (_) {
-      _proc = null;
-    }
+    _binary ??= '$_root/native/staticpy/voice/wc_voice';
   }
 
-  void _onLine(String line) {
-    final i = line.indexOf('\t');
-    if (i < 0) return;
-    final tag = line.substring(0, i);
-    final text = line.substring(i + 1);
-    if ((tag == 'PLAY' || tag == 'OK') && busy.value == text) {
-      busy.value = null;
-    }
-  }
-
-  /// 朗读一段文本（英文单词/句子）；[sid] 可指定 Kokoro 音色（47=中文女声）。
   void speak(String text, {int? sid}) {
     final t = text.trim();
     if (t.isEmpty) return;
     busy.value = t;
-    final payload = sid == null ? t : jsonEncode({'text': t, 'sid': sid});
-    final p = _proc;
-    if (p == null) {
-      start().then((_) => _write(payload));
-    } else {
-      _write(payload);
-    }
+    _run(t, sid ?? 3);
   }
 
-  void _write(String payload) {
-    try {
-      _proc?.stdin.writeln(payload);
-    } catch (_) {
-      _proc = null;
+  Future<void> _run(String text, int sid) async {
+    await start();
+    final bin = _binary;
+    if (bin == null) {
       busy.value = null;
+      return;
+    }
+    final old = _proc;
+    _proc = null;
+    old?.kill();
+    try {
+      final p = await Process.start(
+        bin,
+        ['say', text, '$sid'],
+        environment: {
+          ...Platform.environment,
+          'LD_LIBRARY_PATH':
+              '$_root/native/staticpy/voice:$_root/voice/libs',
+        },
+      );
+      _proc = p;
+      p.stdout.drain<void>();
+      p.stderr.drain<void>();
+      await p.exitCode;
+      if (identical(_proc, p)) {
+        _proc = null;
+        if (busy.value == text) busy.value = null;
+      }
+    } catch (_) {
+      if (busy.value == text) busy.value = null;
     }
   }
 

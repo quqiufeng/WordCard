@@ -160,8 +160,8 @@ class _ImportPageState extends State<ImportPage> {
       if (!mounted) return;
       setState(() {
         _ebookStage = null;
-        _ebookMsg = '《${extract.title}》新增 $added 词，译文回填 $translated 条；'
-            '对照文件: ${extract.bilingualPath}';
+        _ebookMsg = '《${extract.title}》新增 $added 词'
+            '${translated > 0 ? '，译文回填 $translated 条' : ''}';
       });
     } catch (e) {
       if (!mounted) return;
