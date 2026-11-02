@@ -77,3 +77,6 @@ extern fn wc_backfill_memo(db: str, limit: int, url: str, model: str) -> int fro
 
 extern fn wc_cli_import(path: str, db: str, name: str, max_words: int) -> int from "wc_cli"
 extern fn wc_cli_review_interactive(db_path: str, user_id: int) -> int from "wc_cli"
+
+# wordlist generator
+extern fn wc_build_wordlists(cache: str, out: str, mask: int, refresh: int) -> int from "wc_build_wordlists"

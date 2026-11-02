@@ -247,7 +247,7 @@ class _ImportPageState extends State<ImportPage> {
           const ListTile(
             leading: Icon(Icons.folder_off_outlined, color: Kami.faint),
             title: Text('未找到词表数据'),
-            subtitle: Text('运行: python3 tools/build_wordlists.py'),
+            subtitle: Text('运行: native/staticpy/wordlists/wc_build_wordlists'),
           )
         else
           ..._lists.map((i) => _wordlistTile(theme, i)),

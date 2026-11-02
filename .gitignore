@@ -320,3 +320,7 @@ native/staticpy/backfill_memo/wc_backfill_memo.so
 # StaticPy ebook_json artifacts
 native/staticpy/ebook_json/wc_ebook_json
 native/staticpy/ebook_json/wc_ebook_json.so
+
+# StaticPy wordlists artifacts
+native/staticpy/wordlists/wc_build_wordlists
+native/staticpy/wordlists/wc_build_wordlists.so

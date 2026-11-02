@@ -18,7 +18,7 @@ final class WordlistInfo {
 
 /// 读取 `data/wordlists/` 下的词表并通过 FFI 导入 DB。
 ///
-/// 数据由 `tools/build_wordlists.py` 从 ECDICT 生成，TSV 为单行 5 列:
+/// 数据由 `wc_build_wordlists` 从 ECDICT 生成，TSV 为单行 5 列:
 /// word \t phonetic \t pos \t translation \t tag
 final class WordlistService {
   WordlistService(this.engine);
